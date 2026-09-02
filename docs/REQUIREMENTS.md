@@ -350,7 +350,7 @@ no CRS/GSD + "How many hectares?"
 
 **Level:** MUST
 
-Analytical outputs SHOULD be represented internally as structured evidence before final language generation.
+Analytical outputs MUST be represented internally as structured evidence before final language generation.
 
 Possible evidence types:
 
@@ -653,7 +653,7 @@ The UI MUST support image upload and display:
 
 **Level:** MUST
 
-The primary analysis interface SHOULD be centered on the imagery/map rather than a chat-only view.
+The primary analysis interface MUST be centered on the imagery/map rather than a chat-only view.
 
 ---
 
@@ -758,7 +758,7 @@ VQA evaluation SHOULD include:
 
 **Level:** MUST
 
-Change evaluation SHOULD include:
+Change evaluation MUST include:
 
 ```text
 T1 + T2
@@ -918,7 +918,7 @@ Annotations derived from the same underlying scene/pair MUST NOT be split across
 
 **Level:** MUST
 
-Where available, training samples SHOULD retain:
+Where available, training samples MUST retain:
 
 - sensor,
 - modality,
