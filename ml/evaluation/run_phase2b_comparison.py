@@ -23,7 +23,9 @@ from ml.training.phase2b import (
     model_cache_dir,
     resolve_image_path,
     sha256_file,
+    hardware_report,
 )
+from ml.training.precision import select_precision
 from satquery.inference.preprocessing import FrozenImagePreprocessor
 from satquery.registry import load_model_registry, load_preprocessing_registry
 
@@ -85,7 +87,8 @@ def run_comparison(
         local_files_only=True,
         trust_remote_code=registration.allow_remote_code,
     )
-    dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
+    precision = select_precision(torch)
+    dtype = precision.torch_dtype(torch)
     preprocessor = FrozenImagePreprocessor(profile)
 
     started = time.perf_counter()
@@ -197,6 +200,7 @@ def run_comparison(
         "adapter": str(adapter_dir.resolve()),
         "metrics": metrics,
         "elapsed_seconds": round(time.perf_counter() - started, 4),
+        "runtime": hardware_report(torch, precision),
         "warning": (
             "Use this test comparison only after training and validation choices are frozen."
         ),

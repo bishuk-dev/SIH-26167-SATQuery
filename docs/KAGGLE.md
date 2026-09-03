@@ -5,9 +5,20 @@ Kaggle is only an execution host. The notebook does not contain dataset, preproc
 ## Notebook setup
 
 1. Create a Kaggle notebook and import `notebooks/kaggle_phase2b.ipynb`, or upload that file directly.
-2. In **Settings**, select a GPU accelerator. A T4 or P100 with 16 GB VRAM is recommended; the configuration uses batch size 1, gradient accumulation, 512 × 512 inputs, and LoRA on the 256M SmolVLM checkpoint. The pipeline requires CUDA and is designed for at least 8 GB VRAM, but the first Kaggle smoke run must confirm the measured peak on the assigned GPU.
+2. In **Settings**, select a GPU accelerator. The verified target is `Tesla P100-PCIE-16GB` (Pascal, compute capability 6.0). The configuration uses batch size 1, gradient accumulation, 512 × 512 inputs, and LoRA on the 256M SmolVLM checkpoint.
 3. Enable **Internet**. It is required to clone/pull GitHub, install training extras, and download the pinned model and RSVQA-LR data. Internet can be disabled only when the repository, Python packages, model snapshot, manifest, and images are supplied through `/kaggle/input`.
-4. Run all cells. The notebook prints Python, PyTorch, CUDA, GPU name, VRAM, and BF16 support before doing any work. It then runs exactly one optimizer step and one validation inference. The disposable base-model cache is placed under `/kaggle/temp`; adapter checkpoints and metrics remain under `/kaggle/working`.
+4. Run all cells from a fresh session. The first code cell removes incompatible `torchao` before any PyTorch import and pins `torch==2.8.0`, `torchvision==0.23.0`, and `torchaudio==2.8.0` from the CUDA 12.6 wheel index. The next cell asserts `torch==2.8.0+cu126`, then prints Python, PyTorch, CUDA, GPU name, VRAM, compute capability, and the runtime's BF16 report. It then runs exactly one optimizer step and one validation inference. The disposable base-model cache is placed under `/kaggle/temp`; adapter checkpoints and metrics remain under `/kaggle/working`.
+
+The P100 always runs Phase 2B in FP16. SatQuery does not trust `torch.cuda.is_bf16_supported()` by itself: BF16 is selected only when the runtime reports support **and** the GPU compute capability is at least 8.0 (Ampere or newer). CPU debugging remains FP32.
+
+Equivalent bootstrap commands are:
+
+```bash
+python -m pip uninstall -y torchao
+python -m pip install --no-cache-dir \
+  torch==2.8.0 torchvision==0.23.0 torchaudio==2.8.0 \
+  --index-url https://download.pytorch.org/whl/cu126
+```
 
 Override `SATQUERY_REPO_URL` when running a fork or private mirror. For a prepared Kaggle Dataset, set `SATQUERY_DATA_ROOT` to its read-only `/kaggle/input/<dataset>` directory; otherwise the repository preparation command downloads images to `/kaggle/working`.
 

@@ -43,3 +43,5 @@ python -m ml.training.phase2b \
 ```
 
 Use `--smoke-test` for one optimizer step and one validation inference. Kaggle-specific setup and resume instructions are in `docs/KAGGLE.md`.
+
+Mixed precision is hardware-gated in one shared module for training and comparison: CPU uses FP32, CUDA devices below compute capability 8.0 use FP16, and BF16 requires both capability 8.0+ and a positive PyTorch runtime check. This prevents the P100/Pascal false-positive BF16 report observed on Kaggle.

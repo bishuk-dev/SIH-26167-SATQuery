@@ -6,7 +6,8 @@ from pathlib import Path
 
 from ml.evaluation.run_phase2b_comparison import _scene_balanced_subset
 from ml.training.config import load_training_config
-from ml.training.phase2b import VqaSample
+from ml.training.phase2b import VqaSample, hardware_report
+from ml.training.precision import choose_precision_name, select_precision
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -62,6 +63,10 @@ def test_kaggle_notebook_is_thin_and_invokes_repository_entrypoint() -> None:
     assert "ml.evaluation.prepare_phase2b_rsvqa" in source
     assert "ml.training.phase2b" in source
     assert "--smoke-test" in source
+    assert "pip', 'uninstall', '-y', 'torchao'" in source
+    assert "'torch==2.8.0'" in source
+    assert "https://download.pytorch.org/whl/cu126" in source
+    assert source.index("'torchao'") < source.index("import torch")
     assert "from peft" not in source
     assert "Trainer(" not in source
 
@@ -88,3 +93,76 @@ def test_comparison_subset_samples_across_scenes() -> None:
         "a-1",
         "b-1",
     ]
+
+
+def test_pascal_uses_fp16_even_when_runtime_claims_bf16() -> None:
+    assert choose_precision_name(
+        cuda_available=True,
+        compute_capability=(6, 0),
+        bf16_runtime_reported=True,
+    ) == "fp16"
+
+
+def test_ampere_uses_bf16_only_when_runtime_supports_it() -> None:
+    assert choose_precision_name(
+        cuda_available=True,
+        compute_capability=(8, 0),
+        bf16_runtime_reported=True,
+    ) == "bf16"
+    assert choose_precision_name(
+        cuda_available=True,
+        compute_capability=(8, 0),
+        bf16_runtime_reported=False,
+    ) == "fp16"
+
+
+def test_cpu_uses_fp32() -> None:
+    assert choose_precision_name(
+        cuda_available=False,
+        compute_capability=None,
+        bf16_runtime_reported=True,
+    ) == "fp32"
+
+
+def test_hardware_report_records_selected_p100_precision() -> None:
+    class FakeProperties:
+        name = "Tesla P100-PCIE-16GB"
+        total_memory = 16 * 1024**3
+
+    class FakeCuda:
+        @staticmethod
+        def is_available() -> bool:
+            return True
+
+        @staticmethod
+        def get_device_capability(_index: int) -> tuple[int, int]:
+            return (6, 0)
+
+        @staticmethod
+        def is_bf16_supported() -> bool:
+            return True
+
+        @staticmethod
+        def get_device_properties(_index: int) -> FakeProperties:
+            return FakeProperties()
+
+    class FakeVersion:
+        cuda = "12.6"
+
+    class FakeTorch:
+        __version__ = "2.8.0+cu126"
+        cuda = FakeCuda()
+        version = FakeVersion()
+        float32 = "float32"
+        float16 = "float16"
+        bfloat16 = "bfloat16"
+
+    precision = select_precision(FakeTorch())
+    report = hardware_report(FakeTorch(), precision)
+
+    assert precision.name == "fp16"
+    assert precision.torch_dtype(FakeTorch()) == "float16"
+    assert report["selected_precision"] == "fp16"
+    assert report["compute_capability"] == [6, 0]
+    assert report["bf16_runtime_reported"] is True
+    assert report["bf16_selected"] is False

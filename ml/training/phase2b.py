@@ -19,6 +19,7 @@ from typing import Any
 from PIL import Image
 
 from ml.training.config import TrainingConfig, load_training_config
+from ml.training.precision import PrecisionSelection, select_precision
 from satquery.inference.preprocessing import FrozenImagePreprocessor
 from satquery.registry import load_model_registry, load_preprocessing_registry
 
@@ -206,10 +207,8 @@ def run_training(
     set_seed(config.seed)
     random.seed(config.seed)
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    use_bf16 = device == "cuda" and torch.cuda.is_bf16_supported()
-    dtype = torch.bfloat16 if use_bf16 else (
-        torch.float16 if device == "cuda" else torch.float32
-    )
+    precision = select_precision(torch)
+    dtype = precision.torch_dtype(torch)
     snapshot = Path(
         snapshot_download(
             repo_id=registration.model_id,
@@ -277,8 +276,8 @@ def run_training(
         save_steps=1 if smoke_test else config.save_steps,
         save_total_limit=config.save_total_limit,
         eval_strategy="no" if smoke_test else "epoch",
-        fp16=device == "cuda" and not use_bf16,
-        bf16=use_bf16,
+        fp16=precision.trainer_fp16,
+        bf16=precision.trainer_bf16,
         gradient_checkpointing=config.gradient_checkpointing,
         gradient_checkpointing_kwargs={"use_reentrant": False},
         remove_unused_columns=False,
@@ -317,6 +316,7 @@ def run_training(
             "trainable_parameters": trainable,
             "total_parameters": total,
             "trainable_fraction": trainable / total,
+            "selected_precision": precision.name,
         }
     )
     if device == "cuda":
@@ -357,7 +357,7 @@ def run_training(
             "preprocessing_profile": config.preprocessing_profile,
             "preprocessing_version": profile.version,
         },
-        "runtime": hardware_report(torch),
+        "runtime": hardware_report(torch, precision),
         "artifacts": {
             "adapter": str(adapter_dir),
             "adapter_checkpoint_sha256": adapter_sha256,
@@ -419,12 +419,23 @@ def load_manifest_samples(
     return selected[train_split], selected[validation_split], manifest
 
 
-def hardware_report(torch: Any) -> dict[str, Any]:
+def hardware_report(
+    torch: Any,
+    precision: PrecisionSelection | None = None,
+) -> dict[str, Any]:
+    selection = precision or select_precision(torch)
     report: dict[str, Any] = {
         "python": platform.python_version(),
         "pytorch": torch.__version__,
         "cuda_available": torch.cuda.is_available(),
         "pytorch_cuda": torch.version.cuda,
+        "selected_precision": selection.name,
+        "compute_capability": (
+            list(selection.compute_capability)
+            if selection.compute_capability is not None
+            else None
+        ),
+        "bf16_runtime_reported": selection.bf16_runtime_reported,
     }
     if torch.cuda.is_available():
         properties = torch.cuda.get_device_properties(0)
@@ -433,7 +444,7 @@ def hardware_report(torch: Any) -> dict[str, Any]:
                 "gpu_name": properties.name,
                 "gpu_vram_bytes": properties.total_memory,
                 "gpu_vram_gib": round(properties.total_memory / 1024**3, 2),
-                "bf16_supported": torch.cuda.is_bf16_supported(),
+                "bf16_selected": selection.trainer_bf16,
             }
         )
     return report
