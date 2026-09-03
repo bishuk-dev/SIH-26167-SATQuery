@@ -1919,6 +1919,8 @@ uvicorn apps.api.app.main:app --reload
 
 Run the current test suite with `python -m pytest`.
 
+GPU adaptation is executed from the same repository entrypoint on Kaggle or another CUDA host. See [`docs/KAGGLE.md`](docs/KAGGLE.md) for the one-step smoke run, full Phase 2B command, resume procedure, and artifact paths.
+
 ---
 
 ## Frontend
@@ -2052,10 +2054,10 @@ Non-overlapping temporal pair
 
 ## Phase 2 — Single-image VQA
 
-- [ ] Integrate baseline VLM
+- [x] Integrate baseline VLM
 - [ ] Remote-sensing preprocessing
-- [ ] VQA inference
-- [ ] Evaluation harness
+- [x] VQA inference
+- [x] Evaluation harness
 - [ ] Blank/shuffled-image baselines
 
 ---

@@ -12,7 +12,11 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from apps.api.app.routes.observations import invalid_request_response, router
 from apps.api.app.routes.tiles import router as tiles_router
+from apps.api.app.routes.vqa import invalid_vqa_request_response
+from apps.api.app.routes.vqa import router as vqa_router
 from apps.api.app.services.observations import ObservationIngestionService
+from satquery.inference.config import VqaRuntimeSettings
+from satquery.inference.vqa import SingleImageVqaService, VqaBackend
 from satquery.ingestion import (
     FilesystemObservationStore,
     RasterInspector,
@@ -28,6 +32,8 @@ def create_app(
     data_root: str | Path | None = None,
     limits: RasterSafetyLimits | None = None,
     visualization_settings: VisualizationSettings | None = None,
+    vqa_settings: VqaRuntimeSettings | None = None,
+    vqa_backend: VqaBackend | None = None,
 ) -> FastAPI:
     safety_limits = limits or RasterSafetyLimits.from_env()
     display_settings = visualization_settings or VisualizationSettings.from_env()
@@ -40,13 +46,21 @@ def create_app(
         derivative_generator=VisualizationDerivativeGenerator(display_settings),
     )
     application.state.raster_tile_service = RasterTileService(store, display_settings)
+    application.state.single_image_vqa_service = SingleImageVqaService(
+        store,
+        settings=vqa_settings,
+        backend=vqa_backend,
+    )
     application.include_router(router)
     application.include_router(tiles_router)
+    application.include_router(vqa_router)
 
     @application.exception_handler(RequestValidationError)
     async def request_validation_handler(
-        _request: Request, _error: RequestValidationError
+        request: Request, _error: RequestValidationError
     ) -> JSONResponse:
+        if request.url.path == "/api/vqa":
+            return invalid_vqa_request_response()
         return invalid_request_response()
 
     @application.exception_handler(StarletteHTTPException)

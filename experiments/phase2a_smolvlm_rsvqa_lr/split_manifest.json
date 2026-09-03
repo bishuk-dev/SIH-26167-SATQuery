@@ -1,0 +1,252 @@
+{
+  "schema_version": 1,
+  "dataset": {
+    "id": "dmarsili/RSVQA-LR-2k",
+    "revision": "35de41f26170edda2ccc4f88c0f62f641bb9e1f1",
+    "license": "CC-BY-4.0",
+    "upstream": "RSVQA-LR validation data"
+  },
+  "subset": {
+    "selection": "first_12_unique_scenes_in_source_order",
+    "scene_count": 12,
+    "questions_per_scene": 2,
+    "scene_group_key": "sha256_image_bytes"
+  },
+  "split_policy": {
+    "method": "sort_scene_sha256_then_7_train_2_validation_3_test",
+    "grouped_by_scene": true
+  },
+  "created_at": "2026-09-03T16:19:12.279431+00:00",
+  "scene_assignments": {
+    "00edf7a26269ad2a2f9e44c6eb873fec307d6162868a326be2c72b4eda8adf56": "train",
+    "1908670f601452dc6169b3987dd8513305c174de970738210b2e6b6a9a7f6a72": "train",
+    "39266ee9526a3c216199fd3d17fc766d5d75e5f6fb7e9b36216f58fe83f14071": "train",
+    "5262efcaf1e02e6f3706bcbcd0a1407d09197acf6ef16e8d0f5effca9aabfe8a": "train",
+    "5def2881a1913af2bcd9b29b65f7bd40776325641ac05810525b04ae074af4f4": "train",
+    "7394f4e181d9e7bd8875bd4e7c25c3a359f7a59494803ce4456ececbbaf2e518": "train",
+    "9c546a0c0e962ed976ac214c7f87b3359fbe409edd11fbda0271c6aba7ab0281": "train",
+    "a4eac6fcf1aec219d5abe1eab3e0b4300df92cfef639608f7b762f740577fa6f": "validation",
+    "b5f9be1ebf73fa974dc07c02892f16b270f33503b69a531d877a2aee484c5c31": "validation",
+    "c1f9d668a6c81ad74ee78c9a348006983e8a25048d086ee6c626dcc59d7b4ef1": "test",
+    "cf28cebb1e9e3ebeda6ca03f9dcdf18dbc0282b8cbe7dbfac3c8d7012fdbd9cb": "test",
+    "f3dd151e0ee950c84b4cabe68b0a688b0c7e1ecfcd8511b0d3e14111e064b7c6": "test"
+  },
+  "samples": [
+    {
+      "sample_id": "rsvqa_lr_2k_row_0",
+      "scene_id": "39266ee9526a3c216199fd3d17fc766d5d75e5f6fb7e9b36216f58fe83f14071",
+      "source_row": 0,
+      "image_path": "data/benchmarks/rsvqa_lr_2k/39266ee9526a3c216199fd3d17fc766d5d75e5f6fb7e9b36216f58fe83f14071.jpg",
+      "question": "Is it a rural or an urban area",
+      "answer": "rural",
+      "split": "train"
+    },
+    {
+      "sample_id": "rsvqa_lr_2k_row_1",
+      "scene_id": "39266ee9526a3c216199fd3d17fc766d5d75e5f6fb7e9b36216f58fe83f14071",
+      "source_row": 1,
+      "image_path": "data/benchmarks/rsvqa_lr_2k/39266ee9526a3c216199fd3d17fc766d5d75e5f6fb7e9b36216f58fe83f14071.jpg",
+      "question": "What is the number of commercial buildings?",
+      "answer": "5",
+      "split": "train"
+    },
+    {
+      "sample_id": "rsvqa_lr_2k_row_21",
+      "scene_id": "b5f9be1ebf73fa974dc07c02892f16b270f33503b69a531d877a2aee484c5c31",
+      "source_row": 21,
+      "image_path": "data/benchmarks/rsvqa_lr_2k/b5f9be1ebf73fa974dc07c02892f16b270f33503b69a531d877a2aee484c5c31.jpg",
+      "question": "Is there a water area?",
+      "answer": "yes",
+      "split": "validation"
+    },
+    {
+      "sample_id": "rsvqa_lr_2k_row_22",
+      "scene_id": "b5f9be1ebf73fa974dc07c02892f16b270f33503b69a531d877a2aee484c5c31",
+      "source_row": 22,
+      "image_path": "data/benchmarks/rsvqa_lr_2k/b5f9be1ebf73fa974dc07c02892f16b270f33503b69a531d877a2aee484c5c31.jpg",
+      "question": "Is there a rectangular road?",
+      "answer": "no",
+      "split": "validation"
+    },
+    {
+      "sample_id": "rsvqa_lr_2k_row_41",
+      "scene_id": "5262efcaf1e02e6f3706bcbcd0a1407d09197acf6ef16e8d0f5effca9aabfe8a",
+      "source_row": 41,
+      "image_path": "data/benchmarks/rsvqa_lr_2k/5262efcaf1e02e6f3706bcbcd0a1407d09197acf6ef16e8d0f5effca9aabfe8a.jpg",
+      "question": "Is it a rural or an urban area",
+      "answer": "rural",
+      "split": "train"
+    },
+    {
+      "sample_id": "rsvqa_lr_2k_row_42",
+      "scene_id": "5262efcaf1e02e6f3706bcbcd0a1407d09197acf6ef16e8d0f5effca9aabfe8a",
+      "source_row": 42,
+      "image_path": "data/benchmarks/rsvqa_lr_2k/5262efcaf1e02e6f3706bcbcd0a1407d09197acf6ef16e8d0f5effca9aabfe8a.jpg",
+      "question": "Are there more water areas than commercial buildings?",
+      "answer": "yes",
+      "split": "train"
+    },
+    {
+      "sample_id": "rsvqa_lr_2k_row_61",
+      "scene_id": "00edf7a26269ad2a2f9e44c6eb873fec307d6162868a326be2c72b4eda8adf56",
+      "source_row": 61,
+      "image_path": "data/benchmarks/rsvqa_lr_2k/00edf7a26269ad2a2f9e44c6eb873fec307d6162868a326be2c72b4eda8adf56.jpg",
+      "question": "Is there a forest?",
+      "answer": "yes",
+      "split": "train"
+    },
+    {
+      "sample_id": "rsvqa_lr_2k_row_62",
+      "scene_id": "00edf7a26269ad2a2f9e44c6eb873fec307d6162868a326be2c72b4eda8adf56",
+      "source_row": 62,
+      "image_path": "data/benchmarks/rsvqa_lr_2k/00edf7a26269ad2a2f9e44c6eb873fec307d6162868a326be2c72b4eda8adf56.jpg",
+      "question": "How many residential buildings are there?",
+      "answer": "53",
+      "split": "train"
+    },
+    {
+      "sample_id": "rsvqa_lr_2k_row_82",
+      "scene_id": "f3dd151e0ee950c84b4cabe68b0a688b0c7e1ecfcd8511b0d3e14111e064b7c6",
+      "source_row": 82,
+      "image_path": "data/benchmarks/rsvqa_lr_2k/f3dd151e0ee950c84b4cabe68b0a688b0c7e1ecfcd8511b0d3e14111e064b7c6.jpg",
+      "question": "Is a building present?",
+      "answer": "yes",
+      "split": "test"
+    },
+    {
+      "sample_id": "rsvqa_lr_2k_row_83",
+      "scene_id": "f3dd151e0ee950c84b4cabe68b0a688b0c7e1ecfcd8511b0d3e14111e064b7c6",
+      "source_row": 83,
+      "image_path": "data/benchmarks/rsvqa_lr_2k/f3dd151e0ee950c84b4cabe68b0a688b0c7e1ecfcd8511b0d3e14111e064b7c6.jpg",
+      "question": "Is a commercial building present?",
+      "answer": "yes",
+      "split": "test"
+    },
+    {
+      "sample_id": "rsvqa_lr_2k_row_99",
+      "scene_id": "7394f4e181d9e7bd8875bd4e7c25c3a359f7a59494803ce4456ececbbaf2e518",
+      "source_row": 99,
+      "image_path": "data/benchmarks/rsvqa_lr_2k/7394f4e181d9e7bd8875bd4e7c25c3a359f7a59494803ce4456ececbbaf2e518.jpg",
+      "question": "What is the amount of buildings?",
+      "answer": "601",
+      "split": "train"
+    },
+    {
+      "sample_id": "rsvqa_lr_2k_row_100",
+      "scene_id": "7394f4e181d9e7bd8875bd4e7c25c3a359f7a59494803ce4456ececbbaf2e518",
+      "source_row": 100,
+      "image_path": "data/benchmarks/rsvqa_lr_2k/7394f4e181d9e7bd8875bd4e7c25c3a359f7a59494803ce4456ececbbaf2e518.jpg",
+      "question": "Is there a residential building?",
+      "answer": "yes",
+      "split": "train"
+    },
+    {
+      "sample_id": "rsvqa_lr_2k_row_122",
+      "scene_id": "9c546a0c0e962ed976ac214c7f87b3359fbe409edd11fbda0271c6aba7ab0281",
+      "source_row": 122,
+      "image_path": "data/benchmarks/rsvqa_lr_2k/9c546a0c0e962ed976ac214c7f87b3359fbe409edd11fbda0271c6aba7ab0281.jpg",
+      "question": "Is there a building?",
+      "answer": "yes",
+      "split": "train"
+    },
+    {
+      "sample_id": "rsvqa_lr_2k_row_123",
+      "scene_id": "9c546a0c0e962ed976ac214c7f87b3359fbe409edd11fbda0271c6aba7ab0281",
+      "source_row": 123,
+      "image_path": "data/benchmarks/rsvqa_lr_2k/9c546a0c0e962ed976ac214c7f87b3359fbe409edd11fbda0271c6aba7ab0281.jpg",
+      "question": "What is the number of water areas?",
+      "answer": "17",
+      "split": "train"
+    },
+    {
+      "sample_id": "rsvqa_lr_2k_row_138",
+      "scene_id": "c1f9d668a6c81ad74ee78c9a348006983e8a25048d086ee6c626dcc59d7b4ef1",
+      "source_row": 138,
+      "image_path": "data/benchmarks/rsvqa_lr_2k/c1f9d668a6c81ad74ee78c9a348006983e8a25048d086ee6c626dcc59d7b4ef1.jpg",
+      "question": "What is the number of grass areas?",
+      "answer": "171",
+      "split": "test"
+    },
+    {
+      "sample_id": "rsvqa_lr_2k_row_139",
+      "scene_id": "c1f9d668a6c81ad74ee78c9a348006983e8a25048d086ee6c626dcc59d7b4ef1",
+      "source_row": 139,
+      "image_path": "data/benchmarks/rsvqa_lr_2k/c1f9d668a6c81ad74ee78c9a348006983e8a25048d086ee6c626dcc59d7b4ef1.jpg",
+      "question": "What is the amount of water areas?",
+      "answer": "20",
+      "split": "test"
+    },
+    {
+      "sample_id": "rsvqa_lr_2k_row_154",
+      "scene_id": "cf28cebb1e9e3ebeda6ca03f9dcdf18dbc0282b8cbe7dbfac3c8d7012fdbd9cb",
+      "source_row": 154,
+      "image_path": "data/benchmarks/rsvqa_lr_2k/cf28cebb1e9e3ebeda6ca03f9dcdf18dbc0282b8cbe7dbfac3c8d7012fdbd9cb.jpg",
+      "question": "Is there a farmland?",
+      "answer": "yes",
+      "split": "test"
+    },
+    {
+      "sample_id": "rsvqa_lr_2k_row_155",
+      "scene_id": "cf28cebb1e9e3ebeda6ca03f9dcdf18dbc0282b8cbe7dbfac3c8d7012fdbd9cb",
+      "source_row": 155,
+      "image_path": "data/benchmarks/rsvqa_lr_2k/cf28cebb1e9e3ebeda6ca03f9dcdf18dbc0282b8cbe7dbfac3c8d7012fdbd9cb.jpg",
+      "question": "Are there more buildings than forests?",
+      "answer": "yes",
+      "split": "test"
+    },
+    {
+      "sample_id": "rsvqa_lr_2k_row_169",
+      "scene_id": "1908670f601452dc6169b3987dd8513305c174de970738210b2e6b6a9a7f6a72",
+      "source_row": 169,
+      "image_path": "data/benchmarks/rsvqa_lr_2k/1908670f601452dc6169b3987dd8513305c174de970738210b2e6b6a9a7f6a72.jpg",
+      "question": "How many commercial buildings are there?",
+      "answer": "538",
+      "split": "train"
+    },
+    {
+      "sample_id": "rsvqa_lr_2k_row_170",
+      "scene_id": "1908670f601452dc6169b3987dd8513305c174de970738210b2e6b6a9a7f6a72",
+      "source_row": 170,
+      "image_path": "data/benchmarks/rsvqa_lr_2k/1908670f601452dc6169b3987dd8513305c174de970738210b2e6b6a9a7f6a72.jpg",
+      "question": "How many circular commercial buildings are there?",
+      "answer": "0",
+      "split": "train"
+    },
+    {
+      "sample_id": "rsvqa_lr_2k_row_194",
+      "scene_id": "a4eac6fcf1aec219d5abe1eab3e0b4300df92cfef639608f7b762f740577fa6f",
+      "source_row": 194,
+      "image_path": "data/benchmarks/rsvqa_lr_2k/a4eac6fcf1aec219d5abe1eab3e0b4300df92cfef639608f7b762f740577fa6f.jpg",
+      "question": "Is it a rural or an urban area",
+      "answer": "rural",
+      "split": "validation"
+    },
+    {
+      "sample_id": "rsvqa_lr_2k_row_195",
+      "scene_id": "a4eac6fcf1aec219d5abe1eab3e0b4300df92cfef639608f7b762f740577fa6f",
+      "source_row": 195,
+      "image_path": "data/benchmarks/rsvqa_lr_2k/a4eac6fcf1aec219d5abe1eab3e0b4300df92cfef639608f7b762f740577fa6f.jpg",
+      "question": "Are there less circular grass areas than water areas?",
+      "answer": "yes",
+      "split": "validation"
+    },
+    {
+      "sample_id": "rsvqa_lr_2k_row_212",
+      "scene_id": "5def2881a1913af2bcd9b29b65f7bd40776325641ac05810525b04ae074af4f4",
+      "source_row": 212,
+      "image_path": "data/benchmarks/rsvqa_lr_2k/5def2881a1913af2bcd9b29b65f7bd40776325641ac05810525b04ae074af4f4.jpg",
+      "question": "Is a residential building present?",
+      "answer": "yes",
+      "split": "train"
+    },
+    {
+      "sample_id": "rsvqa_lr_2k_row_213",
+      "scene_id": "5def2881a1913af2bcd9b29b65f7bd40776325641ac05810525b04ae074af4f4",
+      "source_row": 213,
+      "image_path": "data/benchmarks/rsvqa_lr_2k/5def2881a1913af2bcd9b29b65f7bd40776325641ac05810525b04ae074af4f4.jpg",
+      "question": "What is the amount of commercial buildings?",
+      "answer": "3",
+      "split": "train"
+    }
+  ]
+}

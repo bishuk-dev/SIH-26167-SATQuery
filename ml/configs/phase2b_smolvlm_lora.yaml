@@ -1,0 +1,26 @@
+schema_version: 1
+run_name: phase2b_smolvlm_rsvqa_lora_v1
+model_registry_id: smolvlm_256m_instruct_v1
+preprocessing_profile: smolvlm_single_image_v1
+manifest: experiments/phase2b_smolvlm_rsvqa_lr/split_manifest.json
+train_split: train
+validation_split: validation
+seed: 42
+epochs: 3
+max_steps: -1
+per_device_train_batch_size: 1
+per_device_eval_batch_size: 1
+gradient_accumulation_steps: 4
+learning_rate: 0.0001
+weight_decay: 0.01
+warmup_ratio: 0.05
+gradient_checkpointing: true
+lora_rank: 8
+lora_alpha: 16
+lora_dropout: 0.05
+lora_target_modules: [q_proj, k_proj, v_proj, o_proj]
+logging_steps: 10
+save_steps: 100
+save_total_limit: 2
+max_new_tokens: 16
+evaluation_max_samples: 100

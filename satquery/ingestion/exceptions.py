@@ -35,3 +35,7 @@ class InvalidUploadError(IngestionError):
 
 class AssetStorageError(IngestionError):
     code = "ASSET_STORAGE_FAILED"
+
+
+class ObservationNotFoundError(IngestionError):
+    code = "OBSERVATION_NOT_FOUND"

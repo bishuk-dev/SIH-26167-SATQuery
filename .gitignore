@@ -9,6 +9,7 @@ __pycache__/
 *.egg-info/
 .pytest_cache/
 .pytest-tmp/
+.ipynb_checkpoints/
 .mypy_cache/
 .ruff_cache/
 .coverage
@@ -36,6 +37,7 @@ data/*
 *.sqlite3
 *.log
 tmp/
+outputs/
 
 # Model artifacts (the registry and its documentation stay versioned)
 models/checkpoints/

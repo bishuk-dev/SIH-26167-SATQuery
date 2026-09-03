@@ -1,2 +1,15 @@
 schema_version: 1
-models: {}
+models:
+  smolvlm_256m_instruct_v1:
+    task: single_image_vqa
+    provider: huggingface
+    model_id: HuggingFaceTB/SmolVLM-256M-Instruct
+    revision: 7e3e67edbbed1bf9888184d9df282b700a323964
+    checkpoint_file: model.safetensors
+    checkpoint_sha256: 74dea5904032e5ae99a2e0eef5179e6ac0f1dedc3ab0c7c2a5d4d387c843203e
+    architecture: SmolVLM / Idefics3
+    license: Apache-2.0
+    preprocessing_profile: smolvlm_single_image_v1
+    frozen: true
+    allow_remote_code: false
+    max_new_tokens: 16

@@ -1,2 +1,16 @@
 schema_version: 1
-profiles: {}
+profiles:
+  smolvlm_single_image_v1:
+    task: single_image_vqa
+    version: "1.0.0"
+    input_asset_kind: visualization
+    image_mode: RGB
+    resize: fit_pad
+    width: 512
+    height: 512
+    resampling: bilinear
+    padding_rgb: [0, 0, 0]
+    nodata_policy: alpha_to_padding
+    processor_source: checkpoint
+    processor_resize: disabled
+    prompt_template: "Answer the remote-sensing image question with a short answer only. Question: {question}"

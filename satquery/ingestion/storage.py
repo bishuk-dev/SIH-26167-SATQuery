@@ -10,7 +10,7 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
-from satquery.ingestion.exceptions import AssetStorageError
+from satquery.ingestion.exceptions import AssetStorageError, ObservationNotFoundError
 from satquery.ingestion.models import ObservationState, SourceAsset
 from satquery.visualization.exceptions import VisualizationAssetNotFoundError
 from satquery.visualization.models import ObservationRegistration, VisualizationAsset
@@ -206,6 +206,48 @@ class FilesystemObservationStore:
             raise VisualizationAssetNotFoundError(
                 "Visualization asset was not found"
             ) from None
+
+    def load_registration(
+        self, observation_id: str
+    ) -> tuple[ObservationRegistration, Path]:
+        if OBSERVATION_ID_PATTERN.fullmatch(observation_id) is None:
+            raise ObservationNotFoundError("Observation was not found")
+        observation_dir = self.observations_root / observation_id
+        metadata_path = observation_dir / METADATA_FILENAME
+        visualization_metadata_path = observation_dir / VISUALIZATION_METADATA_FILENAME
+        try:
+            observation = ObservationState.model_validate_json(
+                metadata_path.read_text(encoding="utf-8")
+            )
+            visualization = VisualizationAsset.model_validate_json(
+                visualization_metadata_path.read_text(encoding="utf-8")
+            )
+            if observation.observation_id != observation_id:
+                raise ValueError("Observation metadata is inconsistent")
+            expected_key = (
+                Path("observations") / observation_id / VISUALIZATION_FILENAME
+            ).as_posix()
+            if (
+                visualization.observation_id != observation_id
+                or visualization.parent_asset_id != observation.source_asset.asset_id
+                or visualization.path != expected_key
+            ):
+                raise ValueError("Visualization provenance is inconsistent")
+            visualization_path = (self.data_root / visualization.path).resolve(
+                strict=True
+            )
+            visualization_path.relative_to(self.observations_root)
+            if not visualization_path.is_file():
+                raise OSError("Visualization path is not a file")
+            return (
+                ObservationRegistration(
+                    observation=observation,
+                    visualization=visualization,
+                ),
+                visualization_path,
+            )
+        except (OSError, RuntimeError, ValidationError, ValueError):
+            raise ObservationNotFoundError("Observation was not found") from None
 
     def discard_quarantine(self, path: Path) -> None:
         try:

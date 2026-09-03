@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "run_id": "phase2a_smolvlm_256m_rsvqa_lr_grouped_v1",
+  "created_at": "2026-09-03T16:46:00.101068+00:00",
+  "model": {
+    "registry_id": "smolvlm_256m_instruct_v1",
+    "model_id": "HuggingFaceTB/SmolVLM-256M-Instruct",
+    "revision": "7e3e67edbbed1bf9888184d9df282b700a323964",
+    "checkpoint_sha256": "74dea5904032e5ae99a2e0eef5179e6ac0f1dedc3ab0c7c2a5d4d387c843203e",
+    "preprocessing_profile": "smolvlm_single_image_v1",
+    "preprocessing_version": "1.0.0",
+    "frozen": true
+  },
+  "dataset": {
+    "id": "dmarsili/RSVQA-LR-2k",
+    "revision": "35de41f26170edda2ccc4f88c0f62f641bb9e1f1",
+    "license": "CC-BY-4.0",
+    "upstream": "RSVQA-LR validation data"
+  },
+  "split_manifest": "experiments/phase2a_smolvlm_rsvqa_lr/split_manifest.json",
+  "evaluated_split": "test",
+  "sample_count": 6,
+  "scene_count": 3,
+  "metrics": {
+    "normalized_exact_match": 0.0,
+    "majority_answer": "yes",
+    "majority_normalized_exact_match": 0.6666666666666666
+  },
+  "runtime": {
+    "device": "cpu",
+    "cpu_threads": 2,
+    "total_seconds": 68.488,
+    "mean_seconds_per_sample": 11.4147,
+    "python": "3.13.9",
+    "platform": "Windows-10-10.0.19045-SP0",
+    "logical_cpus": 4,
+    "torch": "2.13.0+cpu"
+  },
+  "limitations": [
+    "Smoke-scale held-out subset; not a publishable benchmark estimate.",
+    "Generic frozen model has not been adapted to remote-sensing imagery.",
+    "Generated answers provide no calibrated confidence score."
+  ]
+}

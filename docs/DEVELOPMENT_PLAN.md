@@ -4,7 +4,7 @@ This plan translates the roadmap in `README.md` into implementation gates. The r
 
 ## Phase 0 — Project foundation and research freeze
 
-**Status: incomplete.** The repository foundation, task matrix, evaluation protocol, and failure policy are now present. Dataset-specific split manifests and reproducible frozen-model baseline results do not yet exist, so the research-freeze portion of Phase 0 cannot honestly be marked complete.
+**Status: incomplete.** The repository foundation, task matrix, evaluation protocol, and failure policy are present. Phase 2A now supplies the first pinned VQA model, scene-grouped RSVQA-LR subset, and reproducible frozen-model result. Grounding, fusion, and change baselines are still intentionally unselected, so the broader research freeze remains incomplete.
 
 Exit work:
 
@@ -35,9 +35,13 @@ These research artifacts are not a code dependency for beginning the Phase 1 geo
 
 **Phase 1D status: complete.** Each accepted observation now receives an immutable, display-only COG derivative with parent provenance and a source-grid-preserving affine. The API returns its display and tile metadata, and serves bounded PNG tiles through Web Mercator XYZ or an explicit pixel-grid fallback for ungeoreferenced imagery. The frontend remains deferred.
 
+**Phase 2A status: complete.** The pinned frozen `HuggingFaceTB/SmolVLM-256M-Instruct` baseline is registered with a versioned 512 × 512 preprocessing profile and checksum verification. Registered observations can produce structured VQA evidence through the API. A deterministic 24-question RSVQA-LR smoke subset is grouped by image-content hash into 14/4/6 train/validation/test questions, and the six-question held-out result is stored under `experiments/phase2a_smolvlm_rsvqa_lr/`. This result establishes plumbing, not model quality.
+
+**Phase 2B status: GPU-ready, training incomplete.** A separate 1,767-question RSVQA-LR adaptation manifest contains 70/9/9 scene-grouped train/validation/test scenes and excludes all 12 Phase 2A scenes. Rank-8 attention-projection LoRA, checkpoint/resume handling, structured run provenance, frozen/adapted evaluation, and majority/question-only/blank/shuffled controls are implemented. A one-step CPU smoke test passed; meaningful adaptation and final comparison await a CUDA run.
+
 ## Foundation decisions
 
 - Keep the implementation as a modular monolith until measured scaling needs justify additional infrastructure.
 - Keep API transport in `apps/api`, UI code in `apps/web`, reusable scientific/domain logic in `satquery`, and offline model work in `ml`.
-- Keep model, tool, and preprocessing registries empty until a real implementation satisfies their contracts.
+- Add model, tool, and preprocessing registry entries only when a real implementation satisfies their contracts.
 - Add Dockerfiles and Compose with the first runnable Phase 1 services; an empty container topology would not be executable or verifiable.
