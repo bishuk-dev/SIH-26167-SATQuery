@@ -7,7 +7,6 @@
     "source_split": "validation",
     "source_row_limit": 2000
   },
-  "created_at": "2026-09-03T19:52:40.525227+00:00",
   "scene_group_key": "sha256_image_bytes",
   "split_policy": {
     "seed": 42,

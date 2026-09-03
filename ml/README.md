@@ -42,6 +42,6 @@ python -m ml.training.phase2b \
   --output-dir outputs/phase2b_smolvlm_lora
 ```
 
-Use `--smoke-test` for one optimizer step and one validation inference. Kaggle-specific setup and resume instructions are in `docs/KAGGLE.md`.
+Use `--stability-smoke` before a full GPU run. It exercises eight optimizer steps with the configured gradient accumulation, fails on any non-finite loss/gradient/LoRA parameter, verifies that LoRA weights changed, and records runtime and peak CUDA memory. The older `--smoke-test` remains a minimal wiring check. Kaggle-specific setup, FP32 fallback, and resume instructions are in `docs/KAGGLE.md`.
 
-Mixed precision is hardware-gated in one shared module for training and comparison: CPU uses FP32, CUDA devices below compute capability 8.0 use FP16, and BF16 requires both capability 8.0+ and a positive PyTorch runtime check. This prevents the P100/Pascal false-positive BF16 report observed on Kaggle.
+Mixed precision is hardware-gated in one shared module for training and comparison: CPU uses FP32, CUDA devices below compute capability 8.0 use FP16, and BF16 requires both capability 8.0+ and a positive PyTorch runtime check. This prevents the P100/Pascal false-positive BF16 report observed on Kaggle. Both entrypoints accept `--precision fp32` as an explicit numerical-stability fallback.

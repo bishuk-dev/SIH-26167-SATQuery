@@ -7,7 +7,6 @@ import hashlib
 import json
 import random
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlencode
 from urllib.request import urlopen
@@ -28,6 +27,34 @@ DEFAULT_MANIFEST = (
 DEFAULT_DATA_ROOT = PROJECT_ROOT / "data/benchmarks/rsvqa_lr_phase2b"
 SOURCE_ROW_LIMIT = 2000
 SPLIT_SEED = 42
+
+
+def prepare_dataset(
+    manifest_path: Path,
+    data_root: Path,
+    phase2a_manifest_path: Path,
+    *,
+    regenerate: bool = False,
+    source_row_limit: int = SOURCE_ROW_LIMIT,
+) -> dict[str, object]:
+    """Reuse the frozen manifest and materialize only missing/corrupt images."""
+    if regenerate or not manifest_path.is_file():
+        return build_manifest(
+            manifest_path,
+            data_root,
+            phase2a_manifest_path,
+            source_row_limit=source_row_limit,
+        )
+
+    original_bytes = manifest_path.read_bytes()
+    manifest = json.loads(original_bytes)
+    phase2a = json.loads(phase2a_manifest_path.read_text(encoding="utf-8"))
+    excluded_scenes = set(phase2a["scene_assignments"])
+    _validate_frozen_manifest(manifest, excluded_scenes)
+    _materialize_manifest_images(manifest, data_root)
+    if manifest_path.read_bytes() != original_bytes:
+        raise RuntimeError("Frozen Phase 2B manifest changed during data preparation")
+    return manifest
 
 
 def build_manifest(
@@ -96,7 +123,6 @@ def build_manifest(
             "source_split": "validation",
             "source_row_limit": source_row_limit,
         },
-        "created_at": datetime.now(timezone.utc).isoformat(),
         "scene_group_key": "sha256_image_bytes",
         "split_policy": {
             "seed": SPLIT_SEED,
@@ -184,6 +210,92 @@ def _assert_integrity(
         raise RuntimeError("A scene crosses Phase 2B split boundaries")
 
 
+def _validate_frozen_manifest(
+    manifest: dict[str, object], excluded_scenes: set[str]
+) -> None:
+    dataset = manifest.get("dataset")
+    if not isinstance(dataset, dict) or (
+        dataset.get("id") != DATASET_ID
+        or dataset.get("revision") != DATASET_REVISION
+    ):
+        raise RuntimeError("Frozen Phase 2B dataset provenance is invalid")
+    manifest_exclusions = set(manifest.get("excluded_phase2a_scene_ids", []))
+    if manifest_exclusions != excluded_scenes:
+        raise RuntimeError("Frozen manifest Phase 2A exclusions are inconsistent")
+    samples = manifest.get("samples")
+    if not isinstance(samples, list) or not samples:
+        raise RuntimeError("Frozen Phase 2B manifest has no samples")
+    _assert_integrity(samples, excluded_scenes)
+    assignments = manifest.get("scene_assignments")
+    if not isinstance(assignments, dict):
+        raise RuntimeError("Frozen Phase 2B manifest has no scene assignments")
+    actual_assignments = {
+        str(item["scene_id"]): str(item["split"]) for item in samples
+    }
+    if assignments != actual_assignments:
+        raise RuntimeError("Frozen Phase 2B scene assignments are inconsistent")
+    actual_counts = {
+        split: {
+            "scenes": len(
+                {
+                    str(item["scene_id"])
+                    for item in samples
+                    if item["split"] == split
+                }
+            ),
+            "questions": sum(1 for item in samples if item["split"] == split),
+        }
+        for split in ("train", "validation", "test")
+    }
+    if manifest.get("counts") != actual_counts:
+        raise RuntimeError("Frozen Phase 2B manifest counts are inconsistent")
+
+
+def _materialize_manifest_images(
+    manifest: dict[str, object], data_root: Path
+) -> None:
+    samples = manifest["samples"]
+    first_sample_by_scene: dict[str, dict[str, object]] = {}
+    for item in samples:
+        first_sample_by_scene.setdefault(str(item["scene_id"]), item)
+
+    data_root.mkdir(parents=True, exist_ok=True)
+    missing_scene_ids = []
+    for scene_id in first_sample_by_scene:
+        path = data_root / f"{scene_id}.jpg"
+        if not path.is_file() or _file_sha256(path) != scene_id:
+            missing_scene_ids.append(scene_id)
+    if not missing_scene_ids:
+        return
+
+    dataset = manifest["dataset"]
+    rows = _fetch_rows(int(dataset["source_row_limit"]))
+    rows_by_index = {int(row["row_idx"]): row for row in rows}
+    urls = []
+    for scene_id in missing_scene_ids:
+        source_row = int(first_sample_by_scene[scene_id]["source_row"])
+        try:
+            urls.append(str(rows_by_index[source_row]["image_url"]))
+        except KeyError as exc:
+            raise RuntimeError(
+                f"Source row {source_row} is unavailable for scene {scene_id}"
+            ) from exc
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        images = list(executor.map(_download_image, urls))
+    for scene_id, image_bytes in zip(missing_scene_ids, images, strict=True):
+        if hashlib.sha256(image_bytes).hexdigest() != scene_id:
+            raise RuntimeError(f"Downloaded image hash changed for scene {scene_id}")
+        (data_root / f"{scene_id}.jpg").write_bytes(image_bytes)
+
+
+def _file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
@@ -192,14 +304,30 @@ def main() -> None:
         "--phase2a-manifest", type=Path, default=DEFAULT_PHASE2A_MANIFEST
     )
     parser.add_argument("--source-row-limit", type=int, default=SOURCE_ROW_LIMIT)
+    parser.add_argument(
+        "--regenerate",
+        action="store_true",
+        help="Explicitly rebuild the experiment definition instead of reusing it",
+    )
     args = parser.parse_args()
-    manifest = build_manifest(
+    manifest_was_reused = args.manifest.resolve().is_file() and not args.regenerate
+    manifest = prepare_dataset(
         args.manifest.resolve(),
         args.data_root.resolve(),
         args.phase2a_manifest.resolve(),
+        regenerate=args.regenerate,
         source_row_limit=args.source_row_limit,
     )
-    print(json.dumps(manifest["counts"], indent=2))
+    print(
+        json.dumps(
+            {
+                "counts": manifest["counts"],
+                "manifest_sha256": _file_sha256(args.manifest.resolve()),
+                "manifest_reused": manifest_was_reused,
+            },
+            indent=2,
+        )
+    )
 
 
 if __name__ == "__main__":

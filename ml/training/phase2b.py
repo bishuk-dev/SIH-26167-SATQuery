@@ -14,12 +14,13 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from PIL import Image
 
 from ml.training.config import TrainingConfig, load_training_config
 from ml.training.precision import PrecisionSelection, select_precision
+from ml.training.stability import NonFiniteTrainingError, StabilityMonitorCallback
 from satquery.inference.preprocessing import FrozenImagePreprocessor
 from satquery.registry import load_model_registry, load_preprocessing_registry
 
@@ -141,6 +142,8 @@ def run_training(
     data_root: Path | None,
     resume_from_checkpoint: Path | None,
     smoke_test: bool,
+    stability_smoke: bool,
+    precision_mode: Literal["auto", "fp32"],
     allow_cpu: bool,
 ) -> dict[str, Any]:
     import torch
@@ -158,6 +161,10 @@ def run_training(
         raise RuntimeError(
             "Phase 2B requires a CUDA GPU; use --allow-cpu only for local debugging"
         )
+    if smoke_test and stability_smoke:
+        raise ValueError("Choose either --smoke-test or --stability-smoke")
+    if resume_from_checkpoint is not None and (smoke_test or stability_smoke):
+        raise ValueError("Smoke modes cannot resume an existing training run")
     if resume_from_checkpoint is not None and not resume_from_checkpoint.is_dir():
         raise FileNotFoundError(
             f"Resume checkpoint does not exist: {resume_from_checkpoint}"
@@ -181,6 +188,13 @@ def run_training(
     if smoke_test:
         train_samples = train_samples[:2]
         validation_samples = validation_samples[:1]
+    elif stability_smoke:
+        stability_microbatches = 8 * config.gradient_accumulation_steps
+        stability_samples = (
+            stability_microbatches * config.per_device_train_batch_size
+        )
+        train_samples = train_samples[:stability_samples]
+        validation_samples = validation_samples[:1]
 
     output_dir = output_dir.expanduser().resolve()
     checkpoint_dir = output_dir / "checkpoints"
@@ -190,6 +204,7 @@ def run_training(
     for path in (checkpoint_dir, metrics_dir, logs_dir, adapter_dir):
         path.mkdir(parents=True, exist_ok=True)
 
+    precision = select_precision(torch, force_fp32=precision_mode == "fp32")
     resume_guard = {
         "config_sha256": sha256_file(config_path.resolve()),
         "manifest_sha256": sha256_file(manifest_path),
@@ -197,6 +212,7 @@ def run_training(
         "model_revision": registration.revision,
         "preprocessing_profile": config.preprocessing_profile,
         "preprocessing_version": profile.version,
+        "selected_precision": precision.name,
     }
     guard_path = output_dir / "resume_guard.json"
     if resume_from_checkpoint is not None:
@@ -207,7 +223,6 @@ def run_training(
     set_seed(config.seed)
     random.seed(config.seed)
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    precision = select_precision(torch)
     dtype = precision.torch_dtype(torch)
     snapshot = Path(
         snapshot_download(
@@ -255,13 +270,17 @@ def run_training(
         FrozenImagePreprocessor(profile),
         profile.prompt_template,
     )
-    max_steps = 1 if smoke_test else config.max_steps
+    max_steps = 1 if smoke_test else (8 if stability_smoke else config.max_steps)
+    is_short_run = smoke_test or stability_smoke
     training_arguments = TrainingArguments(
         output_dir=str(checkpoint_dir),
-        run_name=config.run_name + ("_smoke" if smoke_test else ""),
+        run_name=(
+            config.run_name
+            + ("_smoke" if smoke_test else "_stability" if stability_smoke else "")
+        ),
         seed=config.seed,
         data_seed=config.seed,
-        num_train_epochs=1 if smoke_test else config.epochs,
+        num_train_epochs=1 if is_short_run else config.epochs,
         max_steps=max_steps,
         per_device_train_batch_size=config.per_device_train_batch_size,
         per_device_eval_batch_size=config.per_device_eval_batch_size,
@@ -271,11 +290,11 @@ def run_training(
         learning_rate=config.learning_rate,
         weight_decay=config.weight_decay,
         warmup_ratio=0 if smoke_test else config.warmup_ratio,
-        logging_steps=1 if smoke_test else config.logging_steps,
-        save_strategy="steps",
+        logging_steps=1 if is_short_run else config.logging_steps,
+        save_strategy="no" if stability_smoke else "steps",
         save_steps=1 if smoke_test else config.save_steps,
         save_total_limit=config.save_total_limit,
-        eval_strategy="no" if smoke_test else "epoch",
+        eval_strategy="no" if is_short_run else "epoch",
         fp16=precision.trainer_fp16,
         bf16=precision.trainer_bf16,
         gradient_checkpointing=config.gradient_checkpointing,
@@ -285,24 +304,56 @@ def run_training(
         logging_dir=str(logs_dir),
         report_to=["tensorboard"],
     )
-    trainer = Trainer(
+    monitor = StabilityMonitorCallback(torch, model, precision.name)
+
+    class MonitoredTrainer(Trainer):
+        def training_step(self, *args: Any, **kwargs: Any) -> Any:
+            loss = super().training_step(*args, **kwargs)
+            monitor.record_loss(loss)
+            return loss
+
+    trainer = MonitoredTrainer(
         model=model,
         args=training_arguments,
         data_collator=collator,
         train_dataset=ManifestDataset(train_samples),
         eval_dataset=ManifestDataset(validation_samples),
+        callbacks=[monitor],
     )
 
     if device == "cuda":
         torch.cuda.reset_peak_memory_stats()
     started = time.perf_counter()
-    train_result = trainer.train(
-        resume_from_checkpoint=(
-            str(resume_from_checkpoint.resolve())
-            if resume_from_checkpoint is not None
-            else None
+    try:
+        train_result = trainer.train(
+            resume_from_checkpoint=(
+                str(resume_from_checkpoint.resolve())
+                if resume_from_checkpoint is not None
+                else None
+            )
         )
-    )
+        parameters_changed = monitor.verify_parameters_changed(model)
+    except NonFiniteTrainingError as exc:
+        elapsed = time.perf_counter() - started
+        failure = {
+            "status": "FAIL",
+            "error": str(exc),
+            "selected_precision": precision.name,
+            "gradient_accumulation_steps": (
+                1 if smoke_test else config.gradient_accumulation_steps
+            ),
+            "runtime_seconds": round(elapsed, 4),
+            **monitor.report(parameters_changed=False),
+        }
+        if device == "cuda":
+            failure["peak_gpu_memory_gib"] = round(
+                torch.cuda.max_memory_allocated() / 1024**3,
+                3,
+            )
+        _write_json(metrics_dir / "numerical_failure.json", failure)
+        raise
+    finally:
+        monitor.close()
     elapsed = time.perf_counter() - started
     trainer.save_model(adapter_dir)
     processor.save_pretrained(adapter_dir)
@@ -325,7 +376,7 @@ def run_training(
             3,
         )
     _write_json(metrics_dir / "train_metrics.json", metrics)
-    if smoke_test:
+    if is_short_run:
         _write_json(
             metrics_dir / "smoke_prediction.json",
             _smoke_inference(
@@ -337,11 +388,32 @@ def run_training(
                 device,
             ),
         )
+    if stability_smoke:
+        stability_report = {
+            "status": "PASS",
+            "selected_precision": precision.name,
+            "gradient_accumulation_steps": config.gradient_accumulation_steps,
+            "expected_optimizer_steps": 8,
+            "runtime_seconds": round(elapsed, 4),
+            **monitor.report(parameters_changed=parameters_changed),
+        }
+        if monitor.optimizer_steps != 8:
+            raise RuntimeError(
+                f"Stability smoke expected 8 optimizer steps, got {monitor.optimizer_steps}"
+            )
+        if device == "cuda":
+            stability_report["peak_gpu_memory_gib"] = round(
+                torch.cuda.max_memory_allocated() / 1024**3,
+                3,
+            )
+        _write_json(metrics_dir / "stability_smoke.json", stability_report)
 
     run_record = {
         "schema_version": 1,
         "run_name": config.run_name,
         "smoke_test": smoke_test,
+        "stability_smoke": stability_smoke,
+        "precision_mode": precision_mode,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "git_commit": _git_commit(),
         "config": str(config_path.resolve()),
@@ -556,6 +628,13 @@ def main() -> None:
     parser.add_argument("--data-root", type=Path)
     parser.add_argument("--resume-from-checkpoint", type=Path)
     parser.add_argument("--smoke-test", action="store_true")
+    parser.add_argument("--stability-smoke", action="store_true")
+    parser.add_argument(
+        "--precision",
+        choices=("auto", "fp32"),
+        default="auto",
+        help="Use capability-gated automatic precision or explicitly force FP32",
+    )
     parser.add_argument("--allow-cpu", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args()
     record = run_training(
@@ -564,6 +643,8 @@ def main() -> None:
         data_root=args.data_root,
         resume_from_checkpoint=args.resume_from_checkpoint,
         smoke_test=args.smoke_test,
+        stability_smoke=args.stability_smoke,
+        precision_mode=args.precision,
         allow_cpu=args.allow_cpu,
     )
     print(json.dumps(record, indent=2))

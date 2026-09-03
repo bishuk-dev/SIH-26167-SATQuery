@@ -47,7 +47,12 @@ def choose_precision_name(
     return "fp16"
 
 
-def select_precision(torch: Any, device_index: int = 0) -> PrecisionSelection:
+def select_precision(
+    torch: Any,
+    device_index: int = 0,
+    *,
+    force_fp32: bool = False,
+) -> PrecisionSelection:
     if not torch.cuda.is_available():
         return PrecisionSelection(
             name="fp32",
@@ -56,6 +61,12 @@ def select_precision(torch: Any, device_index: int = 0) -> PrecisionSelection:
         )
     capability = tuple(torch.cuda.get_device_capability(device_index))
     bf16_reported = bool(torch.cuda.is_bf16_supported())
+    if force_fp32:
+        return PrecisionSelection(
+            name="fp32",
+            compute_capability=capability,
+            bf16_runtime_reported=bf16_reported,
+        )
     return PrecisionSelection(
         name=choose_precision_name(
             cuda_available=True,

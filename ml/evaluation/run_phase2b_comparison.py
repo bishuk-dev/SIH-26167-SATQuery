@@ -11,7 +11,7 @@ import time
 from collections import Counter, defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from PIL import Image
 
@@ -39,6 +39,7 @@ def run_comparison(
     *,
     adapter_dir: Path,
     data_root: Path | None,
+    precision_mode: Literal["auto", "fp32"],
 ) -> dict[str, Any]:
     import torch
     from huggingface_hub import snapshot_download
@@ -87,7 +88,7 @@ def run_comparison(
         local_files_only=True,
         trust_remote_code=registration.allow_remote_code,
     )
-    precision = select_precision(torch)
+    precision = select_precision(torch, force_fp32=precision_mode == "fp32")
     dtype = precision.torch_dtype(torch)
     preprocessor = FrozenImagePreprocessor(profile)
 
@@ -353,6 +354,12 @@ def main() -> None:
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument("--adapter-dir", type=Path)
     parser.add_argument("--data-root", type=Path)
+    parser.add_argument(
+        "--precision",
+        choices=("auto", "fp32"),
+        default="auto",
+        help="Use capability-gated automatic precision or explicitly force FP32",
+    )
     args = parser.parse_args()
     adapter_dir = args.adapter_dir or args.output_dir / "adapter"
     result = run_comparison(
@@ -360,6 +367,7 @@ def main() -> None:
         args.output_dir,
         adapter_dir=adapter_dir,
         data_root=args.data_root,
+        precision_mode=args.precision,
     )
     print(json.dumps(result, indent=2))
 

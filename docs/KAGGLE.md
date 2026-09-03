@@ -7,9 +7,9 @@ Kaggle is only an execution host. The notebook does not contain dataset, preproc
 1. Create a Kaggle notebook and import `notebooks/kaggle_phase2b.ipynb`, or upload that file directly.
 2. In **Settings**, select a GPU accelerator. The verified target is `Tesla P100-PCIE-16GB` (Pascal, compute capability 6.0). The configuration uses batch size 1, gradient accumulation, 512 × 512 inputs, and LoRA on the 256M SmolVLM checkpoint.
 3. Enable **Internet**. It is required to clone/pull GitHub, install training extras, and download the pinned model and RSVQA-LR data. Internet can be disabled only when the repository, Python packages, model snapshot, manifest, and images are supplied through `/kaggle/input`.
-4. Run all cells from a fresh session. The first code cell removes incompatible `torchao` before any PyTorch import and pins `torch==2.8.0`, `torchvision==0.23.0`, and `torchaudio==2.8.0` from the CUDA 12.6 wheel index. The next cell asserts `torch==2.8.0+cu126`, then prints Python, PyTorch, CUDA, GPU name, VRAM, compute capability, and the runtime's BF16 report. It then runs exactly one optimizer step and one validation inference. The disposable base-model cache is placed under `/kaggle/temp`; adapter checkpoints and metrics remain under `/kaggle/working`.
+4. Run all cells from a fresh session. The first code cell removes incompatible `torchao` before any PyTorch import and pins `torch==2.8.0`, `torchvision==0.23.0`, and `torchaudio==2.8.0` from the CUDA 12.6 wheel index. The next cell asserts `torch==2.8.0+cu126`, then prints Python, PyTorch, CUDA, GPU name, VRAM, compute capability, and the runtime's BF16 report. It then runs the eight-optimizer-step stability smoke with the real configured gradient accumulation. The disposable base-model cache is placed under `/kaggle/temp`; adapter checkpoints and metrics remain under `/kaggle/working`.
 
-The P100 always runs Phase 2B in FP16. SatQuery does not trust `torch.cuda.is_bf16_supported()` by itself: BF16 is selected only when the runtime reports support **and** the GPU compute capability is at least 8.0 (Ampere or newer). CPU debugging remains FP32.
+The P100 selects FP16 by default. SatQuery does not trust `torch.cuda.is_bf16_supported()` by itself: BF16 is selected only when the runtime reports support **and** the GPU compute capability is at least 8.0 (Ampere or newer). CPU debugging remains FP32. FP16 is not considered safe for a full P100 run until the stability smoke passes; `--precision fp32` is the explicit fallback if it fails.
 
 Equivalent bootstrap commands are:
 
@@ -24,22 +24,36 @@ Override `SATQUERY_REPO_URL` when running a fork or private mirror. For a prepar
 
 ## Commands
 
-From the cloned repository root, prepare the separate Phase 2B manifest:
+From the cloned repository root, validate the committed Phase 2B manifest and materialize any missing images:
 
 ```bash
 python -m ml.evaluation.prepare_phase2b_rsvqa
 ```
 
-Run the same one-step smoke command used by the notebook:
+Normal preparation never rewrites the committed split manifest. It validates dataset provenance, Phase 2A exclusions, scene assignments, split counts, and image hashes. Use `--regenerate` only when deliberately defining a new experiment; deterministic regeneration no longer embeds a timestamp.
+
+Run the same stability smoke command used by the notebook:
 
 ```bash
 python -m ml.training.phase2b \
   --config ml/configs/phase2b_smolvlm_lora.yaml \
-  --output-dir /kaggle/working/satquery-output/phase2b-smoke \
-  --smoke-test
+  --output-dir /kaggle/working/satquery-output/phase2b-stability-fp16 \
+  --stability-smoke
 ```
 
-After inspecting the smoke artifacts and GPU peak memory, start the actual Phase 2B run explicitly:
+This executes eight optimizer steps and the configured four-way gradient accumulation. Every microbatch loss and every optimizer-step gradient/LoRA parameter is checked for finiteness; the run also requires at least one LoRA parameter to change. Results are written to `metrics/stability_smoke.json`. A non-finite run stops immediately and writes `metrics/numerical_failure.json`.
+
+If the FP16 stability smoke fails on the P100, rerun it in FP32 in a separate output directory:
+
+```bash
+python -m ml.training.phase2b \
+  --config ml/configs/phase2b_smolvlm_lora.yaml \
+  --output-dir /kaggle/working/satquery-output/phase2b-stability-fp32 \
+  --stability-smoke \
+  --precision fp32
+```
+
+Only after inspecting a passing stability report and its GPU peak memory, start the actual Phase 2B run explicitly. If only the FP32 smoke passes, append `--precision fp32` to this command:
 
 ```bash
 python -m ml.training.phase2b \
@@ -72,7 +86,7 @@ python -m ml.training.phase2b \
   --resume-from-checkpoint /kaggle/working/satquery-output/phase2b/checkpoints/checkpoint-<step>
 ```
 
-The resumed run must use the same config, manifest, base-model revision, and preprocessing profile. The entrypoint records their hashes in `resume_guard.json` before training and refuses incompatible resumes. `run.json` additionally records the Git commit when a run completes.
+The resumed run must use the same config, frozen manifest, base-model revision, preprocessing profile, and selected precision. The entrypoint records them in `resume_guard.json` before training and refuses incompatible resumes. `run.json` additionally records the Git commit when a run completes.
 
 ## Outputs and retrieval
 
@@ -81,7 +95,7 @@ All writable artifacts are below `/kaggle/working/satquery-output/<run>`:
 ```text
 adapter/       final PEFT adapter and processor files
 checkpoints/   resumable Trainer checkpoints
-metrics/       train metrics, GPU peak memory, and smoke prediction
+metrics/       train metrics, stability/failure report, GPU peak memory, smoke prediction
 logs/          TensorBoard event logs
 evaluation/    frozen/adapted/control metrics and predictions
 run.json       Git, dataset, model, preprocessing, hardware, and artifact provenance
