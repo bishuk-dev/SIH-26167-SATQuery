@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "satquery"
+version = "0.1.0"
+description = "Evidence-grounded, sensor-aware remote-sensing analysis"
+requires-python = ">=3.11"
+dependencies = [
+  "affine>=2.4,<4",
+  "fastapi>=0.110,<1",
+  "numpy>=2,<3",
+  "pydantic>=2.10,<3",
+  "python-multipart>=0.0.20,<1",
+  "rasterio>=1.4,<2",
+  "uvicorn>=0.30,<1",
+]
+
+[project.optional-dependencies]
+dev = [
+  "httpx>=0.27,<1",
+  "pytest>=8,<10",
+]
+
+[tool.setuptools.packages.find]
+include = ["satquery*"]
+
+[tool.setuptools.package-data]
+"satquery.registry" = ["*.yaml"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --basetemp=.pytest-tmp"

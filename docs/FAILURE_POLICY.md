@@ -374,6 +374,51 @@ CRITICAL
 
 ---
 
+## F-UPLOAD-006 — Asset storage failure
+
+**Condition**
+
+The inspected raster cannot be promoted from quarantine into immutable observation storage, or its filesystem registration record cannot be written safely.
+
+**Outcome**
+
+```text
+REJECT
+```
+
+**Code**
+
+```text
+ASSET_STORAGE_FAILED
+```
+
+This is a server-side failure. Partial observation state and remaining quarantine files must be cleaned before a retry.
+
+---
+
+## F-UPLOAD-007 — Visualization derivative failure
+
+**Condition**
+
+The source raster passes inspection, but its bounded display-only derivative cannot be generated or exceeds the configured derivative-size limit.
+
+**Outcome**
+
+```text
+REJECT
+```
+
+**Codes**
+
+```text
+VISUALIZATION_GENERATION_FAILED
+VISUALIZATION_RESOURCE_LIMIT_EXCEEDED
+```
+
+The original and derivative quarantine artifacts must be cleaned; no partial observation is registered.
+
+---
+
 # 7. Metadata failures
 
 ## F-META-001 — Missing CRS
@@ -1523,6 +1568,7 @@ Better:
 | corrupt TIFF | REJECT | INVALID_RASTER |
 | oversized TIFF | REJECT | RASTER_RESOURCE_LIMIT_EXCEEDED |
 | unsupported driver | REJECT | UNSUPPORTED_RASTER_DRIVER |
+| asset storage failure | REJECT | ASSET_STORAGE_FAILED |
 
 ---
 

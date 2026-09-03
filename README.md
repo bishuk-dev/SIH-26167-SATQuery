@@ -1454,7 +1454,7 @@ OpenLayers
 Tailwind CSS
 ```
 
-## Backend
+## Python domain/backend environment
 
 ```text
 Python
@@ -1590,7 +1590,7 @@ Rasterio/GDAL
    ↓
 COG / raster source
    ↓
-rio-tiler / TiTiler
+bounded Rasterio tile renderer
    ↓
 XYZ tiles
    ↓
@@ -1598,6 +1598,8 @@ OpenLayers
 ```
 
 The browser loads only the imagery required for the current viewport and zoom level.
+
+The MVP uses Rasterio directly. `rio-tiler` or TiTiler remains an optional scale-up path rather than a required dependency.
 
 ---
 
@@ -1613,8 +1615,12 @@ data/
 │   └── <observation_id>/
 │       ├── original.tif
 │       ├── visualization.tif
+│       ├── visualization.json
 │       ├── thumbnail.png
 │       └── metadata.json
+│
+├── assets/
+│   └── <visualization_asset_id>.json
 │
 ├── analyses/
 │   └── <analysis_id>/
@@ -1902,24 +1908,22 @@ source .venv/bin/activate
 # Windows
 # .venv\Scripts\activate
 
-pip install -r apps/api/requirements.txt
+pip install -e ".[dev]"
 ```
 
-Start:
+Start the Phase 1B API:
 
 ```bash
 uvicorn apps.api.app.main:app --reload
 ```
 
+Run the current test suite with `python -m pytest`.
+
 ---
 
 ## Frontend
 
-```bash
-cd apps/web
-npm install
-npm run dev
-```
+The frontend package has not been scaffolded yet. It will be added with the imagery-viewer phase rather than maintained as unused boilerplate.
 
 ---
 
@@ -1943,12 +1947,15 @@ SATQUERY_ENV=development
 DATA_ROOT=./data
 MODEL_ROOT=./models
 
-DATABASE_URL=sqlite:///./satquery.db
+DATABASE_URL=sqlite:///./data/satquery.db
 
-MAX_UPLOAD_SIZE_MB=
-MAX_RASTER_PIXELS=
+MAX_UPLOAD_SIZE_MB=512
+MAX_RASTER_WIDTH=50000
+MAX_RASTER_HEIGHT=50000
+MAX_RASTER_PIXELS=150000000
+MAX_RASTER_BANDS=32
 
-GPU_DEVICE=cuda:0
+GPU_DEVICE=cpu
 
 ENABLE_REMOTE_NETWORK=false
 ```
@@ -2033,13 +2040,13 @@ Non-overlapping temporal pair
 
 ## Phase 1 — Geospatial foundation
 
-- [ ] GeoTIFF upload
-- [ ] Raster metadata inspector
-- [ ] CRS/GSD/bounds extraction
-- [ ] Pair validator
-- [ ] COG/tiling support
+- [x] GeoTIFF upload
+- [x] Raster metadata inspector
+- [x] CRS/GSD/bounds extraction
+- [x] Pair validator
+- [x] COG/tiling support
 - [ ] OpenLayers viewer
-- [ ] Coordinate-mapping tests
+- [x] Coordinate-mapping tests
 
 ---
 

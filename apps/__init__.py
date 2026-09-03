@@ -1,0 +1,1 @@
+"""SatQuery application entry points."""

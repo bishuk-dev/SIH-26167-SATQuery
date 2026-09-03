@@ -1583,12 +1583,14 @@ Scientific raster
       ↓
 COG / raster source
       ↓
-rio-tiler / TiTiler
+bounded Rasterio tile renderer
       ↓
 XYZ tile endpoint
       ↓
 OpenLayers
 ```
+
+The MVP renders requested windows directly with Rasterio. `rio-tiler` or TiTiler remains a scale-up option if tile requirements outgrow this boundary.
 
 Dense evidence masks should normally be rendered as raster overlays.
 
@@ -2388,6 +2390,7 @@ INVALID_UPLOAD
 UNSUPPORTED_RASTER_DRIVER
 RASTER_RESOURCE_LIMIT_EXCEEDED
 RASTER_METADATA_INVALID
+ASSET_STORAGE_FAILED
 
 UNKNOWN_MODALITY
 UNSUPPORTED_MODALITY

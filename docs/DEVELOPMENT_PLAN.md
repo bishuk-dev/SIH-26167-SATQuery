@@ -27,6 +27,14 @@ These research artifacts are not a code dependency for beginning the Phase 1 geo
 9. **Phase 10 — Product experience:** complete evidence inspection, temporal/multimodal controls, warnings, trace views, and structured report export.
 10. **Phases 11–12 — Red-team and hardening:** run adversarial raster/failure suites, freeze checkpoints and preprocessing, profile performance, verify offline deployment, and prepare reproducible demos.
 
+**Phase 1A status: complete.** Typed observation contracts, metadata-only GeoTIFF/TIFF inspection, provenance hashing, and configurable header/file limits are implemented and covered by focused tests. Upload handling, persistence, pair compatibility, and all raster transformations remain outside Phase 1A.
+
+**Phase 1B status: complete.** The FastAPI ingestion boundary streams multipart uploads through controlled quarantine, registers immutable originals and filesystem metadata using server-generated IDs, returns sanitized observation metadata, and cleans rejected files. Database persistence and downstream raster processing remain deferred.
+
+**Phase 1C status: complete.** Typed pair compatibility, read-only pair validation, affine/crop coordinate mapping, and CRS bounds transformation are implemented. Pair validation distinguishes exact grid compatibility from pairs that remain analyzable after future reprojection, resampling, or registration; those transformations remain deferred.
+
+**Phase 1D status: complete.** Each accepted observation now receives an immutable, display-only COG derivative with parent provenance and a source-grid-preserving affine. The API returns its display and tile metadata, and serves bounded PNG tiles through Web Mercator XYZ or an explicit pixel-grid fallback for ungeoreferenced imagery. The frontend remains deferred.
+
 ## Foundation decisions
 
 - Keep the implementation as a modular monolith until measured scaling needs justify additional infrastructure.
