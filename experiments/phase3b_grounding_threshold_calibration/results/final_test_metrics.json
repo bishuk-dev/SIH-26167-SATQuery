@@ -8,11 +8,11 @@
   "phase3_tuning_reopened": false,
   "scene_count": 8,
   "reference_count": 16,
-  "mean_iou": 0.17385793,
+  "mean_iou": 0.17385757,
   "acc_at_0_5_iou": 0.1875,
   "no_detection_count": 2,
   "detected_reference_count": 14,
-  "detected_only_mean_iou": 0.19869478,
+  "detected_only_mean_iou": 0.19869437,
   "huge_selected_box_count": 0,
   "dataset": {
     "id": "xiang709/VRSBench",
@@ -23,9 +23,9 @@
     "text_annotation_license": "CC-BY-4.0",
     "image_use": "academic_research_only; verify source-image terms"
   },
-  "manifest": "C:\\Users\\Techno\\Documents\\GitHub\\SIH-26167-SATQuery\\experiments\\phase3a_grounding_dino_vrsbench\\split_manifest.json",
-  "manifest_sha256": "5128144b792cc5cb30a039bdb11f99347e982a7fc4eeedf1501f118ac1e2ba52",
-  "frozen_decision_sha256": "fdab23f61c5e35e7417eef7a333c357d3350c8bacebcf43e579660a493bfe622",
+  "manifest": "/kaggle/working/SIH-26167-SATQuery/experiments/phase3a_grounding_dino_vrsbench/split_manifest.json",
+  "manifest_sha256": "c4112c133734257caf0540cd327cda40a87acff864d1588b30ef2689627fdb9b",
+  "frozen_decision_sha256": "4e9c8bf7c10c63c52444ad8420160ad48202333b85f52ec09473c3276d45c814",
   "model": {
     "registry_id": "grounding_dino_tiny_phase3_final_v1",
     "model_id": "IDEA-Research/grounding-dino-tiny",
@@ -41,24 +41,29 @@
     "empty_selection": "abstain with valid empty evidence"
   },
   "runtime": {
-    "elapsed_seconds": 5216.0468,
-    "python": "3.13.9",
-    "pytorch": "2.13.0+cpu",
-    "device": "cpu",
-    "cuda_available": false,
-    "cuda_version": null,
-    "gpu": null,
-    "peak_gpu_memory_bytes": null
+    "elapsed_seconds": 53.1317,
+    "python": "3.12.13",
+    "pytorch": "2.8.0+cu126",
+    "device": "cuda",
+    "cuda_available": true,
+    "cuda_version": "12.6",
+    "gpu": "Tesla P100-PCIE-16GB",
+    "peak_gpu_memory_bytes": 1569480704
   },
   "provenance": {
     "commit": "86e1dcf5939d61d0ea453ea430950af7b4293cf7",
-    "dirty_worktree": true,
-    "runner_experiment": null,
-    "runner_reproducible": null,
+    "dirty_worktree": false,
+    "runner_experiment": "phase3-final-grounding-test",
+    "runner_metadata": {
+      "git_sha": "86e1dcf5939d61d0ea453ea430950af7b4293cf7",
+      "experiment": "phase3-final-grounding-test",
+      "reproducible": true,
+      "dirty_worktree": false
+    },
     "production_grounding_sha256": "62fd5b7d1a597c8d55570998dfdd6de4a6f7255019aa38d0cebd1acd6e8926e7",
     "model_registry_sha256": "785817bfb8df66954dc0655c592a7496e4f96a46a0743d63b986bd2e1f25dfef",
     "preprocessing_registry_sha256": "89922637f1f1c0e25d57c0fda41e0d014be35fe89308253334d54424e1516f22"
   },
   "prediction_file": "final_test_predictions.jsonl",
-  "prediction_file_sha256": "e3cfec03f83588fc0e19314ec9e7db2a602f0c7e532d75a305d8b86c834bd5c9"
+  "prediction_file_sha256": "966d319d003a2fb5b2357aff023e1eb2d479a8dff85098aca9fff9ecbe7f5c6b"
 }
