@@ -1,0 +1,346 @@
+{
+  "schema_version": 1,
+  "scope": {
+    "splits_analyzed": [
+      "train",
+      "validation"
+    ],
+    "test_samples_analyzed": 0,
+    "phase2b_comparison_predictions_available": false
+  },
+  "source": {
+    "manifest": "experiments/phase2b_smolvlm_rsvqa_lr/split_manifest.json",
+    "manifest_sha256": "deaf8a0f5f2d053ad0803c19fd8524a143599f214fdbf83f9548c69ba0ca34c2"
+  },
+  "samples": {
+    "train": 1378,
+    "validation": 180
+  },
+  "normalized_question_overlap": {
+    "train_unique": 682,
+    "validation_unique": 161,
+    "shared_unique": 104,
+    "validation_unique_share": 0.645963,
+    "validation_samples_with_seen_question": 122,
+    "validation_sample_share": 0.677778
+  },
+  "answer_distribution": {
+    "train": {
+      "total": 1378,
+      "yes": 479,
+      "no": 477,
+      "yes_no_total": 956,
+      "yes_no_share": 0.693759,
+      "other_total": 422,
+      "top_answers": {
+        "yes": 479,
+        "no": 477,
+        "0": 104,
+        "1": 24,
+        "2": 14,
+        "4": 11,
+        "urban": 11,
+        "3": 9,
+        "6": 9,
+        "rural": 9
+      }
+    },
+    "validation": {
+      "total": 180,
+      "yes": 54,
+      "no": 71,
+      "yes_no_total": 125,
+      "yes_no_share": 0.694444,
+      "other_total": 55,
+      "top_answers": {
+        "no": 71,
+        "yes": 54,
+        "0": 9,
+        "3": 3,
+        "6": 3,
+        "5": 3,
+        "rural": 2,
+        "2": 2,
+        "77": 2,
+        "4": 2
+      }
+    }
+  },
+  "question_types": {
+    "train": {
+      "presence": {
+        "samples": 398,
+        "share": 0.288824,
+        "top_answers": {
+          "yes": 311,
+          "no": 87
+        },
+        "majority_share": 0.781407
+      },
+      "comparison": {
+        "samples": 558,
+        "share": 0.404935,
+        "top_answers": {
+          "no": 390,
+          "yes": 168
+        },
+        "majority_share": 0.698925
+      },
+      "count": {
+        "samples": 402,
+        "share": 0.291727,
+        "top_answers": {
+          "0": 104,
+          "1": 24,
+          "2": 14,
+          "4": 11,
+          "3": 9
+        },
+        "majority_share": 0.258706
+      },
+      "rural_urban": {
+        "samples": 20,
+        "share": 0.014514,
+        "top_answers": {
+          "urban": 11,
+          "rural": 9
+        },
+        "majority_share": 0.55
+      }
+    },
+    "validation": {
+      "presence": {
+        "samples": 46,
+        "share": 0.255556,
+        "top_answers": {
+          "yes": 31,
+          "no": 15
+        },
+        "majority_share": 0.673913
+      },
+      "comparison": {
+        "samples": 79,
+        "share": 0.438889,
+        "top_answers": {
+          "no": 56,
+          "yes": 23
+        },
+        "majority_share": 0.708861
+      },
+      "count": {
+        "samples": 51,
+        "share": 0.283333,
+        "top_answers": {
+          "0": 9,
+          "3": 3,
+          "6": 3,
+          "5": 3,
+          "2": 2
+        },
+        "majority_share": 0.176471
+      },
+      "rural_urban": {
+        "samples": 4,
+        "share": 0.022222,
+        "top_answers": {
+          "rural": 2,
+          "urban": 2
+        },
+        "majority_share": 0.5
+      }
+    }
+  },
+  "train_question_conditioning": {
+    "repeated_questions_with_multiple_answers": 100,
+    "samples_in_visual_contrast_groups": 386,
+    "validation_samples_in_visual_contrast_groups": 36,
+    "balanced_training_samples": 464,
+    "balanced_training_scenes": 70
+  },
+  "repeated_question_answer_patterns": {
+    "total_repeated_groups": 274,
+    "single_answer_groups": 174,
+    "multiple_answer_groups": 100,
+    "by_question_type": {
+      "presence": {
+        "repeated_groups": 86,
+        "multiple_answer_groups": 17
+      },
+      "comparison": {
+        "repeated_groups": 107,
+        "multiple_answer_groups": 20
+      },
+      "count": {
+        "repeated_groups": 80,
+        "multiple_answer_groups": 62
+      },
+      "rural_urban": {
+        "repeated_groups": 1,
+        "multiple_answer_groups": 1
+      }
+    },
+    "most_frequent": [
+      {
+        "question": "is it a rural or an urban area",
+        "samples": 20,
+        "answers": {
+          "urban": 11,
+          "rural": 9
+        }
+      },
+      {
+        "question": "are there more residential buildings than water areas",
+        "samples": 10,
+        "answers": {
+          "yes": 9,
+          "no": 1
+        }
+      },
+      {
+        "question": "how many commercial buildings are there",
+        "samples": 10,
+        "answers": {
+          "1": 2,
+          "0": 2,
+          "15": 1,
+          "4": 1,
+          "3": 1,
+          "16": 1,
+          "5": 1,
+          "136": 1
+        }
+      },
+      {
+        "question": "is there a commercial building",
+        "samples": 10,
+        "answers": {
+          "yes": 8,
+          "no": 2
+        }
+      },
+      {
+        "question": "are there less commercial buildings than roads",
+        "samples": 9,
+        "answers": {
+          "yes": 9
+        }
+      },
+      {
+        "question": "is a residential building present",
+        "samples": 9,
+        "answers": {
+          "yes": 9
+        }
+      },
+      {
+        "question": "are there less buildings than water areas",
+        "samples": 8,
+        "answers": {
+          "no": 8
+        }
+      },
+      {
+        "question": "how many forests are there",
+        "samples": 8,
+        "answers": {
+          "22": 1,
+          "39": 1,
+          "150": 1,
+          "277": 1,
+          "90": 1,
+          "94": 1,
+          "104": 1,
+          "196": 1
+        }
+      },
+      {
+        "question": "is a building present",
+        "samples": 8,
+        "answers": {
+          "yes": 8
+        }
+      },
+      {
+        "question": "is the number of buildings equal to the number of roads",
+        "samples": 8,
+        "answers": {
+          "no": 8
+        }
+      },
+      {
+        "question": "is there a forest",
+        "samples": 8,
+        "answers": {
+          "yes": 8
+        }
+      },
+      {
+        "question": "what is the amount of buildings",
+        "samples": 8,
+        "answers": {
+          "198": 1,
+          "156": 1,
+          "973": 1,
+          "289": 1,
+          "145": 1,
+          "24": 1,
+          "7268": 1,
+          "577": 1
+        }
+      },
+      {
+        "question": "are there less residential buildings than roads",
+        "samples": 7,
+        "answers": {
+          "no": 7
+        }
+      },
+      {
+        "question": "are there less water areas than commercial buildings",
+        "samples": 7,
+        "answers": {
+          "no": 5,
+          "yes": 2
+        }
+      },
+      {
+        "question": "are there less water areas than roads",
+        "samples": 7,
+        "answers": {
+          "yes": 7
+        }
+      }
+    ]
+  },
+  "question_only_validation": {
+    "method": "train exact-question majority; global train majority fallback",
+    "normalized_exact_match": 0.561111,
+    "per_question_type": {
+      "presence": {
+        "samples": 46,
+        "normalized_exact_match": 0.804348
+      },
+      "comparison": {
+        "samples": 79,
+        "normalized_exact_match": 0.721519
+      },
+      "count": {
+        "samples": 51,
+        "normalized_exact_match": 0.098039
+      },
+      "rural_urban": {
+        "samples": 4,
+        "normalized_exact_match": 0.5
+      }
+    }
+  },
+  "visual_prediction_diagnostics": {
+    "status": "requires_phase2b_validation_predictions",
+    "reason": "No Phase 2B comparison predictions are present locally; the supplied aggregate scores are from the frozen test subset and are not reused."
+  },
+  "selected_intervention": {
+    "name": "visual_contrast_balanced_sampling",
+    "rationale": "Train only on real cross-scene groups where the same normalized question has multiple answers, balancing each answer within its question. The question alone is therefore insufficient.",
+    "test_samples_used": 0
+  }
+}

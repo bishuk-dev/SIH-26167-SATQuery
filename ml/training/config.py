@@ -8,6 +8,8 @@ from typing import Literal
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from ml.training.sampling import SamplingStrategy
+
 
 class TrainingConfig(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -38,6 +40,7 @@ class TrainingConfig(BaseModel):
     save_total_limit: int = Field(gt=0)
     max_new_tokens: int = Field(gt=0, le=64)
     evaluation_max_samples: int = Field(gt=0, le=1000)
+    training_sampling: SamplingStrategy = "all"
 
     @model_validator(mode="after")
     def validate_lora_rank(self) -> TrainingConfig:

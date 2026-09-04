@@ -37,7 +37,9 @@ These research artifacts are not a code dependency for beginning the Phase 1 geo
 
 **Phase 2A status: complete.** The pinned frozen `HuggingFaceTB/SmolVLM-256M-Instruct` baseline is registered with a versioned 512 × 512 preprocessing profile and checksum verification. Registered observations can produce structured VQA evidence through the API. A deterministic 24-question RSVQA-LR smoke subset is grouped by image-content hash into 14/4/6 train/validation/test questions, and the six-question held-out result is stored under `experiments/phase2a_smolvlm_rsvqa_lr/`. This result establishes plumbing, not model quality.
 
-**Phase 2B status: GPU-ready, training incomplete.** A separate 1,767-question RSVQA-LR adaptation manifest contains 70/9/9 scene-grouped train/validation/test scenes and excludes all 12 Phase 2A scenes. Rank-8 attention-projection LoRA, checkpoint/resume handling, structured run provenance, frozen/adapted evaluation, and majority/question-only/blank/shuffled controls are implemented. A one-step CPU smoke test passed; meaningful adaptation and final comparison await a CUDA run.
+**Phase 2B status: complete.** A separate 1,767-question RSVQA-LR adaptation manifest contains 70/9/9 scene-grouped train/validation/test scenes and excludes all 12 Phase 2A scenes. Rank-8 attention-projection LoRA improved the reported held-out exact match from 0.26 to 0.57, but question-only, blank-image, and shuffled-image controls around 0.54–0.55 exposed substantial shortcut learning.
+
+**Phase 2C status: GPU evaluation pending.** Train/validation diagnostics identify strong exact-question and answer-template priors. One predeclared candidate uses balanced real examples where identical normalized questions have different answers across scenes. Its validation-only correct/blank/shuffled comparison is implemented; the Phase 2B test split remains frozen.
 
 ## Foundation decisions
 

@@ -20,6 +20,7 @@ from PIL import Image
 
 from ml.training.config import TrainingConfig, load_training_config
 from ml.training.precision import PrecisionSelection, select_precision
+from ml.training.sampling import select_training_samples
 from ml.training.stability import NonFiniteTrainingError, StabilityMonitorCallback
 from satquery.inference.preprocessing import FrozenImagePreprocessor
 from satquery.registry import load_model_registry, load_preprocessing_registry
@@ -185,6 +186,11 @@ def run_training(
         train_split=config.train_split,
         validation_split=config.validation_split,
     )
+    train_samples, sampling_report = select_training_samples(
+        train_samples,
+        strategy=config.training_sampling,
+        seed=config.seed,
+    )
     if smoke_test:
         train_samples = train_samples[:2]
         validation_samples = validation_samples[:1]
@@ -339,6 +345,7 @@ def run_training(
             "status": "FAIL",
             "error": str(exc),
             "selected_precision": precision.name,
+            "training_sampling": sampling_report.as_dict(),
             "gradient_accumulation_steps": (
                 1 if smoke_test else config.gradient_accumulation_steps
             ),
@@ -368,6 +375,7 @@ def run_training(
             "total_parameters": total,
             "trainable_fraction": trainable / total,
             "selected_precision": precision.name,
+            "training_sampling": sampling_report.as_dict(),
         }
     )
     if device == "cuda":
@@ -421,6 +429,7 @@ def run_training(
         "manifest": str(manifest_path),
         "manifest_sha256": resume_guard["manifest_sha256"],
         "dataset": manifest["dataset"],
+        "training_sampling": sampling_report.as_dict(),
         "base_model": {
             "registry_id": config.model_registry_id,
             "model_id": registration.model_id,
