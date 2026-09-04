@@ -62,13 +62,24 @@ def _run(
     cwd: Path | None = None,
     check: bool = True,
 ) -> subprocess.CompletedProcess[str]:
-    """Run a subprocess, streaming output unless capture=True."""
+    """
+    Run a subprocess, streaming output unless capture=True.
+
+    Forces UTF-8 encoding for both our text=True capture and for the
+    child process's own stdout/stderr via PYTHONIOENCODING.  This prevents
+    'charmap' codec errors on Windows when the Kaggle CLI prints Unicode
+    characters (emoji, special paths) to a cp1252 console.
+    """
+    env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
     return subprocess.run(
         cmd,
         capture_output=capture,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         check=check,
         cwd=str(cwd or REPO_ROOT),
+        env=env,
     )
 
 
@@ -466,11 +477,20 @@ def _download_artifacts(
 
     with tempfile.TemporaryDirectory(prefix="satquery-kaggle-dl-") as tmp:
         tmp_path = Path(tmp)
-        _run([
+        dl_result = _run([
             "kaggle", "kernels", "output", kernel_id,
             "-p", str(tmp_path),
             "--file-pattern", pattern,
-        ])
+        ], check=False)
+        # The Kaggle CLI on Windows may exit non-zero after printing Unicode
+        # characters that the cp1252 console can't encode, even though all
+        # requested files have already been written to disk.  We detect this
+        # by checking file presence below and only fail if files are absent.
+        if dl_result.returncode != 0:
+            _warn(
+                f"kaggle kernels output exited with code {dl_result.returncode} "
+                "(often a Windows encoding issue — checking whether files arrived)"
+            )
 
         # Kaggle CLI mirrors the remote path structure under tmp_path.
         # Notebook artifacts live at:

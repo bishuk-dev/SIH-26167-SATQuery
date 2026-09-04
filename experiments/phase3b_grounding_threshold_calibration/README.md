@@ -80,14 +80,28 @@ validates the production registry against `decision.json`, accepts only the fixe
 already exists. Ground truth is read only after inference and the shared
 production selector has completed for every reference.
 
-The local checkpoint download stalled before inference and created no final-test
-artifact, so `test_split_evaluated` remains false. After committing the frozen
-implementation, launch the GPU run exactly once from a clean worktree:
+The one-time test completed on the untouched 8-scene / 16-reference split. These
+are final observational results and must not be used to change the model,
+thresholds, preprocessing, guardrail, queries, or selection policy.
 
-```bash
-python scripts/kaggle/runner.py run phase3-final-grounding-test
-```
+| Frozen-policy split | References | Mean IoU | Acc@0.5 | No detection | Detected | Detected-only mIoU | Huge boxes |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Validation | 24 | 0.2058 | 25.00% | 9 | 15 | 0.3293 | 0 |
+| **Final test** | **16** | **0.1739** | **18.75%** | **2** | **14** | **0.1987** | **0** |
 
-The runner retrieves `results/final_test_metrics.json` and
-`results/final_test_predictions.jsonl`. Review and record those immutable results
-without changing the frozen policy or reopening Phase 3 tuning.
+The final test ran once in 53.1317 seconds on a Tesla P100-PCIE-16GB with
+PyTorch 2.8.0+cu126. Peak allocated GPU memory was 1,569,480,704 bytes
+(approximately 1.46 GiB). The clean run used Git commit
+`86e1dcf5939d61d0ea453ea430950af7b4293cf7`, manifest SHA-256
+`c4112c133734257caf0540cd327cda40a87acff864d1588b30ef2689627fdb9b`,
+and the registered Grounding DINO Tiny checkpoint SHA-256
+`1a2412ef99bd74bcd3c2a246fa1e48581f8889a1300c9051974741314fc042f3`.
+
+Compared with frozen validation, test mean IoU is lower by 0.0320 and Acc@0.5
+is lower by 6.25 percentage points. This comparison is context only: validation
+tuning remains closed, the test will not be rerun, and Phase 3 is complete.
+
+Immutable evidence:
+
+- `results/final_test_metrics.json`
+- `results/final_test_predictions.jsonl`

@@ -73,7 +73,46 @@
     "selection": "highest raw model score among remaining detections",
     "all_rejected": "abstain with valid empty evidence"
   },
+  "final_test": {
+    "status": "final_observational_evidence",
+    "execution_ordinal": 1,
+    "metrics_artifact": "results/final_test_metrics.json",
+    "metrics_artifact_sha256": "6268d666dba8de19175668677363d2623c0180f8439d19f4464ab96bc1538f0a",
+    "predictions_artifact": "results/final_test_predictions.jsonl",
+    "predictions_artifact_sha256": "966d319d003a2fb5b2357aff023e1eb2d479a8dff85098aca9fff9ecbe7f5c6b",
+    "scenes": 8,
+    "references": 16,
+    "mean_iou": 0.17385757,
+    "acc_at_0_5_iou": 0.1875,
+    "no_detection_count": 2,
+    "detected_reference_count": 14,
+    "detected_only_mean_iou": 0.19869437,
+    "huge_selected_box_count": 0,
+    "runtime": {
+      "elapsed_seconds": 53.1317,
+      "python": "3.12.13",
+      "pytorch": "2.8.0+cu126",
+      "device": "cuda",
+      "cuda_version": "12.6",
+      "gpu": "Tesla P100-PCIE-16GB",
+      "peak_gpu_memory_bytes": 1569480704
+    },
+    "provenance": {
+      "git_commit": "86e1dcf5939d61d0ea453ea430950af7b4293cf7",
+      "clean_reproducible_run": true,
+      "manifest_sha256": "c4112c133734257caf0540cd327cda40a87acff864d1588b30ef2689627fdb9b",
+      "frozen_decision_sha256_at_execution": "4e9c8bf7c10c63c52444ad8420160ad48202333b85f52ec09473c3276d45c814",
+      "model_registry_id": "grounding_dino_tiny_phase3_final_v1",
+      "model_revision": "a2bb814dd30d776dcf7e30523b00659f4f141c71",
+      "checkpoint_sha256": "1a2412ef99bd74bcd3c2a246fa1e48581f8889a1300c9051974741314fc042f3",
+      "preprocessing_profile": "grounding_dino_tiny_phase3_final_v1",
+      "preprocessing_version": "1.0.0"
+    },
+    "interpretation": "Final test evidence only; no Phase 3 tuning or policy changes are permitted from this result."
+  },
   "specialist_status": "frozen",
+  "phase3_status": "complete",
   "phase3_validation_tuning_closed": true,
-  "test_split_evaluated": false
+  "final_test_executed_once": true,
+  "test_split_evaluated": true
 }

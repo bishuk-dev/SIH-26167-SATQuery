@@ -73,6 +73,10 @@ def _frozen_inputs(tmp_path: Path) -> tuple[Path, Path, Path]:
         Path("experiments/phase3b_grounding_threshold_calibration/decision.json")
         .read_text(encoding="utf-8")
     )
+    # Unit tests exercise the pre-execution guard state without touching the real test.
+    decision["test_split_evaluated"] = False
+    decision["final_test_executed_once"] = False
+    decision.pop("final_test", None)
     decision_path = tmp_path / "decision.json"
     decision_path.write_text(json.dumps(decision), encoding="utf-8")
     return manifest_path, data_root, decision_path
@@ -153,3 +157,42 @@ def test_final_test_rejects_policy_drift_before_inference(tmp_path: Path) -> Non
             confirmed=True,
             backend=NoCallBackend(),
         )
+
+
+def test_completed_final_test_artifacts_match_recorded_decision() -> None:
+    experiment = Path("experiments/phase3b_grounding_threshold_calibration")
+    decision = json.loads((experiment / "decision.json").read_text(encoding="utf-8"))
+    final_test = decision["final_test"]
+    metrics_path = experiment / final_test["metrics_artifact"]
+    predictions_path = experiment / final_test["predictions_artifact"]
+    metrics = json.loads(metrics_path.read_text(encoding="utf-8"))
+    predictions = [
+        json.loads(line)
+        for line in predictions_path.read_text(encoding="utf-8").splitlines()
+        if line
+    ]
+
+    assert hashlib.sha256(metrics_path.read_bytes()).hexdigest() == final_test[
+        "metrics_artifact_sha256"
+    ]
+    assert hashlib.sha256(predictions_path.read_bytes()).hexdigest() == final_test[
+        "predictions_artifact_sha256"
+    ]
+    assert metrics["prediction_file_sha256"] == final_test[
+        "predictions_artifact_sha256"
+    ]
+    for key in (
+        "mean_iou",
+        "acc_at_0_5_iou",
+        "no_detection_count",
+        "detected_reference_count",
+        "detected_only_mean_iou",
+        "huge_selected_box_count",
+    ):
+        assert final_test[key] == metrics[key]
+    assert len(predictions) == 16
+    assert len({row["scene_id"] for row in predictions}) == 8
+    assert decision["test_split_evaluated"] is True
+    assert decision["final_test_executed_once"] is True
+    assert decision["phase3_validation_tuning_closed"] is True
+    assert decision["phase3_status"] == "complete"
