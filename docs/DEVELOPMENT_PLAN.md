@@ -39,7 +39,9 @@ These research artifacts are not a code dependency for beginning the Phase 1 geo
 
 **Phase 2B status: complete.** A separate 1,767-question RSVQA-LR adaptation manifest contains 70/9/9 scene-grouped train/validation/test scenes and excludes all 12 Phase 2A scenes. Rank-8 attention-projection LoRA improved the reported held-out exact match from 0.26 to 0.57, but question-only, blank-image, and shuffled-image controls around 0.54–0.55 exposed substantial shortcut learning.
 
-**Phase 2C status: GPU evaluation pending.** Train/validation diagnostics identify strong exact-question and answer-template priors. One predeclared candidate uses balanced real examples where identical normalized questions have different answers across scenes. Its validation-only correct/blank/shuffled comparison is implemented; the Phase 2B test split remains frozen.
+**Phase 2C status: complete and rejected.** Train/validation diagnostics identified strong exact-question and answer-template priors. The single visual-contrast sampling experiment did not materially increase the correct-image gap over blank/shuffled controls. Phase 2 is frozen; no further RSVQA training or test evaluation is planned.
+
+**Phase 3A status: implementation complete; GPU benchmark pending.** Grounding DINO Tiny is pinned with frozen preprocessing, a production adapter emits model/source/normalized/world-coordinate evidence, and `POST /api/grounding` exposes it for registered observations. A checksum-verified VRSBench subset contains 12 validation scenes / 24 references and 8 untouched test scenes / 16 references. The metric runner and thin Kaggle notebook are ready; measured model metrics require the explicit GPU run.
 
 ## Foundation decisions
 

@@ -15,3 +15,7 @@ class ModelInputUnsupportedError(ModelInferenceError):
 
 class ModelExecutionError(ModelInferenceError):
     code = "MODEL_EXECUTION_FAILED"
+
+
+class EvidenceGeometryError(ModelInferenceError):
+    code = "INVALID_EVIDENCE_GEOMETRY"

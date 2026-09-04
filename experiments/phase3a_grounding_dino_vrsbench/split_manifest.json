@@ -1,0 +1,856 @@
+{
+  "schema_version": 1,
+  "dataset": {
+    "id": "xiang709/VRSBench",
+    "revision": "6cee2968fd752a6d51c6cb2d18dded2bc0baa218",
+    "annotation_file": "VRSBench_EVAL_referring.json",
+    "annotation_sha256": "fd63f7c6b77a158f4cc933a1ead88fa63aa23ebcf30f2ec9be111f3567ff1b44",
+    "image_archive": "Images_val.zip",
+    "text_annotation_license": "CC-BY-4.0",
+    "image_use": "academic_research_only; verify source-image terms"
+  },
+  "coordinate_contract": {
+    "source": "VRSBench ground_truth tokens normalized to 0-100",
+    "stored": "xyxy normalized to 0-1"
+  },
+  "selection": {
+    "seed": 43,
+    "eligible_rule": "valid_box_and_at_least_two_references_per_scene",
+    "scenes": 20,
+    "references_per_scene": 2
+  },
+  "scene_assignments": {
+    "P1005_0026.png": "validation",
+    "07390_0000.png": "validation",
+    "10981_0000.png": "validation",
+    "P0524_0004.png": "validation",
+    "P1809_0120.png": "validation",
+    "09477_0000.png": "validation",
+    "P0968_0000.png": "validation",
+    "P0990_0010.png": "validation",
+    "09891_0000.png": "validation",
+    "07002_0000.png": "validation",
+    "06769_0000.png": "validation",
+    "P1390_0080.png": "validation",
+    "P0961_0014.png": "test",
+    "P2645_0046.png": "test",
+    "P5789_2323.png": "test",
+    "07084_0000.png": "test",
+    "08212_0000.png": "test",
+    "10804_0000.png": "test",
+    "P6687_0130.png": "test",
+    "07300_0000.png": "test"
+  },
+  "counts": {
+    "validation": {
+      "scenes": 12,
+      "references": 24
+    },
+    "test": {
+      "scenes": 8,
+      "references": 16
+    }
+  },
+  "samples": [
+    {
+      "sample_id": "vrsbench_ref_1004",
+      "scene_id": "eecbe09d65e4ce02a1522ec07145720aab56d179fd91144b658213ed115c318f",
+      "source_image_id": "P0524_0004.png",
+      "source_question_id": 1004,
+      "image_path": "data/benchmarks/vrsbench_grounding_phase3a/P0524_0004.png",
+      "image_sha256": "eecbe09d65e4ce02a1522ec07145720aab56d179fd91144b658213ed115c318f",
+      "image_width": 512,
+      "image_height": 512,
+      "query": "The small ship is situated on the water towards the top-right of the image.",
+      "object_class": "ship",
+      "unique": true,
+      "ground_truth_normalized_xyxy": [
+        0.8,
+        0.05,
+        0.86,
+        0.08
+      ],
+      "split": "validation"
+    },
+    {
+      "sample_id": "vrsbench_ref_1005",
+      "scene_id": "eecbe09d65e4ce02a1522ec07145720aab56d179fd91144b658213ed115c318f",
+      "source_image_id": "P0524_0004.png",
+      "source_question_id": 1005,
+      "image_path": "data/benchmarks/vrsbench_grounding_phase3a/P0524_0004.png",
+      "image_sha256": "eecbe09d65e4ce02a1522ec07145720aab56d179fd91144b658213ed115c318f",
+      "image_width": 512,
+      "image_height": 512,
+      "query": "The small harbor in the top-right area.",
+      "object_class": "harbor",
+      "unique": true,
+      "ground_truth_normalized_xyxy": [
+        0.81,
+        0.05,
+        1.0,
+        0.13
+      ],
+      "split": "validation"
+    },
+    {
+      "sample_id": "vrsbench_ref_1919",
+      "scene_id": "125fbf11298b18033a6b056524ae5d352f6f6ef607381b8e36fad82f63020d21",
+      "source_image_id": "P0961_0014.png",
+      "source_question_id": 1919,
+      "image_path": "data/benchmarks/vrsbench_grounding_phase3a/P0961_0014.png",
+      "image_sha256": "125fbf11298b18033a6b056524ae5d352f6f6ef607381b8e36fad82f63020d21",
+      "image_width": 512,
+      "image_height": 512,
+      "query": "The ship in the middle-right part of the image.",
+      "object_class": "ship",
+      "unique": false,
+      "ground_truth_normalized_xyxy": [
+        0.78,
+        0.46,
+        0.82,
+        0.51
+      ],
+      "split": "test"
+    },
+    {
+      "sample_id": "vrsbench_ref_1920",
+      "scene_id": "125fbf11298b18033a6b056524ae5d352f6f6ef607381b8e36fad82f63020d21",
+      "source_image_id": "P0961_0014.png",
+      "source_question_id": 1920,
+      "image_path": "data/benchmarks/vrsbench_grounding_phase3a/P0961_0014.png",
+      "image_sha256": "125fbf11298b18033a6b056524ae5d352f6f6ef607381b8e36fad82f63020d21",
+      "image_width": 512,
+      "image_height": 512,
+      "query": "The harbor located towards the center-left of the image.",
+      "object_class": "harbor",
+      "unique": false,
+      "ground_truth_normalized_xyxy": [
+        0.5,
+        0.48,
+        0.56,
+        0.8
+      ],
+      "split": "test"
+    },
+    {
+      "sample_id": "vrsbench_ref_1993",
+      "scene_id": "632b565f84eab6db6b2faaeff9d56b8445012c1a41f602f1f6adee4f449c2cc2",
+      "source_image_id": "P0968_0000.png",
+      "source_question_id": 1993,
+      "image_path": "data/benchmarks/vrsbench_grounding_phase3a/P0968_0000.png",
+      "image_sha256": "632b565f84eab6db6b2faaeff9d56b8445012c1a41f602f1f6adee4f449c2cc2",
+      "image_width": 512,
+      "image_height": 512,
+      "query": "The harbor located in the right side of the image.",
+      "object_class": "harbor",
+      "unique": false,
+      "ground_truth_normalized_xyxy": [
+        0.67,
+        0.29,
+        0.96,
+        1.0
+      ],
+      "split": "validation"
+    },
+    {
+      "sample_id": "vrsbench_ref_1994",
+      "scene_id": "632b565f84eab6db6b2faaeff9d56b8445012c1a41f602f1f6adee4f449c2cc2",
+      "source_image_id": "P0968_0000.png",
+      "source_question_id": 1994,
+      "image_path": "data/benchmarks/vrsbench_grounding_phase3a/P0968_0000.png",
+      "image_sha256": "632b565f84eab6db6b2faaeff9d56b8445012c1a41f602f1f6adee4f449c2cc2",
+      "image_width": 512,
+      "image_height": 512,
+      "query": "The harbor located on the left side of the image.",
+      "object_class": "harbor",
+      "unique": false,
+      "ground_truth_normalized_xyxy": [
+        0.26,
+        0.39,
+        0.45,
+        1.0
+      ],
+      "split": "validation"
+    },
+    {
+      "sample_id": "vrsbench_ref_2142",
+      "scene_id": "24b0cd3af1ca1a5de4024ba13310acd0ef0a27ab93ade6c476a9bc663e6cc04b",
+      "source_image_id": "P0990_0010.png",
+      "source_question_id": 2142,
+      "image_path": "data/benchmarks/vrsbench_grounding_phase3a/P0990_0010.png",
+      "image_sha256": "24b0cd3af1ca1a5de4024ba13310acd0ef0a27ab93ade6c476a9bc663e6cc04b",
+      "image_width": 512,
+      "image_height": 512,
+      "query": "The harbor situated near the bottom-left edge.",
+      "object_class": "harbor",
+      "unique": false,
+      "ground_truth_normalized_xyxy": [
+        0.05,
+        0.67,
+        0.19,
+        0.83
+      ],
+      "split": "validation"
+    },
+    {
+      "sample_id": "vrsbench_ref_2143",
+      "scene_id": "24b0cd3af1ca1a5de4024ba13310acd0ef0a27ab93ade6c476a9bc663e6cc04b",
+      "source_image_id": "P0990_0010.png",
+      "source_question_id": 2143,
+      "image_path": "data/benchmarks/vrsbench_grounding_phase3a/P0990_0010.png",
+      "image_sha256": "24b0cd3af1ca1a5de4024ba13310acd0ef0a27ab93ade6c476a9bc663e6cc04b",
+      "image_width": 512,
+      "image_height": 512,
+      "query": "The harbor located in the bottom-middle portion of the image, extending towards the bottom edge.",
+      "object_class": "harbor",
+      "unique": false,
+      "ground_truth_normalized_xyxy": [
+        0.48,
+        0.86,
+        0.54,
+        1.0
+      ],
+      "split": "validation"
+    },
+    {
+      "sample_id": "vrsbench_ref_2247",
+      "scene_id": "ab079f0e709af4bb5cdc2f80f8b71084fffd42290761ed4e8b9bfc111476008c",
+      "source_image_id": "P1005_0026.png",
+      "source_question_id": 2247,
+      "image_path": "data/benchmarks/vrsbench_grounding_phase3a/P1005_0026.png",
+      "image_sha256": "ab079f0e709af4bb5cdc2f80f8b71084fffd42290761ed4e8b9bfc111476008c",
+      "image_width": 512,
+      "image_height": 512,
+      "query": "The small harbor in the image is located at the bottom left.",
+      "object_class": "harbor",
+      "unique": true,
+      "ground_truth_normalized_xyxy": [
+        0.02,
+        0.86,
+        0.1,
+        1.0
+      ],
+      "split": "validation"
+    },
+    {
+      "sample_id": "vrsbench_ref_2248",
+      "scene_id": "ab079f0e709af4bb5cdc2f80f8b71084fffd42290761ed4e8b9bfc111476008c",
+      "source_image_id": "P1005_0026.png",
+      "source_question_id": 2248,
+      "image_path": "data/benchmarks/vrsbench_grounding_phase3a/P1005_0026.png",
+      "image_sha256": "ab079f0e709af4bb5cdc2f80f8b71084fffd42290761ed4e8b9bfc111476008c",
+      "image_width": 512,
+      "image_height": 512,
+      "query": "The small vehicle can be seen parked on the bottom right of the image.",
+      "object_class": "vehicle",
+      "unique": true,
+      "ground_truth_normalized_xyxy": [
+        0.76,
+        0.85,
+        0.81,
+        0.88
+      ],
+      "split": "validation"
+    },
+    {
+      "sample_id": "vrsbench_ref_3943",
+      "scene_id": "08db4c7c169051cd829ba903055c7fdfdc05d2682f76277d8b63d438517ffb8d",
+      "source_image_id": "P1390_0080.png",
+      "source_question_id": 3943,
+      "image_path": "data/benchmarks/vrsbench_grounding_phase3a/P1390_0080.png",
+      "image_sha256": "08db4c7c169051cd829ba903055c7fdfdc05d2682f76277d8b63d438517ffb8d",
+      "image_width": 512,
+      "image_height": 512,
+      "query": "The plane located at the bottom row of the group and furthest to the right.",
+      "object_class": "airplane",
+      "unique": false,
+      "ground_truth_normalized_xyxy": [
+        0.24,
+        0.27,
+        0.58,
+        0.54
+      ],
+      "split": "validation"
+    },
+    {
+      "sample_id": "vrsbench_ref_3944",
+      "scene_id": "08db4c7c169051cd829ba903055c7fdfdc05d2682f76277d8b63d438517ffb8d",
+      "source_image_id": "P1390_0080.png",
+      "source_question_id": 3944,
+      "image_path": "data/benchmarks/vrsbench_grounding_phase3a/P1390_0080.png",
+      "image_sha256": "08db4c7c169051cd829ba903055c7fdfdc05d2682f76277d8b63d438517ffb8d",
+      "image_width": 512,
+      "image_height": 512,
+      "query": "The plane positioned adjacent to the dirt road on the left.",
+      "object_class": "airplane",
+      "unique": false,
+      "ground_truth_normalized_xyxy": [
+        0.0,
+        0.27,
+        0.24,
+        0.53
+      ],
+      "split": "validation"
+    },
+    {
+      "sample_id": "vrsbench_ref_5267",
+      "scene_id": "475b9c1537aabe38e3964e565a34495f1ef9bc86f1de81b9d8bd2531cfb92074",
+      "source_image_id": "P1809_0120.png",
+      "source_question_id": 5267,
+      "image_path": "data/benchmarks/vrsbench_grounding_phase3a/P1809_0120.png",
+      "image_sha256": "475b9c1537aabe38e3964e565a34495f1ef9bc86f1de81b9d8bd2531cfb92074",
+      "image_width": 512,
+      "image_height": 512,
+      "query": "The vehicle situated in the top-left quadrant of the image, near the top edge.",
+      "object_class": "vehicle",
+      "unique": false,
+      "ground_truth_normalized_xyxy": [
+        0.27,
+        0.0,
+        0.31,
+        0.02
+      ],
+      "split": "validation"
+    },
+    {
+      "sample_id": "vrsbench_ref_5268",
+      "scene_id": "475b9c1537aabe38e3964e565a34495f1ef9bc86f1de81b9d8bd2531cfb92074",
+      "source_image_id": "P1809_0120.png",
+      "source_question_id": 5268,
+      "image_path": "data/benchmarks/vrsbench_grounding_phase3a/P1809_0120.png",
+      "image_sha256": "475b9c1537aabe38e3964e565a34495f1ef9bc86f1de81b9d8bd2531cfb92074",
+      "image_width": 512,
+      "image_height": 512,
+      "query": "The vehicle located  in the top-left quadrant of the image.",
+      "object_class": "vehicle",
+      "unique": false,
+      "ground_truth_normalized_xyxy": [
+        0.08,
+        0.0,
+        0.13,
+        0.04
+      ],
+      "split": "validation"
+    },
+    {
+      "sample_id": "vrsbench_ref_6824",
+      "scene_id": "6bb1ee2cc948e20bd94de6ad08af579e54dadfb7cc9c64784252d76bb35c46be",
+      "source_image_id": "P2645_0046.png",
+      "source_question_id": 6824,
+      "image_path": "data/benchmarks/vrsbench_grounding_phase3a/P2645_0046.png",
+      "image_sha256": "6bb1ee2cc948e20bd94de6ad08af579e54dadfb7cc9c64784252d76bb35c46be",
+      "image_width": 512,
+      "image_height": 512,
+      "query": "The larger circular storage tank can be spotted at the bottom-right section of the image.",
+      "object_class": "storage-tank",
+      "unique": false,
+      "ground_truth_normalized_xyxy": [
+        0.92,
+        0.25,
+        1.0,
+        0.34
+      ],
+      "split": "test"
+    },
+    {
+      "sample_id": "vrsbench_ref_6825",
+      "scene_id": "6bb1ee2cc948e20bd94de6ad08af579e54dadfb7cc9c64784252d76bb35c46be",
+      "source_image_id": "P2645_0046.png",
+      "source_question_id": 6825,
+      "image_path": "data/benchmarks/vrsbench_grounding_phase3a/P2645_0046.png",
+      "image_sha256": "6bb1ee2cc948e20bd94de6ad08af579e54dadfb7cc9c64784252d76bb35c46be",
+      "image_width": 512,
+      "image_height": 512,
+      "query": "A smaller and less prominent storage tank is visible at the top-right corner of the image.",
+      "object_class": "storage-tank",
+      "unique": false,
+      "ground_truth_normalized_xyxy": [
+        0.89,
+        0.15,
+        0.97,
+        0.23
+      ],
+      "split": "test"
+    },
+    {
+      "sample_id": "vrsbench_ref_8150",
+      "scene_id": "1b87609ae8c5be8ba74c7eb7c1c749a14421ac303dcce146d601476d242ea90d",
+      "source_image_id": "P5789_2323.png",
+      "source_question_id": 8150,
+      "image_path": "data/benchmarks/vrsbench_grounding_phase3a/P5789_2323.png",
+      "image_sha256": "1b87609ae8c5be8ba74c7eb7c1c749a14421ac303dcce146d601476d242ea90d",
+      "image_width": 512,
+      "image_height": 512,
+      "query": "The baseball diamond situated on the right side with its bottom border near the center of the image.",
+      "object_class": "baseball-diamond",
+      "unique": false,
+      "ground_truth_normalized_xyxy": [
+        0.23,
+        0.64,
+        0.33,
+        0.75
+      ],
+      "split": "test"
+    },
+    {
+      "sample_id": "vrsbench_ref_8151",
+      "scene_id": "1b87609ae8c5be8ba74c7eb7c1c749a14421ac303dcce146d601476d242ea90d",
+      "source_image_id": "P5789_2323.png",
+      "source_question_id": 8151,
+      "image_path": "data/benchmarks/vrsbench_grounding_phase3a/P5789_2323.png",
+      "image_sha256": "1b87609ae8c5be8ba74c7eb7c1c749a14421ac303dcce146d601476d242ea90d",
+      "image_width": 512,
+      "image_height": 512,
+      "query": "The baseball diamond located towards the bottom left of the image.",
+      "object_class": "baseball-diamond",
+      "unique": false,
+      "ground_truth_normalized_xyxy": [
+        0.15,
+        0.78,
+        0.25,
+        0.87
+      ],
+      "split": "test"
+    },
+    {
+      "sample_id": "vrsbench_ref_8348",
+      "scene_id": "c683636319eff441a3484f59b4048a7beade07cbf17e10cecf418fcb942603d4",
+      "source_image_id": "P6687_0130.png",
+      "source_question_id": 8348,
+      "image_path": "data/benchmarks/vrsbench_grounding_phase3a/P6687_0130.png",
+      "image_sha256": "c683636319eff441a3484f59b4048a7beade07cbf17e10cecf418fcb942603d4",
+      "image_width": 512,
+      "image_height": 512,
+      "query": "The vehicle located in the left part of the image.",
+      "object_class": "vehicle",
+      "unique": false,
+      "ground_truth_normalized_xyxy": [
+        0.03,
+        0.35,
+        0.15,
+        0.42
+      ],
+      "split": "test"
+    },
+    {
+      "sample_id": "vrsbench_ref_8349",
+      "scene_id": "c683636319eff441a3484f59b4048a7beade07cbf17e10cecf418fcb942603d4",
+      "source_image_id": "P6687_0130.png",
+      "source_question_id": 8349,
+      "image_path": "data/benchmarks/vrsbench_grounding_phase3a/P6687_0130.png",
+      "image_sha256": "c683636319eff441a3484f59b4048a7beade07cbf17e10cecf418fcb942603d4",
+      "image_width": 512,
+      "image_height": 512,
+      "query": "The vehicle located at the center of the image.",
+      "object_class": "vehicle",
+      "unique": false,
+      "ground_truth_normalized_xyxy": [
+        0.51,
+        0.37,
+        0.66,
+        0.49
+      ],
+      "split": "test"
+    },
+    {
+      "sample_id": "vrsbench_ref_9861",
+      "scene_id": "2e3ea10ed23413b6dcc899977048d99f19fdb2954a69a105b2c71e5f35f3ef42",
+      "source_image_id": "06769_0000.png",
+      "source_question_id": 9861,
+      "image_path": "data/benchmarks/vrsbench_grounding_phase3a/06769_0000.png",
+      "image_sha256": "2e3ea10ed23413b6dcc899977048d99f19fdb2954a69a105b2c71e5f35f3ef42",
+      "image_width": 512,
+      "image_height": 512,
+      "query": "The baseball field is located at the bottom-right of the image.",
+      "object_class": "baseball-diamond",
+      "unique": true,
+      "ground_truth_normalized_xyxy": [
+        0.68,
+        0.75,
+        1.0,
+        1.0
+      ],
+      "split": "validation"
+    },
+    {
+      "sample_id": "vrsbench_ref_9862",
+      "scene_id": "2e3ea10ed23413b6dcc899977048d99f19fdb2954a69a105b2c71e5f35f3ef42",
+      "source_image_id": "06769_0000.png",
+      "source_question_id": 9862,
+      "image_path": "data/benchmarks/vrsbench_grounding_phase3a/06769_0000.png",
+      "image_sha256": "2e3ea10ed23413b6dcc899977048d99f19fdb2954a69a105b2c71e5f35f3ef42",
+      "image_width": 512,
+      "image_height": 512,
+      "query": "The small vehicle is parked on the top-right side.",
+      "object_class": "vehicle",
+      "unique": true,
+      "ground_truth_normalized_xyxy": [
+        0.77,
+        0.32,
+        0.84,
+        0.39
+      ],
+      "split": "validation"
+    },
+    {
+      "sample_id": "vrsbench_ref_10158",
+      "scene_id": "8a02687900a45c95c4d7e7dfc6517dcf230b6af078b7b29316d1f048ef2e8e90",
+      "source_image_id": "07002_0000.png",
+      "source_question_id": 10158,
+      "image_path": "data/benchmarks/vrsbench_grounding_phase3a/07002_0000.png",
+      "image_sha256": "8a02687900a45c95c4d7e7dfc6517dcf230b6af078b7b29316d1f048ef2e8e90",
+      "image_width": 512,
+      "image_height": 512,
+      "query": "The oval-shaped ground track field with marked lanes is on the left side of the image.",
+      "object_class": "ground-track-field",
+      "unique": true,
+      "ground_truth_normalized_xyxy": [
+        0.34,
+        0.07,
+        1.0,
+        0.71
+      ],
+      "split": "validation"
+    },
+    {
+      "sample_id": "vrsbench_ref_10159",
+      "scene_id": "8a02687900a45c95c4d7e7dfc6517dcf230b6af078b7b29316d1f048ef2e8e90",
+      "source_image_id": "07002_0000.png",
+      "source_question_id": 10159,
+      "image_path": "data/benchmarks/vrsbench_grounding_phase3a/07002_0000.png",
+      "image_sha256": "8a02687900a45c95c4d7e7dfc6517dcf230b6af078b7b29316d1f048ef2e8e90",
+      "image_width": 512,
+      "image_height": 512,
+      "query": "The small baseball field is situated towards the bottom right of the image.",
+      "object_class": "baseball-diamond",
+      "unique": true,
+      "ground_truth_normalized_xyxy": [
+        0.69,
+        0.84,
+        0.91,
+        1.0
+      ],
+      "split": "validation"
+    },
+    {
+      "sample_id": "vrsbench_ref_10250",
+      "scene_id": "b250ee26d4ad41e745abad5df287e1cffe3e13a9b30eb3553934567d8535f96e",
+      "source_image_id": "07084_0000.png",
+      "source_question_id": 10250,
+      "image_path": "data/benchmarks/vrsbench_grounding_phase3a/07084_0000.png",
+      "image_sha256": "b250ee26d4ad41e745abad5df287e1cffe3e13a9b30eb3553934567d8535f96e",
+      "image_width": 512,
+      "image_height": 512,
+      "query": "The left-most tennis court is marked with white lines on an orange surface.",
+      "object_class": "tennis-court",
+      "unique": false,
+      "ground_truth_normalized_xyxy": [
+        0.16,
+        0.54,
+        0.3,
+        0.84
+      ],
+      "split": "test"
+    },
+    {
+      "sample_id": "vrsbench_ref_10251",
+      "scene_id": "b250ee26d4ad41e745abad5df287e1cffe3e13a9b30eb3553934567d8535f96e",
+      "source_image_id": "07084_0000.png",
+      "source_question_id": 10251,
+      "image_path": "data/benchmarks/vrsbench_grounding_phase3a/07084_0000.png",
+      "image_sha256": "b250ee26d4ad41e745abad5df287e1cffe3e13a9b30eb3553934567d8535f96e",
+      "image_width": 512,
+      "image_height": 512,
+      "query": "The right-most tennis court also has white marking.",
+      "object_class": "tennis-court",
+      "unique": false,
+      "ground_truth_normalized_xyxy": [
+        0.53,
+        0.54,
+        0.66,
+        0.84
+      ],
+      "split": "test"
+    },
+    {
+      "sample_id": "vrsbench_ref_10552",
+      "scene_id": "aaa882a6a17ac0023ae3d48f48e29baefbd41073c78687f6778ca897b4133d9f",
+      "source_image_id": "07300_0000.png",
+      "source_question_id": 10552,
+      "image_path": "data/benchmarks/vrsbench_grounding_phase3a/07300_0000.png",
+      "image_sha256": "aaa882a6a17ac0023ae3d48f48e29baefbd41073c78687f6778ca897b4133d9f",
+      "image_width": 512,
+      "image_height": 512,
+      "query": "The smaller ship located towards the top right of the image.",
+      "object_class": "ship",
+      "unique": false,
+      "ground_truth_normalized_xyxy": [
+        0.72,
+        0.2,
+        0.83,
+        0.43
+      ],
+      "split": "test"
+    },
+    {
+      "sample_id": "vrsbench_ref_10553",
+      "scene_id": "aaa882a6a17ac0023ae3d48f48e29baefbd41073c78687f6778ca897b4133d9f",
+      "source_image_id": "07300_0000.png",
+      "source_question_id": 10553,
+      "image_path": "data/benchmarks/vrsbench_grounding_phase3a/07300_0000.png",
+      "image_sha256": "aaa882a6a17ac0023ae3d48f48e29baefbd41073c78687f6778ca897b4133d9f",
+      "image_width": 512,
+      "image_height": 512,
+      "query": "The larger ship situated at the bottom center of the image extends almost to the left edge.",
+      "object_class": "ship",
+      "unique": false,
+      "ground_truth_normalized_xyxy": [
+        0.56,
+        0.41,
+        0.84,
+        1.0
+      ],
+      "split": "test"
+    },
+    {
+      "sample_id": "vrsbench_ref_10658",
+      "scene_id": "be6d6412edad42b0a4d349313fb311378f79d792eebfd0abae06a2dc41d5560f",
+      "source_image_id": "07390_0000.png",
+      "source_question_id": 10658,
+      "image_path": "data/benchmarks/vrsbench_grounding_phase3a/07390_0000.png",
+      "image_sha256": "be6d6412edad42b0a4d349313fb311378f79d792eebfd0abae06a2dc41d5560f",
+      "image_width": 512,
+      "image_height": 512,
+      "query": "The ship is docked at the bottom middle of the image adjacent to the water's edge.",
+      "object_class": "ship",
+      "unique": true,
+      "ground_truth_normalized_xyxy": [
+        0.49,
+        0.71,
+        0.58,
+        0.95
+      ],
+      "split": "validation"
+    },
+    {
+      "sample_id": "vrsbench_ref_10659",
+      "scene_id": "be6d6412edad42b0a4d349313fb311378f79d792eebfd0abae06a2dc41d5560f",
+      "source_image_id": "07390_0000.png",
+      "source_question_id": 10659,
+      "image_path": "data/benchmarks/vrsbench_grounding_phase3a/07390_0000.png",
+      "image_sha256": "be6d6412edad42b0a4d349313fb311378f79d792eebfd0abae06a2dc41d5560f",
+      "image_width": 512,
+      "image_height": 512,
+      "query": "The distinct vehicle is located on the left side of the image on the bridge.",
+      "object_class": "vehicle",
+      "unique": true,
+      "ground_truth_normalized_xyxy": [
+        0.25,
+        0.64,
+        0.26,
+        0.67
+      ],
+      "split": "validation"
+    },
+    {
+      "sample_id": "vrsbench_ref_11690",
+      "scene_id": "87acfe7ce7426705f900e0b30b7af83b276ab6d7a999adf1b99382f7cdcfcabb",
+      "source_image_id": "08212_0000.png",
+      "source_question_id": 11690,
+      "image_path": "data/benchmarks/vrsbench_grounding_phase3a/08212_0000.png",
+      "image_sha256": "87acfe7ce7426705f900e0b30b7af83b276ab6d7a999adf1b99382f7cdcfcabb",
+      "image_width": 512,
+      "image_height": 512,
+      "query": "The windmill located at the top middle of the image.",
+      "object_class": "windmill",
+      "unique": false,
+      "ground_truth_normalized_xyxy": [
+        0.55,
+        0.08,
+        0.6,
+        0.12
+      ],
+      "split": "test"
+    },
+    {
+      "sample_id": "vrsbench_ref_11691",
+      "scene_id": "87acfe7ce7426705f900e0b30b7af83b276ab6d7a999adf1b99382f7cdcfcabb",
+      "source_image_id": "08212_0000.png",
+      "source_question_id": 11691,
+      "image_path": "data/benchmarks/vrsbench_grounding_phase3a/08212_0000.png",
+      "image_sha256": "87acfe7ce7426705f900e0b30b7af83b276ab6d7a999adf1b99382f7cdcfcabb",
+      "image_width": 512,
+      "image_height": 512,
+      "query": "The windmill positioned closest to the center of the image.",
+      "object_class": "windmill",
+      "unique": false,
+      "ground_truth_normalized_xyxy": [
+        0.61,
+        0.42,
+        0.67,
+        0.46
+      ],
+      "split": "test"
+    },
+    {
+      "sample_id": "vrsbench_ref_13298",
+      "scene_id": "87d225db820335827ac9efa4606d7730f2820246040595a87aa437752ef10eab",
+      "source_image_id": "09477_0000.png",
+      "source_question_id": 13298,
+      "image_path": "data/benchmarks/vrsbench_grounding_phase3a/09477_0000.png",
+      "image_sha256": "87d225db820335827ac9efa4606d7730f2820246040595a87aa437752ef10eab",
+      "image_width": 512,
+      "image_height": 512,
+      "query": "The dark-colored vehicle located in the bottom-right corner of the image.",
+      "object_class": "vehicle",
+      "unique": false,
+      "ground_truth_normalized_xyxy": [
+        0.97,
+        0.82,
+        1.0,
+        0.88
+      ],
+      "split": "validation"
+    },
+    {
+      "sample_id": "vrsbench_ref_13299",
+      "scene_id": "87d225db820335827ac9efa4606d7730f2820246040595a87aa437752ef10eab",
+      "source_image_id": "09477_0000.png",
+      "source_question_id": 13299,
+      "image_path": "data/benchmarks/vrsbench_grounding_phase3a/09477_0000.png",
+      "image_sha256": "87d225db820335827ac9efa4606d7730f2820246040595a87aa437752ef10eab",
+      "image_width": 512,
+      "image_height": 512,
+      "query": "The vehicle located centrally in the image is positioned the highest among the vehicles in the image.",
+      "object_class": "vehicle",
+      "unique": false,
+      "ground_truth_normalized_xyxy": [
+        0.45,
+        0.54,
+        0.5,
+        0.6
+      ],
+      "split": "validation"
+    },
+    {
+      "sample_id": "vrsbench_ref_13822",
+      "scene_id": "cd97130a1b3609fde46999e350f5ff16ddf30bfc7c055634786177a06ce62901",
+      "source_image_id": "09891_0000.png",
+      "source_question_id": 13822,
+      "image_path": "data/benchmarks/vrsbench_grounding_phase3a/09891_0000.png",
+      "image_sha256": "cd97130a1b3609fde46999e350f5ff16ddf30bfc7c055634786177a06ce62901",
+      "image_width": 512,
+      "image_height": 512,
+      "query": "The storage tank with a a white roof, located in the upper half of the image, is the top-most one.",
+      "object_class": "storage-tank",
+      "unique": false,
+      "ground_truth_normalized_xyxy": [
+        0.36,
+        0.14,
+        0.59,
+        0.37
+      ],
+      "split": "validation"
+    },
+    {
+      "sample_id": "vrsbench_ref_13823",
+      "scene_id": "cd97130a1b3609fde46999e350f5ff16ddf30bfc7c055634786177a06ce62901",
+      "source_image_id": "09891_0000.png",
+      "source_question_id": 13823,
+      "image_path": "data/benchmarks/vrsbench_grounding_phase3a/09891_0000.png",
+      "image_sha256": "cd97130a1b3609fde46999e350f5ff16ddf30bfc7c055634786177a06ce62901",
+      "image_width": 512,
+      "image_height": 512,
+      "query": "The storage tank situated in the lower half of the image, exhibiting white circular design, is the bottom-most.",
+      "object_class": "storage-tank",
+      "unique": false,
+      "ground_truth_normalized_xyxy": [
+        0.36,
+        0.66,
+        0.59,
+        0.89
+      ],
+      "split": "validation"
+    },
+    {
+      "sample_id": "vrsbench_ref_14981",
+      "scene_id": "75fc9fa6eea8bc15e2c5c840e954f7c44247faab84435a9a4566b5f67b310a0f",
+      "source_image_id": "10804_0000.png",
+      "source_question_id": 14981,
+      "image_path": "data/benchmarks/vrsbench_grounding_phase3a/10804_0000.png",
+      "image_sha256": "75fc9fa6eea8bc15e2c5c840e954f7c44247faab84435a9a4566b5f67b310a0f",
+      "image_width": 512,
+      "image_height": 512,
+      "query": "The storage tank located in the top-right corner of the image has a small, circular shape with a flat top.",
+      "object_class": "storage-tank",
+      "unique": false,
+      "ground_truth_normalized_xyxy": [
+        0.72,
+        0.09,
+        0.84,
+        0.19
+      ],
+      "split": "test"
+    },
+    {
+      "sample_id": "vrsbench_ref_14982",
+      "scene_id": "75fc9fa6eea8bc15e2c5c840e954f7c44247faab84435a9a4566b5f67b310a0f",
+      "source_image_id": "10804_0000.png",
+      "source_question_id": 14982,
+      "image_path": "data/benchmarks/vrsbench_grounding_phase3a/10804_0000.png",
+      "image_sha256": "75fc9fa6eea8bc15e2c5c840e954f7c44247faab84435a9a4566b5f67b310a0f",
+      "image_width": 512,
+      "image_height": 512,
+      "query": "The storage tank positioned in the bottom-right of the image is the bottom-most tank among those visible.",
+      "object_class": "storage-tank",
+      "unique": false,
+      "ground_truth_normalized_xyxy": [
+        0.72,
+        0.65,
+        0.88,
+        0.81
+      ],
+      "split": "test"
+    },
+    {
+      "sample_id": "vrsbench_ref_15213",
+      "scene_id": "2cf5d0ca9ac215b0d09f9f7b6eea8d57b5dbff3d68dde3b0a427a3f1d5fa7924",
+      "source_image_id": "10981_0000.png",
+      "source_question_id": 15213,
+      "image_path": "data/benchmarks/vrsbench_grounding_phase3a/10981_0000.png",
+      "image_sha256": "2cf5d0ca9ac215b0d09f9f7b6eea8d57b5dbff3d68dde3b0a427a3f1d5fa7924",
+      "image_width": 512,
+      "image_height": 512,
+      "query": "The smallest storage tank is situated towards the bottom-right of the image.",
+      "object_class": "storage-tank",
+      "unique": false,
+      "ground_truth_normalized_xyxy": [
+        0.66,
+        0.79,
+        0.69,
+        0.82
+      ],
+      "split": "validation"
+    },
+    {
+      "sample_id": "vrsbench_ref_15214",
+      "scene_id": "2cf5d0ca9ac215b0d09f9f7b6eea8d57b5dbff3d68dde3b0a427a3f1d5fa7924",
+      "source_image_id": "10981_0000.png",
+      "source_question_id": 15214,
+      "image_path": "data/benchmarks/vrsbench_grounding_phase3a/10981_0000.png",
+      "image_sha256": "2cf5d0ca9ac215b0d09f9f7b6eea8d57b5dbff3d68dde3b0a427a3f1d5fa7924",
+      "image_width": 512,
+      "image_height": 512,
+      "query": "The vehicle positioned at the top-most of the image to the right is small in size.",
+      "object_class": "vehicle",
+      "unique": false,
+      "ground_truth_normalized_xyxy": [
+        0.7,
+        0.31,
+        0.71,
+        0.35
+      ],
+      "split": "validation"
+    }
+  ]
+}

@@ -13,3 +13,15 @@ models:
     frozen: true
     allow_remote_code: false
     max_new_tokens: 16
+  grounding_dino_tiny_v1:
+    task: text_guided_grounding
+    provider: huggingface
+    model_id: IDEA-Research/grounding-dino-tiny
+    revision: a2bb814dd30d776dcf7e30523b00659f4f141c71
+    checkpoint_file: model.safetensors
+    checkpoint_sha256: 1a2412ef99bd74bcd3c2a246fa1e48581f8889a1300c9051974741314fc042f3
+    architecture: Grounding DINO Tiny / Swin-T
+    license: Apache-2.0
+    preprocessing_profile: grounding_dino_tiny_v1
+    frozen: true
+    allow_remote_code: false

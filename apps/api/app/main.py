@@ -11,11 +11,16 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from apps.api.app.routes.observations import invalid_request_response, router
+from apps.api.app.routes.grounding import (
+    invalid_grounding_request_response,
+    router as grounding_router,
+)
 from apps.api.app.routes.tiles import router as tiles_router
 from apps.api.app.routes.vqa import invalid_vqa_request_response
 from apps.api.app.routes.vqa import router as vqa_router
 from apps.api.app.services.observations import ObservationIngestionService
-from satquery.inference.config import VqaRuntimeSettings
+from satquery.inference.config import GroundingRuntimeSettings, VqaRuntimeSettings
+from satquery.inference.grounding import GroundingBackend, TextGuidedGroundingService
 from satquery.inference.vqa import SingleImageVqaService, VqaBackend
 from satquery.ingestion import (
     FilesystemObservationStore,
@@ -34,6 +39,8 @@ def create_app(
     visualization_settings: VisualizationSettings | None = None,
     vqa_settings: VqaRuntimeSettings | None = None,
     vqa_backend: VqaBackend | None = None,
+    grounding_settings: GroundingRuntimeSettings | None = None,
+    grounding_backend: GroundingBackend | None = None,
 ) -> FastAPI:
     safety_limits = limits or RasterSafetyLimits.from_env()
     display_settings = visualization_settings or VisualizationSettings.from_env()
@@ -51,9 +58,15 @@ def create_app(
         settings=vqa_settings,
         backend=vqa_backend,
     )
+    application.state.text_guided_grounding_service = TextGuidedGroundingService(
+        store,
+        settings=grounding_settings,
+        backend=grounding_backend,
+    )
     application.include_router(router)
     application.include_router(tiles_router)
     application.include_router(vqa_router)
+    application.include_router(grounding_router)
 
     @application.exception_handler(RequestValidationError)
     async def request_validation_handler(
@@ -61,6 +74,8 @@ def create_app(
     ) -> JSONResponse:
         if request.url.path == "/api/vqa":
             return invalid_vqa_request_response()
+        if request.url.path == "/api/grounding":
+            return invalid_grounding_request_response()
         return invalid_request_response()
 
     @application.exception_handler(StarletteHTTPException)

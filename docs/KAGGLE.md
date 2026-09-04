@@ -104,3 +104,27 @@ resume_guard.json
 ```
 
 Use Kaggle's **Save Version** / **Save & Run All** so files under `/kaggle/working` appear in the notebook Output tab. Download the output archive or create a private Kaggle Dataset from it for resuming. Do not copy model caches, downloaded images, or checkpoints into Git; only reviewed small manifests and result summaries belong in the repository.
+
+## Phase 3A grounding baseline
+
+Import `notebooks/kaggle_phase3a.ipynb`, select a P100/T4-class GPU, and enable
+Internet. The notebook retains the verified PyTorch 2.8.0 + CUDA 12.6 setup,
+installs the repository's `grounding` extra, range-downloads only the 20 selected
+VRSBench images, and runs the frozen validation benchmark. No training logic is
+present.
+
+Equivalent repository commands are:
+
+```bash
+python -m ml.evaluation.prepare_vrsbench_grounding \
+  --data-root /kaggle/working/vrsbench-grounding --allow-download
+python -m ml.evaluation.run_phase3a_grounding \
+  --data-root /kaggle/working/vrsbench-grounding \
+  --output-dir /kaggle/working/satquery-output/phase3a-grounding-dino \
+  --split validation --device cuda --allow-download
+```
+
+Metrics appear in `validation_metrics.json`; all detections and per-reference IoU
+appear in `validation_predictions.jsonl`. Retrieve the directory from Kaggle's
+Output tab. Do not run the untouched test split while changing the model,
+thresholds, preprocessing, or subset definition.

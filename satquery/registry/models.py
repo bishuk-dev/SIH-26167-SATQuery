@@ -30,9 +30,29 @@ class ModelRegistration(ContractModel):
     max_new_tokens: int = Field(gt=0, le=64)
 
 
+class GroundingModelRegistration(ContractModel):
+    task: Literal["text_guided_grounding"]
+    provider: Literal["huggingface"]
+    model_id: str = Field(min_length=1)
+    revision: str = Field(pattern=r"^[0-9a-f]{40}$")
+    checkpoint_file: str = Field(min_length=1)
+    checkpoint_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    architecture: str = Field(min_length=1)
+    license: str = Field(min_length=1)
+    preprocessing_profile: str = Field(min_length=1)
+    frozen: Literal[True]
+    allow_remote_code: Literal[False]
+
+
 class ModelRegistry(ContractModel):
     schema_version: Literal[1]
-    models: dict[str, ModelRegistration]
+    models: dict[
+        str,
+        Annotated[
+            ModelRegistration | GroundingModelRegistration,
+            Field(discriminator="task"),
+        ],
+    ]
 
 
 class PreprocessingProfile(ContractModel):
@@ -63,9 +83,42 @@ class PreprocessingProfile(ContractModel):
         return value
 
 
+class GroundingPreprocessingProfile(ContractModel):
+    task: Literal["text_guided_grounding"]
+    version: str = Field(min_length=1)
+    input_asset_kind: Literal["visualization"]
+    image_mode: Literal["RGB"]
+    resize: Literal["shortest_edge_with_longest_cap"]
+    shortest_edge: int = Field(gt=0, le=4096)
+    longest_edge: int = Field(gt=0, le=4096)
+    resampling: Literal["bilinear"]
+    image_mean: tuple[float, float, float]
+    image_std: tuple[float, float, float]
+    rescale_factor: float = Field(gt=0)
+    nodata_policy: Literal["alpha_to_black"]
+    processor_source: Literal["checkpoint"]
+    processor_resize: Literal["disabled"]
+    query_format: Literal["lowercase_period"]
+    box_threshold: float = Field(ge=0, le=1)
+    text_threshold: float = Field(ge=0, le=1)
+
+    @field_validator("image_mean", "image_std", mode="before")
+    @classmethod
+    def normalize_yaml_triplet(cls, value: object) -> object:
+        if isinstance(value, list):
+            return tuple(value)
+        return value
+
+
 class PreprocessingRegistry(ContractModel):
     schema_version: Literal[1]
-    profiles: dict[str, PreprocessingProfile]
+    profiles: dict[
+        str,
+        Annotated[
+            PreprocessingProfile | GroundingPreprocessingProfile,
+            Field(discriminator="task"),
+        ],
+    ]
 
 
 def load_model_registry(path: str | Path | None = None) -> ModelRegistry:

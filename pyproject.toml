@@ -33,6 +33,9 @@ training = [
   "peft>=0.19.1,<1",
   "tensorboard>=2.18,<3",
 ]
+grounding = [
+  "fsspec[http]>=2024.10,<2027",
+]
 
 [tool.setuptools.packages.find]
 include = ["satquery*"]

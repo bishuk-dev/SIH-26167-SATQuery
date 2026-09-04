@@ -49,3 +49,11 @@ Mixed precision is hardware-gated in one shared module for training and comparis
 ## Phase 2C visual-dependence experiment
 
 Phase 2C keeps the Phase 2B test result frozen. Its train/validation diagnostic and single visual-contrast sampling intervention are documented in `experiments/phase2c_visual_contrast/README.md`. The candidate uses `ml/configs/phase2c_smolvlm_visual_contrast.yaml`; validation comparison is performed by `ml.evaluation.run_phase2c_validation` and cannot select the test split.
+
+## Phase 3A text-guided grounding
+
+Phase 3A uses the frozen registered Grounding DINO Tiny checkpoint and the
+scene-safe 40-reference VRSBench subset documented in
+`experiments/phase3a_grounding_dino_vrsbench/README.md`. Dataset preparation uses
+HTTP range reads to materialize only the selected images. The production adapter
+and benchmark share the registered preprocessing and model postprocessor.
