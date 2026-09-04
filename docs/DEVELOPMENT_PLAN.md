@@ -41,7 +41,9 @@ These research artifacts are not a code dependency for beginning the Phase 1 geo
 
 **Phase 2C status: complete and rejected.** Train/validation diagnostics identified strong exact-question and answer-template priors. The single visual-contrast sampling experiment did not materially increase the correct-image gap over blank/shuffled controls. Phase 2 is frozen; no further RSVQA training or test evaluation is planned.
 
-**Phase 3A status: implementation complete; GPU benchmark pending.** Grounding DINO Tiny is pinned with frozen preprocessing, a production adapter emits model/source/normalized/world-coordinate evidence, and `POST /api/grounding` exposes it for registered observations. A checksum-verified VRSBench subset contains 12 validation scenes / 24 references and 8 untouched test scenes / 16 references. The metric runner and thin Kaggle notebook are ready; measured model metrics require the explicit GPU run.
+**Phase 3A status: complete.** Grounding DINO Tiny is pinned with frozen preprocessing, a production adapter emits model/source/normalized/world-coordinate evidence, and `POST /api/grounding` exposes it for registered observations. A checksum-verified VRSBench subset contains 12 validation scenes / 24 references and 8 untouched test scenes / 16 references. The validation baseline reported mean IoU 0.1286, Acc@0.5 IoU 0.1667, and 17 no-detection references at box/text thresholds 0.40/0.30.
+
+**Phase 3B status: calibration runner complete; GPU artifact pending.** The Phase 3A validation result exposed low recall at box threshold 0.40. A validation-locked six-threshold sweep, deterministic selection policy, semantic phrase diagnostics, and thin Kaggle runner are implemented. The local checkpoint transfer failed at the model CDN, so the production threshold remains 0.40 until the real calibration artifact is returned and reviewed. The VRSBench test split remains untouched.
 
 ## Foundation decisions
 

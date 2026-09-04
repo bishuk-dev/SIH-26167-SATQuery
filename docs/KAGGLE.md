@@ -1,5 +1,16 @@
 # Kaggle GPU execution — Phase 2B
 
+> **Automated workflow available** — instead of running cells manually, use the
+> local experiment runner:
+> ```bash
+> python scripts/kaggle/runner.py run phase2b-smolvlm-lora
+> ```
+> See [`scripts/kaggle/README.md`](../scripts/kaggle/README.md) for setup and
+> all available experiments including phase3a and phase3b.
+>
+> The rest of this document describes the manual procedure for reference and
+> for cases where the notebook must be run interactively.
+
 Kaggle is only an execution host. The notebook does not contain dataset, preprocessing, LoRA, training, or evaluation logic; it calls versioned modules from this repository.
 
 ## Notebook setup
@@ -128,3 +139,19 @@ Metrics appear in `validation_metrics.json`; all detections and per-reference Io
 appear in `validation_predictions.jsonl`. Retrieve the directory from Kaggle's
 Output tab. Do not run the untouched test split while changing the model,
 thresholds, preprocessing, or subset definition.
+
+### Phase 3B validation-only threshold calibration
+
+Import `notebooks/kaggle_phase3b.ipynb` or run:
+
+```bash
+python -m ml.evaluation.run_phase3b_grounding_calibration \
+  --data-root /kaggle/working/vrsbench-grounding \
+  --output-dir /kaggle/working/satquery-output/phase3b-grounding-calibration \
+  --device cuda --allow-download
+```
+
+The entrypoint has no split option and reads validation records only. Download
+`calibration.json` and `validation_candidates.jsonl` from the Kaggle Output tab.
+Do not alter the production registry threshold until the calibration artifact has
+been reviewed and the predeclared selection rule applied.

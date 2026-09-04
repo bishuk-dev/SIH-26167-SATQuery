@@ -35,5 +35,9 @@ python -m ml.evaluation.run_phase3a_grounding \
 
 The evaluator reports mean IoU and Acc@0.5 IoU against the highest-scoring model
 detection and preserves every raw-score detection in JSONL. No oracle selection
-against ground truth is performed. Metrics are intentionally not committed until
-the registered checkpoint has completed this command.
+against ground truth is performed.
+
+The completed validation run at box threshold 0.40 and text threshold 0.30
+reported mean IoU 0.1286, Acc@0.5 IoU 0.1667, and 17 no-detection references out
+of 24. Phase 3B calibrates only the box threshold on this validation split; the
+test split remains untouched.

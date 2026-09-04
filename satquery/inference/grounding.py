@@ -172,6 +172,12 @@ class GroundingDinoBackend:
                     revision=self.registration.revision,
                     cache_dir=cache_dir,
                     local_files_only=not self.settings.allow_remote_network,
+                    allow_patterns=(
+                        self.registration.checkpoint_file,
+                        "*.json",
+                        "*.txt",
+                    ),
+                    max_workers=1,
                 )
             )
             checkpoint = snapshot / self.registration.checkpoint_file

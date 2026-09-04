@@ -57,3 +57,8 @@ scene-safe 40-reference VRSBench subset documented in
 `experiments/phase3a_grounding_dino_vrsbench/README.md`. Dataset preparation uses
 HTTP range reads to materialize only the selected images. The production adapter
 and benchmark share the registered preprocessing and model postprocessor.
+
+Phase 3B sweeps six box thresholds on validation only while holding the text
+threshold and all Phase 3A components fixed. Its evaluator runs the model once per
+reference at the lowest threshold and filters the same score-sorted candidates at
+higher thresholds. See `experiments/phase3b_grounding_threshold_calibration/`.

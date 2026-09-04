@@ -49,3 +49,6 @@ models/cache/
 
 # Generated source used only to rebuild the learning guide
 docs/Beginner-Learning-Guide-Raw.md
+
+# Kaggle runner — generated kernel push scratch directory
+scripts/kaggle/.kernel_push/

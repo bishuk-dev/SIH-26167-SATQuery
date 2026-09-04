@@ -1,0 +1,13 @@
+{
+  "id": "__USERNAME__/__KERNEL_SLUG__",
+  "title": "__KERNEL_TITLE__",
+  "code_file": "__NOTEBOOK_FILENAME__",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_internet": true,
+  "dataset_sources": [],
+  "competition_sources": [],
+  "kernel_sources": []
+}

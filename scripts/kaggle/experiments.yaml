@@ -1,0 +1,46 @@
+# Kaggle experiment registry
+# Each entry maps a short experiment name to everything runner.py needs.
+#
+# Fields:
+#   notebook         - path from repo root to the source .ipynb file
+#   kernel_slug      - the Kaggle kernel slug (username/<slug> is derived at runtime)
+#   experiment_dir   - repo-relative path used as the local results destination
+#   remote_output_dir - subdirectory name under /kaggle/working/satquery-output/
+#                       that the notebook writes its artifacts into
+#   result_files     - list of relative paths within remote_output_dir to copy locally
+#   gpu              - true/false (passed to kernel-metadata.json)
+#   internet         - true/false (passed to kernel-metadata.json; required to clone repo)
+
+phase3a-grounding-baseline:
+  notebook: notebooks/kaggle_phase3a.ipynb
+  kernel_slug: satquery-phase3a-grounding
+  experiment_dir: experiments/phase3a_grounding_dino_vrsbench
+  remote_output_dir: phase3a-grounding-dino
+  result_files:
+    - validation_metrics.json
+    - validation_predictions.jsonl
+  gpu: true
+  internet: true
+
+phase2b-smolvlm-lora:
+  notebook: notebooks/kaggle_phase2b.ipynb
+  kernel_slug: satquery-phase2b-smolvlm
+  experiment_dir: experiments/phase2b_smolvlm_rsvqa_lr
+  remote_output_dir: phase2b
+  result_files:
+    - metrics/train_metrics.json
+    - metrics/stability_smoke.json
+    - run.json
+  gpu: true
+  internet: true
+
+phase3b-grounding-thresholds:
+  notebook: notebooks/kaggle_phase3b.ipynb
+  kernel_slug: satquery-phase3b-thresholds
+  experiment_dir: experiments/phase3b_grounding_threshold_calibration
+  remote_output_dir: phase3b-grounding-calibration
+  result_files:
+    - calibration.json
+    - validation_candidates.jsonl
+  gpu: true
+  internet: true
