@@ -2,14 +2,16 @@
 tests/test_kaggle_runner.py
 ===========================
 Unit tests for the Kaggle experiment runner.
-These tests cover notebook patching logic only — no network calls, no CLI
-invocations, no Kaggle credentials required.
+No network calls, no CLI invocations, no Kaggle credentials required.
 """
 
 from __future__ import annotations
 
 import json
+import re
+import shutil
 import sys
+import unittest.mock as mock
 from pathlib import Path
 
 import pytest
@@ -115,7 +117,6 @@ class TestPatchNotebook:
             remote_output_dir="test-output",
         )
         nb = json.loads(patched.read_text())
-        # Original had 3 cells; patched adds 1 injected cell → 4 total
         assert len(nb["cells"]) == len(MINIMAL_NOTEBOOK["cells"]) + 1
 
     def test_clone_cell_gets_checkout_code(self, source_nb: Path, dest_dir: Path) -> None:
@@ -129,13 +130,9 @@ class TestPatchNotebook:
             remote_output_dir="test-output",
         )
         nb = json.loads(patched.read_text())
-        # Cell at index 1 should be the markdown cell (unchanged)
-        # Cell at index 2 should be the clone cell with appended checkout
         clone_cell = nb["cells"][2]  # injected(0) + markdown(1) + clone(2)
         src = "".join(clone_cell["source"])
-        # The runner appends subprocess.run(['git', 'checkout', _ref], ...)
-        # so we check for the actual generated fragments, not a shell string.
-        assert "'checkout'" in src or "\"checkout\"" in src, (
+        assert "'checkout'" in src or '"checkout"' in src, (
             f"Expected git checkout call in clone cell source, got: {src!r}"
         )
         assert "SATQUERY_GIT_REF" in src
@@ -179,7 +176,6 @@ class TestPatchNotebook:
             experiment_name="test-exp",
             remote_output_dir="test-output",
         )
-        # Must not raise
         nb = json.loads(patched.read_text())
         assert nb["nbformat"] == 4
 
@@ -285,3 +281,266 @@ class TestExperimentRegistry:
         name = next(iter(registry))
         entry = runner._get_experiment(name)
         assert entry["_name"] == name
+
+
+# ---------------------------------------------------------------------------
+# Tests — status normalizer  (covers exact Kaggle CLI 2.2.4 observed values)
+# ---------------------------------------------------------------------------
+
+class TestNormalizeStatus:
+    # --- Kaggle CLI 2.2.4 observed enum-style values ---
+    def test_enum_running(self) -> None:
+        assert runner._normalize_status("kernelworkerstatus.running") == "running"
+
+    def test_enum_complete(self) -> None:
+        assert runner._normalize_status("kernelworkerstatus.complete") == "complete"
+
+    def test_enum_error(self) -> None:
+        assert runner._normalize_status("kernelworkerstatus.error") == "error"
+
+    def test_enum_queued(self) -> None:
+        assert runner._normalize_status("kernelworkerstatus.queued") == "queued"
+
+    def test_enum_cancelled(self) -> None:
+        assert runner._normalize_status("kernelworkerstatus.cancelled") == "cancelled"
+
+    def test_enum_cancelacknowledged(self) -> None:
+        assert runner._normalize_status("kernelworkerstatus.cancelAcknowledged") == "cancelacknowledged"
+
+    # --- Backward-compat: older bare statuses still work ---
+    def test_bare_running(self) -> None:
+        assert runner._normalize_status("running") == "running"
+
+    def test_bare_complete(self) -> None:
+        assert runner._normalize_status("complete") == "complete"
+
+    def test_bare_error(self) -> None:
+        assert runner._normalize_status("error") == "error"
+
+    def test_bare_queued(self) -> None:
+        assert runner._normalize_status("queued") == "queued"
+
+    # --- Whitespace and quote stripping ---
+    def test_leading_trailing_whitespace(self) -> None:
+        assert runner._normalize_status("  running  ") == "running"
+
+    def test_double_quoted(self) -> None:
+        assert runner._normalize_status('"kernelworkerstatus.complete"') == "complete"
+
+    def test_single_quoted(self) -> None:
+        assert runner._normalize_status("'kernelworkerstatus.running'") == "running"
+
+    def test_whitespace_and_quotes(self) -> None:
+        assert runner._normalize_status('  "kernelworkerstatus.error"  ') == "error"
+
+    # --- Terminal-set membership after normalisation ---
+    def test_enum_complete_is_terminal(self) -> None:
+        status = runner._normalize_status("kernelworkerstatus.complete")
+        assert status in runner._STATUS_TERMINAL
+
+    def test_enum_error_is_terminal(self) -> None:
+        status = runner._normalize_status("kernelworkerstatus.error")
+        assert status in runner._STATUS_TERMINAL
+
+    def test_enum_running_is_not_terminal(self) -> None:
+        status = runner._normalize_status("kernelworkerstatus.running")
+        assert status not in runner._STATUS_TERMINAL
+        assert status in runner._STATUS_RUNNING
+
+    def test_enum_queued_is_not_terminal(self) -> None:
+        status = runner._normalize_status("kernelworkerstatus.queued")
+        assert status not in runner._STATUS_TERMINAL
+        assert status in runner._STATUS_RUNNING
+
+
+# ---------------------------------------------------------------------------
+# Tests — _build_file_pattern
+# ---------------------------------------------------------------------------
+
+class TestBuildFilePattern:
+    def test_single_file(self) -> None:
+        pattern = runner._build_file_pattern(["calibration.json"])
+        assert re.match(pattern, "satquery-output/phase3b/calibration.json")
+        assert not re.match(pattern, "satquery-output/phase3b/old_calibration.json")
+
+    def test_two_files(self) -> None:
+        pattern = runner._build_file_pattern(["calibration.json", "validation_candidates.jsonl"])
+        assert re.match(pattern, "satquery-output/phase3b/calibration.json")
+        assert re.match(pattern, "satquery-output/phase3b/validation_candidates.jsonl")
+        assert not re.match(pattern, "satquery-output/phase3b/other.txt")
+
+    def test_phase3b_exact_result_list(self) -> None:
+        """Verify the pattern built from Phase 3B's actual configured result_files."""
+        registry = runner._load_registry()
+        entry = registry.get("phase3b-grounding-thresholds")
+        if entry is None:
+            pytest.skip("phase3b-grounding-thresholds not in registry")
+        result_files = entry["result_files"]
+        remote_out = entry["remote_output_dir"]
+        assert result_files == ["calibration.json", "validation_candidates.jsonl"], (
+            f"Unexpected phase3b result_files: {result_files}"
+        )
+        pattern = runner._build_file_pattern(result_files)
+        for rf in result_files:
+            remote_path = f"satquery-output/{remote_out}/{rf}"
+            assert re.match(pattern, remote_path), (
+                f"Pattern {pattern!r} did not match {remote_path!r}"
+            )
+
+    def test_phase3_final_test_exact_result_list(self) -> None:
+        entry = runner._load_registry()["phase3-final-grounding-test"]
+        assert entry["result_files"] == [
+            "final_test_metrics.json",
+            "final_test_predictions.jsonl",
+        ]
+        assert entry["gpu"] is True
+        assert entry["internet"] is True
+
+    def test_special_chars_escaped(self) -> None:
+        """Dots in filenames must be treated as literals, not regex wildcards."""
+        pattern = runner._build_file_pattern(["metrics.json"])
+        # 'metricsXjson' has a char in place of '.'; must NOT match
+        assert not re.match(pattern, "some/path/metricsXjson")
+        # The real name must match
+        assert re.match(pattern, "some/path/metrics.json")
+
+    def test_pattern_is_valid_regex(self) -> None:
+        """Constructed pattern must compile without error."""
+        files = ["calibration.json", "validation_candidates.jsonl", "run.json"]
+        pattern = runner._build_file_pattern(files)
+        compiled = re.compile(pattern)
+        assert compiled is not None
+
+    def test_pattern_ends_with_dollar(self) -> None:
+        """Pattern must end with $ to avoid partial-suffix matches."""
+        pattern = runner._build_file_pattern(["metrics.json"])
+        assert pattern.endswith("$"), f"Pattern should end with $, got: {pattern!r}"
+
+    def test_subdirectory_path(self) -> None:
+        """Files in nested directories should also match."""
+        pattern = runner._build_file_pattern(["metrics/train_metrics.json"])
+        assert re.match(pattern, "satquery-output/phase2b/metrics/train_metrics.json")
+
+
+# ---------------------------------------------------------------------------
+# Tests — _download_artifacts  (filesystem only, no network calls)
+# ---------------------------------------------------------------------------
+
+class TestDownloadArtifacts:
+    """
+    Exercises the file-copy logic inside _download_artifacts by pre-populating
+    a fake download directory that mirrors what `kaggle kernels output` produces.
+    """
+
+    @staticmethod
+    def _make_fake_download(base: Path, remote_output_dir: str, files: list[str]) -> Path:
+        """Populate a dir as if kaggle kernels output extracted into it."""
+        out_base = base / "satquery-output" / remote_output_dir
+        out_base.mkdir(parents=True)
+        for f in files:
+            dest = out_base / f
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_text(f"fake content for {f}")
+        return base
+
+    def _fake_run_factory(self, dl_dir: Path, remote_output_dir: str):
+        """Return a _run replacement that mirrors dl_dir into the CLI dest arg."""
+        def fake_run(cmd, **_kwargs):
+            dest = Path(cmd[cmd.index("-p") + 1])
+            src = dl_dir / "satquery-output" / remote_output_dir
+            dest_sub = dest / "satquery-output" / remote_output_dir
+            dest_sub.mkdir(parents=True, exist_ok=True)
+            for f in src.iterdir():
+                shutil.copy2(f, dest_sub / f.name)
+            return mock.MagicMock(returncode=0)
+        return fake_run
+
+    def test_copies_configured_result_files(self, tmp_path: Path) -> None:
+        remote_out = "phase3a-grounding-dino"
+        dl_dir = self._make_fake_download(
+            tmp_path / "dl", remote_out,
+            ["validation_metrics.json", "validation_predictions.jsonl"],
+        )
+        out_dir = tmp_path / "out"
+        out_dir.mkdir()
+        experiment = {
+            "remote_output_dir": remote_out,
+            "result_files": ["validation_metrics.json", "validation_predictions.jsonl"],
+        }
+        with mock.patch.object(runner, "_run", side_effect=self._fake_run_factory(dl_dir, remote_out)):
+            runner._download_artifacts("u", "s", experiment, out_dir, allow_dirty=False)
+
+        results = out_dir / "results"
+        assert (results / "validation_metrics.json").exists()
+        assert (results / "validation_predictions.jsonl").exists()
+        assert not (results / ".dirty_worktree").exists()
+
+    def test_file_pattern_passed_to_cli(self, tmp_path: Path) -> None:
+        """Verify --file-pattern is included in the kaggle kernels output call."""
+        remote_out = "phase3b-grounding-calibration"
+        dl_dir = self._make_fake_download(
+            tmp_path / "dl", remote_out,
+            ["calibration.json", "validation_candidates.jsonl"],
+        )
+        out_dir = tmp_path / "out"
+        out_dir.mkdir()
+        experiment = {
+            "remote_output_dir": remote_out,
+            "result_files": ["calibration.json", "validation_candidates.jsonl"],
+        }
+        captured_cmds: list[list[str]] = []
+
+        def capturing_run(cmd, **_kwargs):
+            captured_cmds.append(cmd[:])
+            # Also copy files so the rest of _download_artifacts succeeds
+            dest = Path(cmd[cmd.index("-p") + 1])
+            src = dl_dir / "satquery-output" / remote_out
+            dest_sub = dest / "satquery-output" / remote_out
+            dest_sub.mkdir(parents=True, exist_ok=True)
+            for f in src.iterdir():
+                shutil.copy2(f, dest_sub / f.name)
+            return mock.MagicMock(returncode=0)
+
+        with mock.patch.object(runner, "_run", side_effect=capturing_run):
+            runner._download_artifacts("u", "s", experiment, out_dir, allow_dirty=False)
+
+        assert len(captured_cmds) == 1
+        cmd = captured_cmds[0]
+        assert "--file-pattern" in cmd
+        pattern_idx = cmd.index("--file-pattern") + 1
+        pattern = cmd[pattern_idx]
+        # Pattern must match the configured basenames
+        assert re.match(pattern, "satquery-output/phase3b/calibration.json")
+        assert re.match(pattern, "satquery-output/phase3b/validation_candidates.jsonl")
+        # Must not match unrelated files
+        assert not re.match(pattern, "satquery-output/phase3b/README.md")
+        assert not re.match(pattern, "SIH-26167-SATQuery/satquery/main.py")
+
+    def test_missing_result_file_raises_system_exit(self, tmp_path: Path) -> None:
+        """Any configured file absent from the download must cause SystemExit."""
+        remote_out = "test-output"
+        # Provide only one of the two configured files
+        dl_dir = self._make_fake_download(tmp_path / "dl", remote_out, ["metrics.json"])
+        out_dir = tmp_path / "out"
+        out_dir.mkdir()
+        experiment = {
+            "remote_output_dir": remote_out,
+            "result_files": ["metrics.json", "missing_file.json"],
+        }
+        with mock.patch.object(runner, "_run", side_effect=self._fake_run_factory(dl_dir, remote_out)):
+            with pytest.raises(SystemExit):
+                runner._download_artifacts("u", "s", experiment, out_dir, allow_dirty=False)
+
+    def test_dirty_flag_written_when_allow_dirty(self, tmp_path: Path) -> None:
+        remote_out = "test-output"
+        dl_dir = self._make_fake_download(tmp_path / "dl", remote_out, ["metrics.json"])
+        out_dir = tmp_path / "out"
+        out_dir.mkdir()
+        experiment = {
+            "remote_output_dir": remote_out,
+            "result_files": ["metrics.json"],
+        }
+        with mock.patch.object(runner, "_run", side_effect=self._fake_run_factory(dl_dir, remote_out)):
+            runner._download_artifacts("u", "s", experiment, out_dir, allow_dirty=True)
+
+        assert (out_dir / "results" / ".dirty_worktree").exists()

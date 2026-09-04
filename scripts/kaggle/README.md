@@ -49,6 +49,15 @@ Useful to inspect the patched notebook and `kernel-metadata.json` before committ
 python scripts/kaggle/runner.py run phase3a-grounding-baseline
 ```
 
+The one-time frozen Phase 3 grounding test uses:
+
+```bash
+python scripts/kaggle/runner.py run phase3-final-grounding-test
+```
+
+Run it only after the final grounding implementation is committed. Its evaluator
+refuses to overwrite either final-test artifact.
+
 The runner will:
 1. Verify the Kaggle CLI is authenticated.
 2. Refuse to proceed if the working tree is dirty (see below).

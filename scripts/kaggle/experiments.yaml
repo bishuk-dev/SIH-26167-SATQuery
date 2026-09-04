@@ -44,3 +44,14 @@ phase3b-grounding-thresholds:
     - validation_candidates.jsonl
   gpu: true
   internet: true
+
+phase3-final-grounding-test:
+  notebook: notebooks/kaggle_phase3_final_test.ipynb
+  kernel_slug: satquery-phase3-final-grounding-test
+  experiment_dir: experiments/phase3b_grounding_threshold_calibration
+  remote_output_dir: phase3-final-grounding-test
+  result_files:
+    - final_test_metrics.json
+    - final_test_predictions.jsonl
+  gpu: true
+  internet: true

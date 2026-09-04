@@ -1,0 +1,389 @@
+{
+  "schema_version": 1,
+  "phase": "3_final_grounding_validation",
+  "split": "validation",
+  "inference_rerun": false,
+  "test_split_evaluated": false,
+  "production_policy": {
+    "model_registry_id": "grounding_dino_tiny_phase3_final_v1",
+    "box_threshold": 0.3,
+    "text_threshold": 0.3,
+    "max_normalized_box_area_exclusive": 0.8,
+    "selection": "highest raw model score among remaining detections",
+    "empty_selection": "abstain with valid empty evidence"
+  },
+  "validation": {
+    "reference_count": 24,
+    "mean_iou": 0.20581098,
+    "acc_at_0_5_iou": 0.25,
+    "no_detection_count": 9,
+    "detected_reference_count": 15,
+    "detected_only_mean_iou": 0.32929757,
+    "huge_selected_box_count": 0
+  },
+  "comparisons": {
+    "phase3a_threshold_0_40": {
+      "previous": {
+        "mean_iou": 0.12862638,
+        "acc_at_0_5_iou": 0.16666667,
+        "no_detection_count": 17,
+        "detected_reference_count": 7,
+        "detected_only_mean_iou": 0.44100473,
+        "huge_selected_box_count": 2
+      },
+      "delta": {
+        "mean_iou": 0.0771846,
+        "acc_at_0_5_iou": 0.08333333,
+        "no_detection_count": -8,
+        "detected_reference_count": 8,
+        "detected_only_mean_iou": -0.11170716,
+        "huge_selected_box_count": -2
+      }
+    },
+    "phase3b_threshold_0_30": {
+      "previous": {
+        "mean_iou": 0.1833708,
+        "acc_at_0_5_iou": 0.20833333,
+        "no_detection_count": 4,
+        "detected_reference_count": 20,
+        "detected_only_mean_iou": 0.22004496,
+        "huge_selected_box_count": 8
+      },
+      "delta": {
+        "mean_iou": 0.02244018,
+        "acc_at_0_5_iou": 0.04166667,
+        "no_detection_count": 5,
+        "detected_reference_count": -5,
+        "detected_only_mean_iou": 0.10925261,
+        "huge_selected_box_count": -8
+      }
+    }
+  },
+  "decision": "freeze_threshold_0_30_with_oversized_box_guardrail",
+  "guardrail_accepted": true,
+  "phase3_validation_tuning_closed": true,
+  "source_evidence": {
+    "calibration_sha256": "abc9b93993a9526eda396430da51463d1383abc71a85fccfc84799bb6475ed68",
+    "validation_candidates_sha256": "66cd98bc0807d4bfd763c0a1b6dfcfb9d77add6a780d177bf7737e5eb2d170cb"
+  },
+  "predictions": [
+    {
+      "sample_id": "vrsbench_ref_1004",
+      "selected": {
+        "normalized_xyxy": [
+          0.7939826965332031,
+          0.017547928094863892,
+          0.9991358947753907,
+          0.15411413192749024
+        ],
+        "raw_model_score": 0.35731998085975647,
+        "phrase": "the small ship",
+        "box_area_fraction": 0.028016993488057793
+      },
+      "iou": 0.06424672,
+      "acc_at_0_5": false,
+      "abstained": false
+    },
+    {
+      "sample_id": "vrsbench_ref_1005",
+      "selected": {
+        "normalized_xyxy": [
+          0.796165771484375,
+          0.018257707357406616,
+          0.9988251495361328,
+          0.1468968105316162
+        ],
+        "raw_model_score": 0.4024145305156708,
+        "phrase": "the small harbor",
+        "box_area_fraction": 0.026069920642421224
+      },
+      "iou": 0.57736067,
+      "acc_at_0_5": true,
+      "abstained": false
+    },
+    {
+      "sample_id": "vrsbench_ref_1993",
+      "selected": null,
+      "iou": 0.0,
+      "acc_at_0_5": false,
+      "abstained": true
+    },
+    {
+      "sample_id": "vrsbench_ref_1994",
+      "selected": null,
+      "iou": 0.0,
+      "acc_at_0_5": false,
+      "abstained": true
+    },
+    {
+      "sample_id": "vrsbench_ref_2142",
+      "selected": null,
+      "iou": 0.0,
+      "acc_at_0_5": false,
+      "abstained": true
+    },
+    {
+      "sample_id": "vrsbench_ref_2143",
+      "selected": null,
+      "iou": 0.0,
+      "acc_at_0_5": false,
+      "abstained": true
+    },
+    {
+      "sample_id": "vrsbench_ref_2247",
+      "selected": {
+        "normalized_xyxy": [
+          0.7978788757324219,
+          0.5864750289916992,
+          0.9342117309570312,
+          0.7194402313232422
+        ],
+        "raw_model_score": 0.3156815767288208,
+        "phrase": "the small harbor",
+        "box_area_fraction": 0.018127525679377136
+      },
+      "iou": 0.0,
+      "acc_at_0_5": false,
+      "abstained": false
+    },
+    {
+      "sample_id": "vrsbench_ref_2248",
+      "selected": null,
+      "iou": 0.0,
+      "acc_at_0_5": false,
+      "abstained": true
+    },
+    {
+      "sample_id": "vrsbench_ref_3943",
+      "selected": {
+        "normalized_xyxy": [
+          0.08988958358764648,
+          0.04056628227233887,
+          0.4036049652099609,
+          0.33514095306396485
+        ],
+        "raw_model_score": 0.31669342517852783,
+        "phrase": "the plane",
+        "box_area_fraction": 0.09241260526366259
+      },
+      "iou": 0.0614063,
+      "acc_at_0_5": false,
+      "abstained": false
+    },
+    {
+      "sample_id": "vrsbench_ref_3944",
+      "selected": {
+        "normalized_xyxy": [
+          0.25377607345581055,
+          0.23951028823852538,
+          0.5643978881835937,
+          0.5320905303955078
+        ],
+        "raw_model_score": 0.33338531851768494,
+        "phrase": "the plane",
+        "box_area_fraction": 0.09088180577229613
+      },
+      "iou": 0.0,
+      "acc_at_0_5": false,
+      "abstained": false
+    },
+    {
+      "sample_id": "vrsbench_ref_5267",
+      "selected": {
+        "normalized_xyxy": [
+          0.7541259765625,
+          0.00035087019205093384,
+          0.9999385070800781,
+          0.24338043212890625
+        ],
+        "raw_model_score": 0.3316009044647217,
+        "phrase": "the vehicle",
+        "box_area_fraction": 0.05973971161027689
+      },
+      "iou": 0.0,
+      "acc_at_0_5": false,
+      "abstained": false
+    },
+    {
+      "sample_id": "vrsbench_ref_5268",
+      "selected": {
+        "normalized_xyxy": [
+          0.7536579895019532,
+          0.0,
+          0.9999301147460937,
+          0.26177618026733396
+        ],
+        "raw_model_score": 0.3093680143356323,
+        "phrase": "the vehicle",
+        "box_area_fraction": 0.06446817625272958
+      },
+      "iou": 0.0,
+      "acc_at_0_5": false,
+      "abstained": false
+    },
+    {
+      "sample_id": "vrsbench_ref_9861",
+      "selected": {
+        "normalized_xyxy": [
+          0.636007194519043,
+          0.7381012725830078,
+          0.9997229766845703,
+          1.0
+        ],
+        "raw_model_score": 0.3080090284347534,
+        "phrase": "field",
+        "box_area_fraction": 0.09525670049062755
+      },
+      "iou": 0.83849926,
+      "acc_at_0_5": true,
+      "abstained": false
+    },
+    {
+      "sample_id": "vrsbench_ref_9862",
+      "selected": {
+        "normalized_xyxy": [
+          0.7712934112548828,
+          0.31789705276489255,
+          0.8470990753173828,
+          0.40384647369384763
+        ],
+        "raw_model_score": 0.4295710623264313,
+        "phrase": "the small vehicle",
+        "box_area_fraction": 0.006515452929306775
+      },
+      "iou": 0.7280453,
+      "acc_at_0_5": true,
+      "abstained": false
+    },
+    {
+      "sample_id": "vrsbench_ref_10158",
+      "selected": {
+        "normalized_xyxy": [
+          0.3623607635498047,
+          0.09725173950195312,
+          0.9990363311767578,
+          0.7273664855957032
+        ],
+        "raw_model_score": 0.5438060164451599,
+        "phrase": "the oval - shaped ground track field",
+        "box_area_fraction": 0.40117866363935173
+      },
+      "iou": 0.90002471,
+      "acc_at_0_5": true,
+      "abstained": false
+    },
+    {
+      "sample_id": "vrsbench_ref_10159",
+      "selected": null,
+      "iou": 0.0,
+      "acc_at_0_5": false,
+      "abstained": true
+    },
+    {
+      "sample_id": "vrsbench_ref_10658",
+      "selected": {
+        "normalized_xyxy": [
+          0.4901931381225586,
+          0.7071660614013672,
+          0.5929447555541992,
+          0.9620967102050781
+        ],
+        "raw_model_score": 0.6178699731826782,
+        "phrase": "the ship",
+        "box_area_fraction": 0.026194536497478844
+      },
+      "iou": 0.82137638,
+      "acc_at_0_5": true,
+      "abstained": false
+    },
+    {
+      "sample_id": "vrsbench_ref_10659",
+      "selected": {
+        "normalized_xyxy": [
+          0.4905569076538086,
+          0.7092311096191406,
+          0.5918518829345704,
+          0.9616343688964843
+        ],
+        "raw_model_score": 0.5645751953125,
+        "phrase": "the distinct vehicle",
+        "box_area_fraction": 0.025567181909282234
+      },
+      "iou": 0.0,
+      "acc_at_0_5": false,
+      "abstained": false
+    },
+    {
+      "sample_id": "vrsbench_ref_13298",
+      "selected": null,
+      "iou": 0.0,
+      "acc_at_0_5": false,
+      "abstained": true
+    },
+    {
+      "sample_id": "vrsbench_ref_13299",
+      "selected": null,
+      "iou": 0.0,
+      "acc_at_0_5": false,
+      "abstained": true
+    },
+    {
+      "sample_id": "vrsbench_ref_13822",
+      "selected": {
+        "normalized_xyxy": [
+          0.09431472778320313,
+          0.004921317100524902,
+          0.9965351867675781,
+          0.5667520141601563
+        ],
+        "raw_model_score": 0.374337762594223,
+        "phrase": "the storage tank",
+        "box_area_fraction": 0.506895149372652
+      },
+      "iou": 0.10436083,
+      "acc_at_0_5": false,
+      "abstained": false
+    },
+    {
+      "sample_id": "vrsbench_ref_13823",
+      "selected": {
+        "normalized_xyxy": [
+          0.3617768478393555,
+          0.662952651977539,
+          0.6079715347290039,
+          0.907889404296875
+        ],
+        "raw_model_score": 0.43564411997795105,
+        "phrase": "white circular design",
+        "box_area_fraction": 0.060302127045026285
+      },
+      "iou": 0.84414342,
+      "acc_at_0_5": true,
+      "abstained": false
+    },
+    {
+      "sample_id": "vrsbench_ref_15213",
+      "selected": null,
+      "iou": 0.0,
+      "acc_at_0_5": false,
+      "abstained": true
+    },
+    {
+      "sample_id": "vrsbench_ref_15214",
+      "selected": {
+        "normalized_xyxy": [
+          0.20309539794921874,
+          0.5739228820800781,
+          0.2768000411987305,
+          0.6628814697265625
+        ],
+        "raw_model_score": 0.34124091267585754,
+        "phrase": "the vehicle",
+        "box_area_fraction": 0.00655666096646455
+      },
+      "iou": 0.0,
+      "acc_at_0_5": false,
+      "abstained": false
+    }
+  ]
+}

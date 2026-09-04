@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from pathlib import Path
 
 import pytest
@@ -142,3 +143,26 @@ def test_phase3b_requires_phase3a_anchor_to_reproduce() -> None:
 
     with pytest.raises(RuntimeError, match="detection-count anchor"):
         validate_phase3a_anchor([{**matching, "no_detection_count": 16}])
+
+
+def test_final_guardrail_artifact_matches_frozen_decision() -> None:
+    experiment_root = Path("experiments/phase3b_grounding_threshold_calibration")
+    decision = json.loads((experiment_root / "decision.json").read_text("utf-8"))
+    artifact_path = experiment_root / decision["final_validation"]["artifact"]
+    artifact = json.loads(artifact_path.read_text("utf-8"))
+
+    artifact_hash = hashlib.sha256(artifact_path.read_bytes()).hexdigest()
+    assert artifact_hash == decision["final_validation"]["artifact_sha256"]
+    assert artifact["validation"] == {
+        "reference_count": 24,
+        "mean_iou": 0.20581098,
+        "acc_at_0_5_iou": 0.25,
+        "no_detection_count": 9,
+        "detected_reference_count": 15,
+        "detected_only_mean_iou": 0.32929757,
+        "huge_selected_box_count": 0,
+    }
+    assert artifact["guardrail_accepted"] is True
+    assert artifact["phase3_validation_tuning_closed"] is True
+    assert artifact["inference_rerun"] is False
+    assert artifact["test_split_evaluated"] is False

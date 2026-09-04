@@ -312,8 +312,32 @@ def _write_kernel_metadata(
 # Status polling
 # ---------------------------------------------------------------------------
 
-_STATUS_TERMINAL = {"complete", "error", "cancelAcknowledged", "cancelled"}
+_STATUS_TERMINAL = {"complete", "error", "cancelacknowledged", "cancelled"}
 _STATUS_RUNNING  = {"running", "queued", "starting"}
+
+# Kaggle CLI 2.x emits enum-style values such as:
+#   kernelworkerstatus.running
+#   kernelworkerstatus.complete
+# Older releases emit bare values: running, complete, error …
+# We normalise both to the bare lowercase form before any comparison.
+_KAGGLE_STATUS_PREFIX = "kernelworkerstatus."
+
+
+def _normalize_status(raw: str) -> str:
+    """
+    Normalise a raw Kaggle status token to a bare lowercase string.
+
+    Handles:
+    - surrounding whitespace
+    - surrounding JSON/string quotes (" or ')
+    - enum-style prefixes:  kernelworkerstatus.running → running
+    - already-bare values:  running → running
+    """
+    s = raw.strip().strip('"\'')
+    s = s.lower()
+    if s.startswith(_KAGGLE_STATUS_PREFIX):
+        s = s[len(_KAGGLE_STATUS_PREFIX):]
+    return s
 
 
 def _poll_status(
@@ -323,44 +347,94 @@ def _poll_status(
 ) -> str:
     """
     Poll `kaggle kernels status` until the kernel reaches a terminal state.
-    Returns the final status string.
+    Returns the final normalised status string.
+    Prints a recovery command on KeyboardInterrupt so the user can retrieve
+    results after the kernel finishes without re-running it.
     """
     kernel_id = f"{username}/{kernel_slug}"
-    print(f"\n⏳  Polling status for {kernel_id} every {poll_interval}s …\n")
+    exp_name = "<experiment>"  # placeholder shown in recovery hint
+    # Derive the experiment name from the slug for a friendlier hint
+    registry = _load_registry()
+    for name, entry in registry.items():
+        if entry.get("kernel_slug") == kernel_slug:
+            exp_name = name
+            break
 
-    while True:
-        result = _run(
-            ["kaggle", "kernels", "status", kernel_id],
-            capture=True,
-            check=False,
+    print(f"\n⏳  Polling status for {kernel_id} every {poll_interval}s …")
+    print(f"    (Ctrl+C to abort — run 'download {exp_name}' later to retrieve results)\n")
+
+    try:
+        while True:
+            result = _run(
+                ["kaggle", "kernels", "status", kernel_id],
+                capture=True,
+                check=False,
+            )
+            output = result.stdout.strip()
+
+            # kaggle kernels status outputs a table; the status is the last
+            # token on the data row, e.g.:
+            #   ref                            totalVotes  status
+            #   username/kernel-slug           0           kernelworkerstatus.running
+            lines = [ln for ln in output.splitlines() if kernel_slug in ln.lower()]
+            raw_status = "unknown"
+            if lines:
+                raw_status = lines[-1].split()[-1]
+
+            status = _normalize_status(raw_status)
+
+            ts = time.strftime("%H:%M:%S")
+            print(f"  [{ts}] status: {status}")
+
+            if status in _STATUS_TERMINAL:
+                emoji = "✅" if status == "complete" else "❌"
+                print(f"\n{emoji}  Kernel finished with status: {status}\n")
+                return status
+
+            if status not in _STATUS_RUNNING and status != "unknown":
+                print(f"  ⚠️  Unexpected status {status!r} — continuing to poll.")
+
+            time.sleep(poll_interval)
+
+    except KeyboardInterrupt:
+        print(
+            f"\n\n⚠️  Polling interrupted.\n"
+            f"    The kernel may still be running on Kaggle.\n"
+            f"    When it completes, retrieve results with:\n"
+            f"\n"
+            f"      python scripts/kaggle/runner.py download {exp_name}\n"
+            f"\n"
+            f"    Or monitor at: https://www.kaggle.com/code/{kernel_id}\n"
         )
-        output = result.stdout.strip()
-
-        # kaggle kernels status outputs a table; the status is the last token
-        # on the data line, e.g.:
-        #   ref                            totalVotes  status
-        #   username/kernel-slug           0           running
-        lines = [l for l in output.splitlines() if kernel_slug in l.lower()]
-        status = "unknown"
-        if lines:
-            status = lines[-1].split()[-1].lower()
-
-        ts = time.strftime("%H:%M:%S")
-        print(f"  [{ts}] status: {status}")
-
-        if status in _STATUS_TERMINAL:
-            print(f"\n{'✅' if status == 'complete' else '❌'}  Kernel finished with status: {status}\n")
-            return status
-
-        if status not in _STATUS_RUNNING and status != "unknown":
-            print(f"  ⚠️  Unexpected status {status!r} — continuing to poll.")
-
-        time.sleep(poll_interval)
+        sys.exit(0)
 
 
 # ---------------------------------------------------------------------------
 # Artifact download
 # ---------------------------------------------------------------------------
+
+import re as _re
+
+
+def _build_file_pattern(result_files: list[str]) -> str:
+    """
+    Build a regex string for `kaggle kernels output --file-pattern` that
+    matches ONLY the basenames listed in result_files.
+
+    Kaggle matches the pattern against the full remote path of each output
+    file.  We require the filename to appear immediately after a '/' (or at
+    the start of the string) so that e.g. "calibration.json" does not
+    accidentally match "old_calibration.json".
+
+    The produced pattern is:
+        .*/(?:calibration[.]json|validation_candidates[.]jsonl)$
+
+    All special regex characters in the filenames are escaped before use.
+    """
+    escaped = [_re.escape(Path(rf).name) for rf in result_files]
+    alternation = "|".join(escaped)
+    return f".*/(?:{alternation})$"
+
 
 def _download_artifacts(
     username: str,
@@ -370,8 +444,13 @@ def _download_artifacts(
     allow_dirty: bool,
 ) -> None:
     """
-    Download kernel output using `kaggle kernels output` into a temp directory,
-    then selectively copy result_files into the local experiment results dir.
+    Download ONLY the configured result_files from a completed Kaggle kernel.
+
+    Uses `kaggle kernels output --file-pattern <regex>` so only matching files
+    are transferred.  The full /kaggle/working tree (cloned repo, .git packs,
+    hundreds of MB of source) is never downloaded.
+
+    Raises SystemExit if any configured result file is absent after download.
     """
     kernel_id = f"{username}/{kernel_slug}"
     result_files: list[str] = experiment.get("result_files", [])
@@ -381,54 +460,72 @@ def _download_artifacts(
         print("⚠️  No result_files configured for this experiment — skipping download.")
         return
 
+    pattern = _build_file_pattern(result_files)
+    print(f"⬇️   Downloading selected artifacts for {kernel_id}")
+    print(f"    file-pattern: {pattern}")
+
     with tempfile.TemporaryDirectory(prefix="satquery-kaggle-dl-") as tmp:
         tmp_path = Path(tmp)
-        print(f"⬇️   Downloading kernel output for {kernel_id} …")
-        _run(["kaggle", "kernels", "output", kernel_id, "-p", str(tmp_path)])
+        _run([
+            "kaggle", "kernels", "output", kernel_id,
+            "-p", str(tmp_path),
+            "--file-pattern", pattern,
+        ])
 
-        # The output zip is extracted by the CLI into tmp_path.
-        # The notebook writes artifacts under:
-        #   /kaggle/working/satquery-output/<remote_output_dir>/
-        # After download the mirror layout is typically:
+        # Kaggle CLI mirrors the remote path structure under tmp_path.
+        # Notebook artifacts live at:
+        #   /kaggle/working/satquery-output/<remote_output_dir>/<file>
+        # Downloaded mirror:
         #   <tmp>/satquery-output/<remote_output_dir>/<file>
-        # but `kaggle kernels output` may also flatten the directory. We search.
-        found: dict[str, Path] = {}
-        for rf in result_files:
-            # Try direct path match first
-            candidate = tmp_path / "satquery-output" / remote_output_dir / rf
-            if candidate.exists():
-                found[rf] = candidate
-                continue
-            # Fallback: recursive search by filename
-            fname = Path(rf).name
-            hits = list(tmp_path.rglob(fname))
-            if hits:
-                found[rf] = hits[0]
-            else:
-                print(f"  ⚠️  {rf} not found in downloaded output — skipping.")
-
-        if not found:
-            print("❌  No result files found in download. Check the experiment's remote_output_dir.")
-            return
-
-        # Write to experiment results dir
+        # We also accept a flat layout in case the CLI version differs.
         results_dest = output_dir / "results"
         results_dest.mkdir(parents=True, exist_ok=True)
 
-        copied = []
-        for rf, src in found.items():
-            dest = results_dest / Path(rf).name
-            shutil.copy2(src, dest)
-            copied.append(dest)
+        missing: list[str] = []
+        copied: list[Path] = []
+
+        for rf in result_files:
+            fname = Path(rf).name
+
+            # 1. Expected structured path
+            candidate = tmp_path / "satquery-output" / remote_output_dir / rf
+            if candidate.exists():
+                dest = results_dest / fname
+                shutil.copy2(candidate, dest)
+                copied.append(dest)
+                continue
+
+            # 2. Flat fallback — search whole download tree by basename
+            hits = [p for p in tmp_path.rglob(fname) if p.is_file()]
+            if hits:
+                dest = results_dest / fname
+                shutil.copy2(hits[0], dest)
+                copied.append(dest)
+                continue
+
+            missing.append(rf)
+
+        if missing:
+            msg_lines = [
+                "❌  Missing result files after download:",
+                *[f"    - {m}" for m in missing],
+                "",
+                "    Check that:",
+                f"    • remote_output_dir in experiments.yaml matches '{remote_output_dir}'",
+                "    • The notebook wrote these files before the kernel completed",
+                f"    • The kernel output is available at:",
+                f"      https://www.kaggle.com/code/{kernel_id}",
+            ]
+            print("\n".join(msg_lines), file=sys.stderr)
+            sys.exit(1)
 
         # Annotate dirty runs
         if allow_dirty:
-            dirty_flag = results_dest / ".dirty_worktree"
-            dirty_flag.write_text(
+            (results_dest / ".dirty_worktree").write_text(
                 "Results from a dirty working tree run — not a reproducible artifact.\n"
             )
 
-        print(f"\n📦  Copied {len(copied)} artifact(s) → {results_dest.relative_to(REPO_ROOT)}/")
+        print(f"\n📦  Copied {len(copied)} artifact(s) → {results_dest.relative_to(REPO_ROOT, walk_up=True)}/")
         for p in copied:
             print(f"    {p.name}  ({p.stat().st_size:,} bytes)")
 
@@ -455,7 +552,45 @@ def cmd_status(args: argparse.Namespace) -> None:
     slug     = exp["kernel_slug"]
     kernel_id = f"{username}/{slug}"
     result = _run(["kaggle", "kernels", "status", kernel_id], capture=True, check=False)
-    print(result.stdout or result.stderr)
+    raw = (result.stdout or result.stderr).strip()
+    # Also print normalised status so it is unambiguous
+    lines = [ln for ln in raw.splitlines() if slug in ln.lower()]
+    if lines:
+        raw_status = lines[-1].split()[-1]
+        normalised = _normalize_status(raw_status)
+        print(raw)
+        print(f"  → normalised status: {normalised}")
+    else:
+        print(raw)
+
+
+def cmd_download(args: argparse.Namespace) -> None:
+    """
+    Download artifacts from a completed Kaggle kernel without re-running it.
+    Uses `kaggle kernels output` and copies only the configured result_files.
+    """
+    _check_kaggle_cli()
+    username = _check_kaggle_auth()
+    exp      = _get_experiment(args.experiment)
+    slug     = exp["kernel_slug"]
+    exp_dir  = REPO_ROOT / exp["experiment_dir"]
+
+    output_dir = Path(args.output_dir) if args.output_dir else exp_dir
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    print(f"\n⬇️   Downloading results for experiment: {args.experiment}")
+    print(f"    Kernel: {username}/{slug}")
+    print(f"    Destination: {output_dir.relative_to(REPO_ROOT)}/results/\n")
+
+    _download_artifacts(
+        username=username,
+        kernel_slug=slug,
+        experiment=exp,
+        output_dir=output_dir,
+        allow_dirty=False,   # downloads never mark as dirty
+    )
+
+    print("\n✅  Done.")
 
 
 def cmd_run(args: argparse.Namespace) -> None:
@@ -613,6 +748,20 @@ def _build_parser() -> argparse.ArgumentParser:
     status_p = sub.add_parser("status", help="Check the status of a running Kaggle kernel.")
     status_p.add_argument("experiment", help="Experiment name from experiments.yaml")
 
+    # download
+    dl_p = sub.add_parser(
+        "download",
+        help="Download results from a completed kernel without re-running it.",
+    )
+    dl_p.add_argument("experiment", help="Experiment name from experiments.yaml")
+    dl_p.add_argument(
+        "--output-dir", metavar="PATH",
+        help=(
+            "Override local artifact destination. "
+            "Defaults to the experiment_dir defined in experiments.yaml."
+        ),
+    )
+
     # run
     run_p = sub.add_parser("run", help="Launch an experiment on Kaggle.")
     run_p.add_argument("experiment", help="Experiment name from experiments.yaml")
@@ -651,9 +800,10 @@ def main() -> None:
     args = parser.parse_args()
 
     dispatch = {
-        "list":   cmd_list,
-        "status": cmd_status,
-        "run":    cmd_run,
+        "list":     cmd_list,
+        "status":   cmd_status,
+        "download": cmd_download,
+        "run":      cmd_run,
     }
     dispatch[args.command](args)
 

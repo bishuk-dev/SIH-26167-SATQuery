@@ -7,3 +7,9 @@
 `grounding_dino_tiny_v1` pins the Phase 3A Grounding DINO Tiny baseline with the
 same offline-by-default and checksum-verification policy. The Phase 3A evaluator
 or API may populate `models/cache/` only when remote access is explicitly enabled.
+
+`grounding_dino_tiny_phase3_final_v1` preserves the same model revision and
+checkpoint while registering the final validation-selected inference policy:
+box/text thresholds 0.30/0.30, normalized source-box area below 0.80, and the
+highest model score among eligible detections. The historical Phase 3A entry is
+retained rather than overwritten.

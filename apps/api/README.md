@@ -42,3 +42,9 @@ Each detection includes the model-input box, source-image pixel box, normalized
 source box, raw Grounding DINO score, and—only when the observation has valid CRS
 and affine metadata—a four-corner world polygon. Missing detections return an
 empty evidence list with a warning; the API never invents geometry.
+
+The frozen production policy uses box/text thresholds 0.30/0.30. After mapping
+boxes to normalized source-image coordinates, it discards boxes covering at least
+80% of the image and returns only the highest-scoring remaining detection. If all
+detections are oversized, the response is successful empty evidence with
+`GROUNDING_ABSTAINED_OVERSIZED_BOXES`; abstention is not an execution failure.

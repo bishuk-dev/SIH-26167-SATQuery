@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "phase": "3B",
+  "decision": "accept_validation_box_threshold",
+  "selected_box_threshold": 0.3,
+  "text_threshold": 0.3,
+  "selection_policy": "max Acc@0.5 IoU, then max mean IoU, then min no-detection count; final exact tie prefers the higher threshold",
+  "validation": {
+    "references": 24,
+    "scenes": 12,
+    "mean_iou": 0.1833708,
+    "acc_at_0_5_iou": 0.20833333,
+    "no_detection_count": 4,
+    "detected_reference_count": 20,
+    "detected_only_mean_iou": 0.22004496,
+    "huge_box_count": 8
+  },
+  "phase3a_anchor": {
+    "box_threshold": 0.4,
+    "mean_iou": 0.12862638,
+    "acc_at_0_5_iou": 0.16666667,
+    "no_detection_count": 17,
+    "detected_reference_count": 7,
+    "detected_only_mean_iou": 0.44100473,
+    "huge_box_count": 2
+  },
+  "evidence": {
+    "calibration_sha256": "abc9b93993a9526eda396430da51463d1383abc71a85fccfc84799bb6475ed68",
+    "validation_candidates_sha256": "66cd98bc0807d4bfd763c0a1b6dfcfb9d77add6a780d177bf7737e5eb2d170cb",
+    "artifact_manifest_sha256": "c4112c133734257caf0540cd327cda40a87acff864d1588b30ef2689627fdb9b",
+    "local_manifest_sha256": "5128144b792cc5cb30a039bdb11f99347e982a7fc4eeedf1501f118ac1e2ba52",
+    "manifest_semantically_equal": true,
+    "manifest_hash_difference": "line-ending serialization only"
+  },
+  "recommended_final_validation_experiment": {
+    "name": "oversized_box_guardrail",
+    "rule": "at box threshold 0.30, discard candidates with normalized area >= 0.80, then select the highest-scoring remaining candidate; abstain when none remains",
+    "selection_inputs": [
+      "raw_model_score",
+      "normalized_box_area"
+    ],
+    "forbidden_inputs": [
+      "ground_truth_box",
+      "object_class"
+    ],
+    "exploratory_candidate_replay": {
+      "mean_iou": 0.20581098,
+      "acc_at_0_5_iou": 0.25,
+      "no_detection_count": 9,
+      "detected_reference_count": 15,
+      "detected_only_mean_iou": 0.32929757,
+      "huge_box_count": 0
+    },
+    "status": "accepted_and_frozen"
+  },
+  "final_validation": {
+    "artifact": "results/final_guardrail_validation.json",
+    "artifact_sha256": "617f14938da18d2491dd588c5b549fd874c7e58577a248d77886348a1b928db0",
+    "mean_iou": 0.20581098,
+    "acc_at_0_5_iou": 0.25,
+    "no_detection_count": 9,
+    "detected_reference_count": 15,
+    "detected_only_mean_iou": 0.32929757,
+    "huge_selected_box_count": 0,
+    "inference_rerun": false,
+    "guardrail_accepted": true
+  },
+  "frozen_production_policy": {
+    "model_registry_id": "grounding_dino_tiny_phase3_final_v1",
+    "box_threshold": 0.3,
+    "text_threshold": 0.3,
+    "reject_normalized_box_area_greater_than_or_equal_to": 0.8,
+    "selection": "highest raw model score among remaining detections",
+    "all_rejected": "abstain with valid empty evidence"
+  },
+  "specialist_status": "frozen",
+  "phase3_validation_tuning_closed": true,
+  "test_split_evaluated": false
+}

@@ -1,0 +1,196 @@
+{
+  "schema_version": 1,
+  "phase": "3B",
+  "task": "validation_only_grounding_threshold_calibration",
+  "split": "validation",
+  "selection_policy": "max Acc@0.5 IoU, then max mean IoU, then min no-detection count; final exact tie prefers the higher threshold",
+  "phase3a_validation_anchor": {
+    "box_threshold": 0.4,
+    "mean_iou": 0.1286,
+    "acc_at_0_5_iou": 0.1667,
+    "no_detection_count": 17,
+    "detected_reference_count": 7
+  },
+  "prediction_policy": "highest model score only; no ground-truth oracle",
+  "sample_count": 24,
+  "scene_count": 12,
+  "box_thresholds": [
+    0.15,
+    0.2,
+    0.25,
+    0.3,
+    0.35,
+    0.4
+  ],
+  "text_threshold": 0.3,
+  "huge_box_definition": "selected normalized box area >= 0.80",
+  "threshold_results": [
+    {
+      "box_threshold": 0.15,
+      "mean_iou": 0.1833708,
+      "acc_at_0_5_iou": 0.20833333,
+      "no_detection_count": 4,
+      "detected_reference_count": 20,
+      "detected_only_mean_iou": 0.22004496,
+      "huge_box_count": 8,
+      "selection_runtime_seconds": 0.000103,
+      "effective_runtime_seconds": 62.6609
+    },
+    {
+      "box_threshold": 0.2,
+      "mean_iou": 0.1833708,
+      "acc_at_0_5_iou": 0.20833333,
+      "no_detection_count": 4,
+      "detected_reference_count": 20,
+      "detected_only_mean_iou": 0.22004496,
+      "huge_box_count": 8,
+      "selection_runtime_seconds": 0.000109,
+      "effective_runtime_seconds": 62.6609
+    },
+    {
+      "box_threshold": 0.25,
+      "mean_iou": 0.1833708,
+      "acc_at_0_5_iou": 0.20833333,
+      "no_detection_count": 4,
+      "detected_reference_count": 20,
+      "detected_only_mean_iou": 0.22004496,
+      "huge_box_count": 8,
+      "selection_runtime_seconds": 8.6e-05,
+      "effective_runtime_seconds": 62.6609
+    },
+    {
+      "box_threshold": 0.3,
+      "mean_iou": 0.1833708,
+      "acc_at_0_5_iou": 0.20833333,
+      "no_detection_count": 4,
+      "detected_reference_count": 20,
+      "detected_only_mean_iou": 0.22004496,
+      "huge_box_count": 8,
+      "selection_runtime_seconds": 7e-05,
+      "effective_runtime_seconds": 62.6609
+    },
+    {
+      "box_threshold": 0.35,
+      "mean_iou": 0.13138722,
+      "acc_at_0_5_iou": 0.16666667,
+      "no_detection_count": 15,
+      "detected_reference_count": 9,
+      "detected_only_mean_iou": 0.35036591,
+      "huge_box_count": 4,
+      "selection_runtime_seconds": 7.5e-05,
+      "effective_runtime_seconds": 62.6609
+    },
+    {
+      "box_threshold": 0.4,
+      "mean_iou": 0.12862638,
+      "acc_at_0_5_iou": 0.16666667,
+      "no_detection_count": 17,
+      "detected_reference_count": 7,
+      "detected_only_mean_iou": 0.44100473,
+      "huge_box_count": 2,
+      "selection_runtime_seconds": 2.7e-05,
+      "effective_runtime_seconds": 62.6608
+    }
+  ],
+  "chosen": {
+    "box_threshold": 0.3,
+    "mean_iou": 0.1833708,
+    "acc_at_0_5_iou": 0.20833333,
+    "no_detection_count": 4,
+    "detected_reference_count": 20,
+    "detected_only_mean_iou": 0.22004496,
+    "huge_box_count": 8,
+    "selection_runtime_seconds": 7e-05,
+    "effective_runtime_seconds": 62.6609
+  },
+  "semantic_diagnostics_at_chosen_threshold": {
+    "method": "diagnostic only: normalized selected phrase contains the annotated object-class tokens; object_class is never model input or selection input",
+    "phrase_mismatch_count": 4,
+    "phrase_mismatches": [
+      {
+        "sample_id": "vrsbench_ref_1004",
+        "query": "The small ship is situated on the water towards the top-right of the image.",
+        "object_class": "ship",
+        "model_phrase": "the water",
+        "raw_model_score": 0.44150447845458984,
+        "normalized_xyxy": [
+          0.00048291683197021484,
+          0.0007114708423614502,
+          0.9999018859863281,
+          0.9996492004394532
+        ],
+        "box_area_fraction": 0.9983573159633201
+      },
+      {
+        "sample_id": "vrsbench_ref_3943",
+        "query": "The plane located at the bottom row of the group and furthest to the right.",
+        "object_class": "airplane",
+        "model_phrase": "the plane",
+        "raw_model_score": 0.31669342517852783,
+        "normalized_xyxy": [
+          0.08988958358764648,
+          0.04056628227233887,
+          0.4036049652099609,
+          0.33514095306396485
+        ],
+        "box_area_fraction": 0.09241260526366259
+      },
+      {
+        "sample_id": "vrsbench_ref_3944",
+        "query": "The plane positioned adjacent to the dirt road on the left.",
+        "object_class": "airplane",
+        "model_phrase": "the plane",
+        "raw_model_score": 0.33338531851768494,
+        "normalized_xyxy": [
+          0.25377607345581055,
+          0.23951028823852538,
+          0.5643978881835937,
+          0.5320905303955078
+        ],
+        "box_area_fraction": 0.09088180577229613
+      },
+      {
+        "sample_id": "vrsbench_ref_9861",
+        "query": "The baseball field is located at the bottom-right of the image.",
+        "object_class": "baseball-diamond",
+        "model_phrase": "field",
+        "raw_model_score": 0.3080090284347534,
+        "normalized_xyxy": [
+          0.636007194519043,
+          0.7381012725830078,
+          0.9997229766845703,
+          1.0
+        ],
+        "box_area_fraction": 0.09525670049062755
+      }
+    ]
+  },
+  "shared_inference_seconds": 62.6608,
+  "runtime_method": "one forward pass per reference at threshold 0.15; higher thresholds filter the same score-sorted detections",
+  "dataset": {
+    "id": "xiang709/VRSBench",
+    "revision": "6cee2968fd752a6d51c6cb2d18dded2bc0baa218",
+    "annotation_file": "VRSBench_EVAL_referring.json",
+    "annotation_sha256": "fd63f7c6b77a158f4cc933a1ead88fa63aa23ebcf30f2ec9be111f3567ff1b44",
+    "image_archive": "Images_val.zip",
+    "text_annotation_license": "CC-BY-4.0",
+    "image_use": "academic_research_only; verify source-image terms"
+  },
+  "manifest_sha256": "c4112c133734257caf0540cd327cda40a87acff864d1588b30ef2689627fdb9b",
+  "model": {
+    "registry_id": "grounding_dino_tiny_v1",
+    "model_id": "IDEA-Research/grounding-dino-tiny",
+    "revision": "a2bb814dd30d776dcf7e30523b00659f4f141c71",
+    "checkpoint_sha256": "1a2412ef99bd74bcd3c2a246fa1e48581f8889a1300c9051974741314fc042f3",
+    "preprocessing_profile": "grounding_dino_tiny_v1",
+    "preprocessing_version": "1.0.0"
+  },
+  "runtime": {
+    "python": "3.12.13",
+    "pytorch": "2.8.0+cu126",
+    "device": "cuda",
+    "cuda_available": true,
+    "gpu": "Tesla P100-PCIE-16GB"
+  },
+  "predictions_file": "/kaggle/working/satquery-output/phase3b-grounding-calibration/validation_candidates.jsonl"
+}

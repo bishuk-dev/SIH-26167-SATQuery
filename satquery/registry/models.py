@@ -101,6 +101,7 @@ class GroundingPreprocessingProfile(ContractModel):
     query_format: Literal["lowercase_period"]
     box_threshold: float = Field(ge=0, le=1)
     text_threshold: float = Field(ge=0, le=1)
+    max_normalized_box_area: float | None = Field(default=None, gt=0, le=1)
 
     @field_validator("image_mean", "image_std", mode="before")
     @classmethod

@@ -32,3 +32,22 @@ profiles:
     query_format: lowercase_period
     box_threshold: 0.4
     text_threshold: 0.3
+  grounding_dino_tiny_phase3_final_v1:
+    task: text_guided_grounding
+    version: "1.0.0"
+    input_asset_kind: visualization
+    image_mode: RGB
+    resize: shortest_edge_with_longest_cap
+    shortest_edge: 800
+    longest_edge: 1333
+    resampling: bilinear
+    image_mean: [0.485, 0.456, 0.406]
+    image_std: [0.229, 0.224, 0.225]
+    rescale_factor: 0.00392156862745098
+    nodata_policy: alpha_to_black
+    processor_source: checkpoint
+    processor_resize: disabled
+    query_format: lowercase_period
+    box_threshold: 0.3
+    text_threshold: 0.3
+    max_normalized_box_area: 0.8

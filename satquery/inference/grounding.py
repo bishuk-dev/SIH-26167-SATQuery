@@ -46,7 +46,7 @@ from satquery.registry.models import (
     load_preprocessing_registry,
 )
 
-DEFAULT_GROUNDING_MODEL_REGISTRY_ID = "grounding_dino_tiny_v1"
+DEFAULT_GROUNDING_MODEL_REGISTRY_ID = "grounding_dino_tiny_phase3_final_v1"
 
 
 @dataclass(frozen=True)
@@ -64,6 +64,18 @@ class GroundingBackendResult:
     input_width: int
     input_height: int
     detections: tuple[RawGroundingDetection, ...]
+
+
+@dataclass(frozen=True)
+class GroundingSelectionCandidate:
+    candidate_index: int
+    raw_score: float
+    normalized_xyxy: tuple[float, float, float, float]
+
+    @property
+    def normalized_area(self) -> float:
+        x_min, y_min, x_max, y_max = self.normalized_xyxy
+        return (x_max - x_min) * (y_max - y_min)
 
 
 class GroundingBackend(Protocol):
@@ -269,7 +281,7 @@ class TextGuidedGroundingService:
                 "Grounding backend returned an inconsistent input coordinate space"
             )
         try:
-            detections = tuple(
+            mapped_detections = tuple(
                 self._to_evidence_detection(raw, prepared, observation)
                 for raw in result.detections
             )
@@ -277,6 +289,7 @@ class TextGuidedGroundingService:
             raise EvidenceGeometryError(
                 "Grounding geometry could not be mapped to the source raster"
             ) from exc
+        detections, oversized_count = self._select_detections(mapped_detections)
         warnings = [
             "FROZEN_GENERIC_GROUNDING_BASELINE",
             "DISPLAY_DERIVATIVE_USED_FOR_GROUNDING",
@@ -287,6 +300,10 @@ class TextGuidedGroundingService:
         if observation.sensor.modality is Modality.SAR:
             warnings.append("SAR_INTERPRETATION_NOT_SPECIALIZED")
             reasons.append("GENERIC_GROUNDING_SAR_INPUT")
+        if oversized_count:
+            warnings.append("OVERSIZED_GROUNDING_DETECTIONS_DISCARDED")
+        if mapped_detections and not detections and oversized_count:
+            warnings.append("GROUNDING_ABSTAINED_OVERSIZED_BOXES")
         if not detections:
             warnings.append("NO_GROUNDING_DETECTIONS")
         return GroundingEvidence(
@@ -311,6 +328,34 @@ class TextGuidedGroundingService:
                 input_asset_id=visualization.asset_id,
             ),
         )
+
+    def _select_detections(
+        self, detections: tuple[GroundingDetection, ...]
+    ) -> tuple[tuple[GroundingDetection, ...], int]:
+        max_area = self.profile.max_normalized_box_area
+        if max_area is None:
+            return detections, 0
+        candidates = tuple(
+            GroundingSelectionCandidate(
+                candidate_index=index,
+                raw_score=detection.raw_score,
+                normalized_xyxy=(
+                    detection.normalized_box.x_min,
+                    detection.normalized_box.y_min,
+                    detection.normalized_box.x_max,
+                    detection.normalized_box.y_max,
+                ),
+            )
+            for index, detection in enumerate(detections)
+            if detection.raw_score >= self.profile.box_threshold
+        )
+        selected = select_grounding_candidate(candidates, max_area=max_area)
+        oversized_count = sum(
+            candidate.normalized_area >= max_area for candidate in candidates
+        )
+        if selected is None:
+            return (), oversized_count
+        return (detections[selected.candidate_index],), oversized_count
 
     @staticmethod
     def _to_evidence_detection(
@@ -381,6 +426,23 @@ def _world_polygon(
         for column, row in corners
     )
     return WorldBoundingPolygon(crs=observation.geo.crs, coordinates=coordinates)
+
+
+def select_grounding_candidate(
+    candidates: tuple[GroundingSelectionCandidate, ...],
+    *,
+    max_area: float,
+) -> GroundingSelectionCandidate | None:
+    """Select the highest model score among boxes below the frozen area cap."""
+
+    if not 0 < max_area <= 1:
+        raise ValueError("max_area must be in the interval (0, 1]")
+    valid = (
+        candidate
+        for candidate in candidates
+        if candidate.normalized_area < max_area
+    )
+    return max(valid, key=lambda candidate: candidate.raw_score, default=None)
 
 
 def _format_query(query: str) -> str:
