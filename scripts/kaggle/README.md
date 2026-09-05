@@ -177,7 +177,7 @@ my-new-experiment:
   result_files:
     - metrics.json
     - predictions.jsonl
-  gpu: true
+  gpu: true  # emits machine_shape: NvidiaTeslaT4 (Kaggle T4 x2)
   internet: true
 ```
 

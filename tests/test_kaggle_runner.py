@@ -228,6 +228,7 @@ class TestWriteKernelMetadata:
         assert meta["id"] == "testuser/satquery-test"
         assert meta["code_file"] == "test.ipynb"
         assert meta["enable_gpu"] is True
+        assert meta["machine_shape"] == "NvidiaTeslaT4"
         assert meta["enable_internet"] is True
         assert meta["kernel_type"] == "notebook"
         assert meta["language"] == "python"
@@ -243,6 +244,7 @@ class TestWriteKernelMetadata:
         )
         meta = json.loads((dest_dir / "kernel-metadata.json").read_text())
         assert meta["enable_gpu"] is False
+        assert meta["machine_shape"] is None
         assert meta["enable_internet"] is False
 
     def test_metadata_resolves_kernel_source_slugs_for_same_user(

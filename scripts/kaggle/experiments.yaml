@@ -8,7 +8,7 @@
 #   remote_output_dir - subdirectory name under /kaggle/working/satquery-output/
 #                       that the notebook writes its artifacts into
 #   result_files     - list of relative paths within remote_output_dir to copy locally
-#   gpu              - true/false (passed to kernel-metadata.json)
+#   gpu              - true/false (GPU jobs default to Kaggle NvidiaTeslaT4 / T4 x2)
 #   internet         - true/false (passed to kernel-metadata.json; required to clone repo)
 #   download_policy  - metadata_only excludes declared large_result_files from local retrieval
 

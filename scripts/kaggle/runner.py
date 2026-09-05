@@ -292,6 +292,9 @@ def _patch_notebook(
 # Kernel metadata
 # ---------------------------------------------------------------------------
 
+DEFAULT_GPU_MACHINE_SHAPE = "NvidiaTeslaT4"
+
+
 def _write_kernel_metadata(
     dest_dir: Path,
     username: str,
@@ -310,6 +313,7 @@ def _write_kernel_metadata(
         "kernel_type": "notebook",
         "is_private": True,
         "enable_gpu": gpu,
+        "machine_shape": DEFAULT_GPU_MACHINE_SHAPE if gpu else None,
         "enable_internet": internet,
         "dataset_sources": [],
         "competition_sources": [],
