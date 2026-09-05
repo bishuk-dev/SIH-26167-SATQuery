@@ -428,6 +428,18 @@ def assert_phase4d_ready(
         raise Phase4DNotReadyError(
             "Phase 4D not ready: frozen manifest SHA-256 does not match"
         )
+    if (
+        readiness.get("status") != "READY_PHASE4E_VALIDATION"
+        or readiness.get("materialization") != {"s1": "verified", "s2": "verified"}
+        or readiness.get("native_train_raster_audit") != "complete"
+        or readiness.get("preprocessing_contract") != "frozen"
+        or readiness.get("test_pixels_opened") is not False
+        or readiness.get("phase4d_status") != "COMPLETE"
+        or readiness.get("phase4e_validation_ready") is not True
+    ):
+        raise Phase4DNotReadyError(
+            "Phase 4D not ready: explicit Phase 4E readiness flags are incomplete"
+        )
     modalities = readiness.get("modalities")
     if not isinstance(modalities, Mapping):
         raise Phase4DNotReadyError(
@@ -468,9 +480,23 @@ def assert_phase4d_ready(
         raise Phase4DNotReadyError(
             "Phase 4D not ready: representative native TRAIN raster audit is incomplete"
         )
+    audit_record = readiness.get("representative_native_train_raster_audit")
+    actual_audit_sha = _sha256(raster_audit_path)
+    if (
+        not isinstance(audit_record, Mapping)
+        or audit_record.get("status") != "COMPLETE"
+        or audit_record.get("sha256") != actual_audit_sha
+    ):
+        raise Phase4DNotReadyError(
+            "Phase 4D not ready: representative raster audit SHA-256 does not match"
+        )
+    contract_audit = preprocessing.get("native_train_raster_audit")
     if (
         preprocessing.get("status") != FROZEN_PREPROCESSING_STATUS
         or preprocessing.get("manifest_sha256") != actual_manifest_sha
+        or not isinstance(contract_audit, Mapping)
+        or contract_audit.get("representative_raster_audit_sha256")
+        != actual_audit_sha
     ):
         raise Phase4DNotReadyError(
             "Phase 4D not ready: preprocessing contract is not frozen"

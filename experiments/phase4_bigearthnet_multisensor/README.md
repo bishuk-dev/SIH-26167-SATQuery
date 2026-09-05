@@ -1,12 +1,12 @@
 # Phase 4A–4E — BigEarthNet v2 multisensor materialization and frozen baselines
 
-Phase 4A froze the source facts, native sensor contract, CROMA candidate, and deterministic subset plan for the first SatQuery optical/SAR experiment. Phase 4B verified the official metadata and produced the immutable paired subset manifest. Phase 4C proved BigEarthNet tensor semantics, audited the pinned CROMA contract, and bounded the canonical archive access path. Phase 4D now provides a fail-closed streaming materializer and pins the official BIFOLD S1, S2, and S1+S2 model/preprocessing contracts. No checkpoint loading, training, or evaluation has occurred.
+Phase 4A froze the source facts, native sensor contract, CROMA candidate, and deterministic subset plan for the first SatQuery optical/SAR experiment. Phase 4B verified the official metadata and produced the immutable paired subset manifest. Phase 4C proved BigEarthNet tensor semantics, audited the pinned CROMA contract, and bounded the canonical archive access path. Phase 4D is complete: both materializations passed integrity verification and the native audit confirmed the already frozen BIFOLD v0.2.0 preprocessing contract. No checkpoint loading, training, or evaluation has occurred.
 
-S1 and S2 have since materialized successfully and their downloaded metadata
-has been independently cross-checked. `phase4e_readiness.json` records both as
-`MATERIALIZED_AND_INTEGRITY_VERIFIED`; both packages remain in Kaggle. Phase 4D
-and all real Phase 4E evaluation remain blocked until the native TRAIN raster
-audit succeeds and the preprocessing contract is frozen against those results.
+S1 and S2 materialized successfully and their downloaded metadata was
+independently cross-checked. `phase4e_readiness.json` records both as
+`MATERIALIZED_AND_INTEGRITY_VERIFIED`; both packages remain in Kaggle. The
+validation-only Phase 4E gate is open. Test remains sealed, and joint BIFOLD,
+training/adaptation, and Phase 5 remain outside this launch authorization.
 
 ## Frozen source decision
 
@@ -22,7 +22,8 @@ The publisher distributes S1 and S2 as separate monolithic Zstandard-compressed 
 
 - S1 is dual-polarization VV/VH, terrain-corrected 10 m dB backscatter. BigEarthNet applies orbit, border-noise, thermal-noise, radiometric calibration, and terrain-correction processing and does not apply speckle filtering.
 - S2 is the 12 stored Level-2A surface-reflectance bands: B01, B02, B03, B04, B05, B06, B07, B08, B8A, B09, B11, and B12. Native 10/20/60 m grids and band semantics remain part of provenance. B10/cirrus is not stored; CROMA therefore excludes none of the 12 stored bands.
-- Stored dtype, numeric scale/sentinel values, and explicit TIFF NoData values remain unknown until representative source files are inspected. The implementation must fail closed rather than guess them.
+- The audit of exactly three predeclared TRAIN pairs measured S1 as float32 VV/VH on aligned 120 × 120, 10 m grids with scale 1, offset 0, no explicit NoData, no invalid pixels, and values consistent with documented dB backscatter. This representative evidence is not a claim about every dataset raster.
+- In those same three pairs, S2 was uint16 with scale 1, offset 0, NoData sentinel 0, no invalid pixels, 120 × 120 10 m B02/B03/B04/B08, 60 × 60 20 m bands, and 20 × 20 60 m B01/B09. Cross-band and S1/S2 footprints, CRS, and affine alignment were consistent.
 - CROMA preprocessing will be a derived, versioned profile. It must not mutate or replace the native GeoTIFF representation.
 
 ## CROMA decision — BLOCKED
@@ -105,6 +106,18 @@ The transient raster tree is removed before completion. Only
 `representative_raster_audit.json` and `native_audit_runner_meta.json` are
 retained as notebook output.
 
+The audit completed from exactly the three frozen TRAIN pairs, opening all 42
+expected rasters and zero test pixels. It emitted no rasters and deleted the
+transient raster tree. The recovered audit SHA-256 is
+`e01649bf106b546ff65d40300fcaf9b231c5e8f89e43992bb8fe90be5692bf4e`.
+Its Git SHA is `93ce0b928068ed4a9de97de79f5b215d0f9f567d`; its inputs were
+`technobishu/satquery-phase4-materialize-s1` and
+`technobishu/satquery-phase4-materialize-s2`. The package SHA-256 values are
+recorded in `phase4e_readiness.json`. A Windows Kaggle CLI charmap warning
+occurred only after both configured artifacts arrived; it is not a scientific
+failure and the audit must not be rerun. No unrecorded Kaggle run identity is
+asserted.
+
 ## Frozen subset manifest
 
 The resulting manifest contains 12,000 train pairs in 3,730 groups, 3,000 validation pairs in 938 groups, and 3,001 untouched test pairs in 969 groups. The one-pair test overage preserves an indivisible geographic group. All 19 classes and all 10 countries appear in every selected split, and no configured class floor is underrepresented.
@@ -123,11 +136,12 @@ logits and sigmoid probabilities and reports micro F1, macro F1, per-class F1,
 macro average precision, per-class average precision, sample count, and class
 prevalence in canonical BigEarthNet class order.
 
-Real execution fails before raster or model access unless both modalities are
-integrity-verified against the frozen manifest, the three predeclared native
-TRAIN pairs have been audited, and `bifold_contract.json` is explicitly marked
-`FROZEN_AFTER_NATIVE_TRAIN_RASTER_AUDIT`. Only `validation` is accepted; test
-paths remain sealed.
+Real execution still fails before raster or model access unless both modalities
+are integrity-verified against the frozen manifest, the measured audit matches
+its recorded SHA-256, and `bifold_contract.json` is explicitly marked
+`FROZEN_AFTER_NATIVE_TRAIN_RASTER_AUDIT`. These checks now pass. Only
+`validation` is accepted; test paths remain sealed and the evaluator exposes no
+joint Phase 4E mode.
 
 The two prepared Kaggle experiments are:
 
@@ -153,7 +167,9 @@ are never placed in notebook output.
 - `materialization_plan.json` — unresolved archive-member acquisition plan; it does not claim data exists locally.
 - `preparation_report.json` — official and selected split/class/country/group counts and reproducibility hashes.
 - `input_contract_audit.json` — separate BigEarthNet and CROMA semantic/preprocessing evidence and the `BLOCKED` gate.
-- `representative_raster_audit.json` — selected train candidates and the unresolved native-raster measurements, without pretending documentation is observation.
+- `representative_raster_audit.json` — the Phase 4C declaration of exactly three TRAIN audit candidates.
+- `results/representative_raster_audit.json` — measured native-raster evidence for those candidates; SHA-256 `e01649bf106b546ff65d40300fcaf9b231c5e8f89e43992bb8fe90be5692bf4e`.
+- `results/native_audit_runner_meta.json` — native-audit execution, input-package, split-access, cleanup, and test-sealing provenance.
 - `materialization_access_audit.json` — bounded network evidence, mirror/tool classifications, nested member templates, and the canonical acquisition route.
 - `results/access_probe.json` — live 128-byte-per-archive range/format probe output.
 - `results/materialization_report.json` — current network-free plan; later populated with per-modality transfer integrity only when the explicit transfer runs.
@@ -190,10 +206,9 @@ python -m ml.evaluation.probe_phase4_materialization
 
 ## Exact next step
 
-Commit the verified S1/S2 readiness state and native-audit infrastructure from a
-clean worktree, then run `phase4d-native-raster-audit`. Review its measured TRAIN
-raster evidence against `bifold_contract.json`; do not run Phase 4E until that
-contract is explicitly frozen and the Phase 4D readiness gate passes.
+Phase 4D is complete. After committing this closeout, the only authorized next
+executions are the separate validation runs shown above. Do not run joint
+BIFOLD, train/adapt, open test pixels, or begin Phase 5.
 
 ## Primary sources
 

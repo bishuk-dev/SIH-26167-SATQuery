@@ -1,0 +1,1867 @@
+{
+  "manifest_sha256": "615e30273cce8eaa8b0838c07256714a3c874019f6dccd50570cbf1ec4c20bd6",
+  "native_geotiff_observations": [
+    {
+      "bands": [
+        {
+          "band_tags": {},
+          "bounds": [
+            600000.0,
+            5843640.0,
+            601200.0,
+            5844840.0
+          ],
+          "crs": "EPSG:32629",
+          "dtype": "float32",
+          "filename": "S1A_IW_GRDH_1SDV_20170617T064724_29UPU_0_46_VV.tif",
+          "height": 120,
+          "inf_count": 0,
+          "invalid_value_count": 0,
+          "maximum": -0.5752131342887878,
+          "minimum": -27.26094627380371,
+          "nan_count": 0,
+          "nodata": null,
+          "offset": 0.0,
+          "percentiles": {
+            "p01": -21.42981616973877,
+            "p05": -19.301639747619628,
+            "p50": -13.950174808502197,
+            "p95": -7.105544662475587,
+            "p99": -4.851842761039731
+          },
+          "pixel_size": [
+            10.0,
+            10.0
+          ],
+          "scale": 1.0,
+          "semantic_band": "VV",
+          "transform": [
+            10.0,
+            0.0,
+            600000.0,
+            0.0,
+            -10.0,
+            5844840.0
+          ],
+          "unit": null,
+          "width": 120
+        },
+        {
+          "band_tags": {},
+          "bounds": [
+            600000.0,
+            5843640.0,
+            601200.0,
+            5844840.0
+          ],
+          "crs": "EPSG:32629",
+          "dtype": "float32",
+          "filename": "S1A_IW_GRDH_1SDV_20170617T064724_29UPU_0_46_VH.tif",
+          "height": 120,
+          "inf_count": 0,
+          "invalid_value_count": 0,
+          "maximum": -5.837544918060303,
+          "minimum": -34.438385009765625,
+          "nan_count": 0,
+          "nodata": null,
+          "offset": 0.0,
+          "percentiles": {
+            "p01": -26.970093383789063,
+            "p05": -24.414439105987547,
+            "p50": -19.096351623535156,
+            "p95": -12.458513641357426,
+            "p99": -9.837707405090327
+          },
+          "pixel_size": [
+            10.0,
+            10.0
+          ],
+          "scale": 1.0,
+          "semantic_band": "VH",
+          "transform": [
+            10.0,
+            0.0,
+            600000.0,
+            0.0,
+            -10.0,
+            5844840.0
+          ],
+          "unit": null,
+          "width": 120
+        },
+        {
+          "band_tags": {},
+          "bounds": [
+            600000.0,
+            5843640.0,
+            601200.0,
+            5844840.0
+          ],
+          "crs": "EPSG:32629",
+          "dtype": "uint16",
+          "filename": "S2A_MSIL2A_20170617T113321_N9999_R080_T29UPU_00_46_B01.tif",
+          "height": 20,
+          "inf_count": 0,
+          "invalid_value_count": 0,
+          "maximum": 650.0,
+          "minimum": 234.0,
+          "nan_count": 0,
+          "nodata": 0.0,
+          "offset": 0.0,
+          "percentiles": {
+            "p01": 237.99,
+            "p05": 248.95,
+            "p50": 312.0,
+            "p95": 466.04999999999995,
+            "p99": 525.2099999999998
+          },
+          "pixel_size": [
+            60.0,
+            60.0
+          ],
+          "scale": 1.0,
+          "semantic_band": "B01",
+          "transform": [
+            60.0,
+            0.0,
+            600000.0,
+            0.0,
+            -60.0,
+            5844840.0
+          ],
+          "unit": null,
+          "width": 20
+        },
+        {
+          "band_tags": {},
+          "bounds": [
+            600000.0,
+            5843640.0,
+            601200.0,
+            5844840.0
+          ],
+          "crs": "EPSG:32629",
+          "dtype": "uint16",
+          "filename": "S2A_MSIL2A_20170617T113321_N9999_R080_T29UPU_00_46_B02.tif",
+          "height": 120,
+          "inf_count": 0,
+          "invalid_value_count": 0,
+          "maximum": 901.0,
+          "minimum": 141.0,
+          "nan_count": 0,
+          "nodata": 0.0,
+          "offset": 0.0,
+          "percentiles": {
+            "p01": 178.0,
+            "p05": 196.0,
+            "p50": 246.0,
+            "p95": 432.0,
+            "p99": 591.0300000000007
+          },
+          "pixel_size": [
+            10.0,
+            10.0
+          ],
+          "scale": 1.0,
+          "semantic_band": "B02",
+          "transform": [
+            10.0,
+            0.0,
+            600000.0,
+            0.0,
+            -10.0,
+            5844840.0
+          ],
+          "unit": null,
+          "width": 120
+        },
+        {
+          "band_tags": {},
+          "bounds": [
+            600000.0,
+            5843640.0,
+            601200.0,
+            5844840.0
+          ],
+          "crs": "EPSG:32629",
+          "dtype": "uint16",
+          "filename": "S2A_MSIL2A_20170617T113321_N9999_R080_T29UPU_00_46_B03.tif",
+          "height": 120,
+          "inf_count": 0,
+          "invalid_value_count": 0,
+          "maximum": 1410.0,
+          "minimum": 347.0,
+          "nan_count": 0,
+          "nodata": 0.0,
+          "offset": 0.0,
+          "percentiles": {
+            "p01": 419.0,
+            "p05": 460.0,
+            "p50": 662.0,
+            "p95": 861.0499999999993,
+            "p99": 1028.0400000000009
+          },
+          "pixel_size": [
+            10.0,
+            10.0
+          ],
+          "scale": 1.0,
+          "semantic_band": "B03",
+          "transform": [
+            10.0,
+            0.0,
+            600000.0,
+            0.0,
+            -10.0,
+            5844840.0
+          ],
+          "unit": null,
+          "width": 120
+        },
+        {
+          "band_tags": {},
+          "bounds": [
+            600000.0,
+            5843640.0,
+            601200.0,
+            5844840.0
+          ],
+          "crs": "EPSG:32629",
+          "dtype": "uint16",
+          "filename": "S2A_MSIL2A_20170617T113321_N9999_R080_T29UPU_00_46_B04.tif",
+          "height": 120,
+          "inf_count": 0,
+          "invalid_value_count": 0,
+          "maximum": 1738.0,
+          "minimum": 161.0,
+          "nan_count": 0,
+          "nodata": 0.0,
+          "offset": 0.0,
+          "percentiles": {
+            "p01": 202.0,
+            "p05": 226.0,
+            "p50": 311.0,
+            "p95": 661.0,
+            "p99": 1042.0400000000009
+          },
+          "pixel_size": [
+            10.0,
+            10.0
+          ],
+          "scale": 1.0,
+          "semantic_band": "B04",
+          "transform": [
+            10.0,
+            0.0,
+            600000.0,
+            0.0,
+            -10.0,
+            5844840.0
+          ],
+          "unit": null,
+          "width": 120
+        },
+        {
+          "band_tags": {},
+          "bounds": [
+            600000.0,
+            5843640.0,
+            601200.0,
+            5844840.0
+          ],
+          "crs": "EPSG:32629",
+          "dtype": "uint16",
+          "filename": "S2A_MSIL2A_20170617T113321_N9999_R080_T29UPU_00_46_B05.tif",
+          "height": 60,
+          "inf_count": 0,
+          "invalid_value_count": 0,
+          "maximum": 2404.0,
+          "minimum": 632.0,
+          "nan_count": 0,
+          "nodata": 0.0,
+          "offset": 0.0,
+          "percentiles": {
+            "p01": 719.98,
+            "p05": 804.95,
+            "p50": 1202.5,
+            "p95": 1552.0,
+            "p99": 1814.1899999999955
+          },
+          "pixel_size": [
+            20.0,
+            20.0
+          ],
+          "scale": 1.0,
+          "semantic_band": "B05",
+          "transform": [
+            20.0,
+            0.0,
+            600000.0,
+            0.0,
+            -20.0,
+            5844840.0
+          ],
+          "unit": null,
+          "width": 60
+        },
+        {
+          "band_tags": {},
+          "bounds": [
+            600000.0,
+            5843640.0,
+            601200.0,
+            5844840.0
+          ],
+          "crs": "EPSG:32629",
+          "dtype": "uint16",
+          "filename": "S2A_MSIL2A_20170617T113321_N9999_R080_T29UPU_00_46_B06.tif",
+          "height": 60,
+          "inf_count": 0,
+          "invalid_value_count": 0,
+          "maximum": 5157.0,
+          "minimum": 1964.0,
+          "nan_count": 0,
+          "nodata": 0.0,
+          "offset": 0.0,
+          "percentiles": {
+            "p01": 2248.0,
+            "p05": 2529.95,
+            "p50": 3761.0,
+            "p95": 4391.049999999999,
+            "p99": 4769.119999999997
+          },
+          "pixel_size": [
+            20.0,
+            20.0
+          ],
+          "scale": 1.0,
+          "semantic_band": "B06",
+          "transform": [
+            20.0,
+            0.0,
+            600000.0,
+            0.0,
+            -20.0,
+            5844840.0
+          ],
+          "unit": null,
+          "width": 60
+        },
+        {
+          "band_tags": {},
+          "bounds": [
+            600000.0,
+            5843640.0,
+            601200.0,
+            5844840.0
+          ],
+          "crs": "EPSG:32629",
+          "dtype": "uint16",
+          "filename": "S2A_MSIL2A_20170617T113321_N9999_R080_T29UPU_00_46_B07.tif",
+          "height": 60,
+          "inf_count": 0,
+          "invalid_value_count": 0,
+          "maximum": 6637.0,
+          "minimum": 2335.0,
+          "nan_count": 0,
+          "nodata": 0.0,
+          "offset": 0.0,
+          "percentiles": {
+            "p01": 2622.95,
+            "p05": 2986.9,
+            "p50": 4482.5,
+            "p95": 5326.099999999999,
+            "p99": 5976.029999999999
+          },
+          "pixel_size": [
+            20.0,
+            20.0
+          ],
+          "scale": 1.0,
+          "semantic_band": "B07",
+          "transform": [
+            20.0,
+            0.0,
+            600000.0,
+            0.0,
+            -20.0,
+            5844840.0
+          ],
+          "unit": null,
+          "width": 60
+        },
+        {
+          "band_tags": {},
+          "bounds": [
+            600000.0,
+            5843640.0,
+            601200.0,
+            5844840.0
+          ],
+          "crs": "EPSG:32629",
+          "dtype": "uint16",
+          "filename": "S2A_MSIL2A_20170617T113321_N9999_R080_T29UPU_00_46_B08.tif",
+          "height": 120,
+          "inf_count": 0,
+          "invalid_value_count": 0,
+          "maximum": 6840.0,
+          "minimum": 2284.0,
+          "nan_count": 0,
+          "nodata": 0.0,
+          "offset": 0.0,
+          "percentiles": {
+            "p01": 2701.98,
+            "p05": 3041.9,
+            "p50": 4720.0,
+            "p95": 5568.0,
+            "p99": 6232.040000000001
+          },
+          "pixel_size": [
+            10.0,
+            10.0
+          ],
+          "scale": 1.0,
+          "semantic_band": "B08",
+          "transform": [
+            10.0,
+            0.0,
+            600000.0,
+            0.0,
+            -10.0,
+            5844840.0
+          ],
+          "unit": null,
+          "width": 120
+        },
+        {
+          "band_tags": {},
+          "bounds": [
+            600000.0,
+            5843640.0,
+            601200.0,
+            5844840.0
+          ],
+          "crs": "EPSG:32629",
+          "dtype": "uint16",
+          "filename": "S2A_MSIL2A_20170617T113321_N9999_R080_T29UPU_00_46_B8A.tif",
+          "height": 60,
+          "inf_count": 0,
+          "invalid_value_count": 0,
+          "maximum": 6743.0,
+          "minimum": 2590.0,
+          "nan_count": 0,
+          "nodata": 0.0,
+          "offset": 0.0,
+          "percentiles": {
+            "p01": 2892.89,
+            "p05": 3282.8,
+            "p50": 4921.0,
+            "p95": 5730.049999999999,
+            "p99": 6347.049999999999
+          },
+          "pixel_size": [
+            20.0,
+            20.0
+          ],
+          "scale": 1.0,
+          "semantic_band": "B8A",
+          "transform": [
+            20.0,
+            0.0,
+            600000.0,
+            0.0,
+            -20.0,
+            5844840.0
+          ],
+          "unit": null,
+          "width": 60
+        },
+        {
+          "band_tags": {},
+          "bounds": [
+            600000.0,
+            5843640.0,
+            601200.0,
+            5844840.0
+          ],
+          "crs": "EPSG:32629",
+          "dtype": "uint16",
+          "filename": "S2A_MSIL2A_20170617T113321_N9999_R080_T29UPU_00_46_B09.tif",
+          "height": 20,
+          "inf_count": 0,
+          "invalid_value_count": 0,
+          "maximum": 6595.0,
+          "minimum": 2737.0,
+          "nan_count": 0,
+          "nodata": 0.0,
+          "offset": 0.0,
+          "percentiles": {
+            "p01": 3100.88,
+            "p05": 3460.95,
+            "p50": 4945.0,
+            "p95": 5705.1,
+            "p99": 6015.24
+          },
+          "pixel_size": [
+            60.0,
+            60.0
+          ],
+          "scale": 1.0,
+          "semantic_band": "B09",
+          "transform": [
+            60.0,
+            0.0,
+            600000.0,
+            0.0,
+            -60.0,
+            5844840.0
+          ],
+          "unit": null,
+          "width": 20
+        },
+        {
+          "band_tags": {},
+          "bounds": [
+            600000.0,
+            5843640.0,
+            601200.0,
+            5844840.0
+          ],
+          "crs": "EPSG:32629",
+          "dtype": "uint16",
+          "filename": "S2A_MSIL2A_20170617T113321_N9999_R080_T29UPU_00_46_B11.tif",
+          "height": 60,
+          "inf_count": 0,
+          "invalid_value_count": 0,
+          "maximum": 3476.0,
+          "minimum": 896.0,
+          "nan_count": 0,
+          "nodata": 0.0,
+          "offset": 0.0,
+          "percentiles": {
+            "p01": 973.89,
+            "p05": 1144.9,
+            "p50": 2255.0,
+            "p95": 2796.149999999999,
+            "p99": 3059.0699999999983
+          },
+          "pixel_size": [
+            20.0,
+            20.0
+          ],
+          "scale": 1.0,
+          "semantic_band": "B11",
+          "transform": [
+            20.0,
+            0.0,
+            600000.0,
+            0.0,
+            -20.0,
+            5844840.0
+          ],
+          "unit": null,
+          "width": 60
+        },
+        {
+          "band_tags": {},
+          "bounds": [
+            600000.0,
+            5843640.0,
+            601200.0,
+            5844840.0
+          ],
+          "crs": "EPSG:32629",
+          "dtype": "uint16",
+          "filename": "S2A_MSIL2A_20170617T113321_N9999_R080_T29UPU_00_46_B12.tif",
+          "height": 60,
+          "inf_count": 0,
+          "invalid_value_count": 0,
+          "maximum": 2177.0,
+          "minimum": 354.0,
+          "nan_count": 0,
+          "nodata": 0.0,
+          "offset": 0.0,
+          "percentiles": {
+            "p01": 386.0,
+            "p05": 479.95000000000005,
+            "p50": 1015.0,
+            "p95": 1464.0499999999997,
+            "p99": 1779.0
+          },
+          "pixel_size": [
+            20.0,
+            20.0
+          ],
+          "scale": 1.0,
+          "semantic_band": "B12",
+          "transform": [
+            20.0,
+            0.0,
+            600000.0,
+            0.0,
+            -20.0,
+            5844840.0
+          ],
+          "unit": null,
+          "width": 60
+        }
+      ],
+      "checks": {
+        "s1_s2_footprints_colocated": true,
+        "s1_values_consistent_with_documented_db_domain": true,
+        "s1_vv_vh_grid_aligned": true,
+        "s2_cross_band_footprints_consistent": true,
+        "s2_native_10_20_60m_grids_verified": true
+      },
+      "country": "Ireland",
+      "geographic_group_id": "T29UPU_00_46",
+      "s1_name": "S1A_IW_GRDH_1SDV_20170617T064724_29UPU_0_46",
+      "s2_patch_id": "S2A_MSIL2A_20170617T113321_N9999_R080_T29UPU_00_46",
+      "sample_id": "ben2_pair_54d6cd2db80bec3b88bd1bde"
+    },
+    {
+      "bands": [
+        {
+          "band_tags": {},
+          "bounds": [
+            600000.0,
+            5295240.0,
+            601200.0,
+            5296440.0
+          ],
+          "crs": "EPSG:32633",
+          "dtype": "float32",
+          "filename": "S1A_IW_GRDH_1SDV_20171104T165048_33TXN_0_3_VV.tif",
+          "height": 120,
+          "inf_count": 0,
+          "invalid_value_count": 0,
+          "maximum": 6.9725470542907715,
+          "minimum": -19.286514282226562,
+          "nan_count": 0,
+          "nodata": null,
+          "offset": 0.0,
+          "percentiles": {
+            "p01": -15.378703212738037,
+            "p05": -13.498605823516845,
+            "p50": -9.828845024108887,
+            "p95": -6.832315254211427,
+            "p99": -5.543585033416745
+          },
+          "pixel_size": [
+            10.0,
+            10.0
+          ],
+          "scale": 1.0,
+          "semantic_band": "VV",
+          "transform": [
+            10.0,
+            0.0,
+            600000.0,
+            0.0,
+            -10.0,
+            5296440.0
+          ],
+          "unit": null,
+          "width": 120
+        },
+        {
+          "band_tags": {},
+          "bounds": [
+            600000.0,
+            5295240.0,
+            601200.0,
+            5296440.0
+          ],
+          "crs": "EPSG:32633",
+          "dtype": "float32",
+          "filename": "S1A_IW_GRDH_1SDV_20171104T165048_33TXN_0_3_VH.tif",
+          "height": 120,
+          "inf_count": 0,
+          "invalid_value_count": 0,
+          "maximum": -5.585992813110352,
+          "minimum": -25.961137771606445,
+          "nan_count": 0,
+          "nodata": null,
+          "offset": 0.0,
+          "percentiles": {
+            "p01": -21.022311305999757,
+            "p05": -18.84607810974121,
+            "p50": -14.90968942642212,
+            "p95": -11.768531036376954,
+            "p99": -10.414854393005369
+          },
+          "pixel_size": [
+            10.0,
+            10.0
+          ],
+          "scale": 1.0,
+          "semantic_band": "VH",
+          "transform": [
+            10.0,
+            0.0,
+            600000.0,
+            0.0,
+            -10.0,
+            5296440.0
+          ],
+          "unit": null,
+          "width": 120
+        },
+        {
+          "band_tags": {},
+          "bounds": [
+            600000.0,
+            5295240.0,
+            601200.0,
+            5296440.0
+          ],
+          "crs": "EPSG:32633",
+          "dtype": "uint16",
+          "filename": "S2A_MSIL2A_20171104T095201_N9999_R079_T33TXN_00_03_B01.tif",
+          "height": 20,
+          "inf_count": 0,
+          "invalid_value_count": 0,
+          "maximum": 686.0,
+          "minimum": 222.0,
+          "nan_count": 0,
+          "nodata": 0.0,
+          "offset": 0.0,
+          "percentiles": {
+            "p01": 232.0,
+            "p05": 248.95,
+            "p50": 294.0,
+            "p95": 421.1999999999998,
+            "p99": 591.3199999999997
+          },
+          "pixel_size": [
+            60.0,
+            60.0
+          ],
+          "scale": 1.0,
+          "semantic_band": "B01",
+          "transform": [
+            60.0,
+            0.0,
+            600000.0,
+            0.0,
+            -60.0,
+            5296440.0
+          ],
+          "unit": null,
+          "width": 20
+        },
+        {
+          "band_tags": {},
+          "bounds": [
+            600000.0,
+            5295240.0,
+            601200.0,
+            5296440.0
+          ],
+          "crs": "EPSG:32633",
+          "dtype": "uint16",
+          "filename": "S2A_MSIL2A_20171104T095201_N9999_R079_T33TXN_00_03_B02.tif",
+          "height": 120,
+          "inf_count": 0,
+          "invalid_value_count": 0,
+          "maximum": 3354.0,
+          "minimum": 21.0,
+          "nan_count": 0,
+          "nodata": 0.0,
+          "offset": 0.0,
+          "percentiles": {
+            "p01": 99.0,
+            "p05": 125.0,
+            "p50": 195.0,
+            "p95": 383.0,
+            "p99": 748.0400000000009
+          },
+          "pixel_size": [
+            10.0,
+            10.0
+          ],
+          "scale": 1.0,
+          "semantic_band": "B02",
+          "transform": [
+            10.0,
+            0.0,
+            600000.0,
+            0.0,
+            -10.0,
+            5296440.0
+          ],
+          "unit": null,
+          "width": 120
+        },
+        {
+          "band_tags": {},
+          "bounds": [
+            600000.0,
+            5295240.0,
+            601200.0,
+            5296440.0
+          ],
+          "crs": "EPSG:32633",
+          "dtype": "uint16",
+          "filename": "S2A_MSIL2A_20171104T095201_N9999_R079_T33TXN_00_03_B03.tif",
+          "height": 120,
+          "inf_count": 0,
+          "invalid_value_count": 0,
+          "maximum": 3326.0,
+          "minimum": 127.0,
+          "nan_count": 0,
+          "nodata": 0.0,
+          "offset": 0.0,
+          "percentiles": {
+            "p01": 224.0,
+            "p05": 273.0,
+            "p50": 401.0,
+            "p95": 766.0,
+            "p99": 1030.0200000000004
+          },
+          "pixel_size": [
+            10.0,
+            10.0
+          ],
+          "scale": 1.0,
+          "semantic_band": "B03",
+          "transform": [
+            10.0,
+            0.0,
+            600000.0,
+            0.0,
+            -10.0,
+            5296440.0
+          ],
+          "unit": null,
+          "width": 120
+        },
+        {
+          "band_tags": {},
+          "bounds": [
+            600000.0,
+            5295240.0,
+            601200.0,
+            5296440.0
+          ],
+          "crs": "EPSG:32633",
+          "dtype": "uint16",
+          "filename": "S2A_MSIL2A_20171104T095201_N9999_R079_T33TXN_00_03_B04.tif",
+          "height": 120,
+          "inf_count": 0,
+          "invalid_value_count": 0,
+          "maximum": 3480.0,
+          "minimum": 99.0,
+          "nan_count": 0,
+          "nodata": 0.0,
+          "offset": 0.0,
+          "percentiles": {
+            "p01": 200.99,
+            "p05": 253.0,
+            "p50": 424.0,
+            "p95": 746.0,
+            "p99": 1152.0
+          },
+          "pixel_size": [
+            10.0,
+            10.0
+          ],
+          "scale": 1.0,
+          "semantic_band": "B04",
+          "transform": [
+            10.0,
+            0.0,
+            600000.0,
+            0.0,
+            -10.0,
+            5296440.0
+          ],
+          "unit": null,
+          "width": 120
+        },
+        {
+          "band_tags": {},
+          "bounds": [
+            600000.0,
+            5295240.0,
+            601200.0,
+            5296440.0
+          ],
+          "crs": "EPSG:32633",
+          "dtype": "uint16",
+          "filename": "S2A_MSIL2A_20171104T095201_N9999_R079_T33TXN_00_03_B05.tif",
+          "height": 60,
+          "inf_count": 0,
+          "invalid_value_count": 0,
+          "maximum": 2930.0,
+          "minimum": 360.0,
+          "nan_count": 0,
+          "nodata": 0.0,
+          "offset": 0.0,
+          "percentiles": {
+            "p01": 499.98,
+            "p05": 573.0,
+            "p50": 843.0,
+            "p95": 1362.0,
+            "p99": 1603.039999999999
+          },
+          "pixel_size": [
+            20.0,
+            20.0
+          ],
+          "scale": 1.0,
+          "semantic_band": "B05",
+          "transform": [
+            20.0,
+            0.0,
+            600000.0,
+            0.0,
+            -20.0,
+            5296440.0
+          ],
+          "unit": null,
+          "width": 60
+        },
+        {
+          "band_tags": {},
+          "bounds": [
+            600000.0,
+            5295240.0,
+            601200.0,
+            5296440.0
+          ],
+          "crs": "EPSG:32633",
+          "dtype": "uint16",
+          "filename": "S2A_MSIL2A_20171104T095201_N9999_R079_T33TXN_00_03_B06.tif",
+          "height": 60,
+          "inf_count": 0,
+          "invalid_value_count": 0,
+          "maximum": 4950.0,
+          "minimum": 566.0,
+          "nan_count": 0,
+          "nodata": 0.0,
+          "offset": 0.0,
+          "percentiles": {
+            "p01": 845.98,
+            "p05": 1008.95,
+            "p50": 1348.0,
+            "p95": 2146.0999999999995,
+            "p99": 3998.41999999999
+          },
+          "pixel_size": [
+            20.0,
+            20.0
+          ],
+          "scale": 1.0,
+          "semantic_band": "B06",
+          "transform": [
+            20.0,
+            0.0,
+            600000.0,
+            0.0,
+            -20.0,
+            5296440.0
+          ],
+          "unit": null,
+          "width": 60
+        },
+        {
+          "band_tags": {},
+          "bounds": [
+            600000.0,
+            5295240.0,
+            601200.0,
+            5296440.0
+          ],
+          "crs": "EPSG:32633",
+          "dtype": "uint16",
+          "filename": "S2A_MSIL2A_20171104T095201_N9999_R079_T33TXN_00_03_B07.tif",
+          "height": 60,
+          "inf_count": 0,
+          "invalid_value_count": 0,
+          "maximum": 5336.0,
+          "minimum": 673.0,
+          "nan_count": 0,
+          "nodata": 0.0,
+          "offset": 0.0,
+          "percentiles": {
+            "p01": 950.96,
+            "p05": 1175.95,
+            "p50": 1576.0,
+            "p95": 2480.0,
+            "p99": 4140.999999999976
+          },
+          "pixel_size": [
+            20.0,
+            20.0
+          ],
+          "scale": 1.0,
+          "semantic_band": "B07",
+          "transform": [
+            20.0,
+            0.0,
+            600000.0,
+            0.0,
+            -20.0,
+            5296440.0
+          ],
+          "unit": null,
+          "width": 60
+        },
+        {
+          "band_tags": {},
+          "bounds": [
+            600000.0,
+            5295240.0,
+            601200.0,
+            5296440.0
+          ],
+          "crs": "EPSG:32633",
+          "dtype": "uint16",
+          "filename": "S2A_MSIL2A_20171104T095201_N9999_R079_T33TXN_00_03_B08.tif",
+          "height": 120,
+          "inf_count": 0,
+          "invalid_value_count": 0,
+          "maximum": 5560.0,
+          "minimum": 472.0,
+          "nan_count": 0,
+          "nodata": 0.0,
+          "offset": 0.0,
+          "percentiles": {
+            "p01": 918.0,
+            "p05": 1260.0,
+            "p50": 1822.0,
+            "p95": 2942.0,
+            "p99": 4644.200000000004
+          },
+          "pixel_size": [
+            10.0,
+            10.0
+          ],
+          "scale": 1.0,
+          "semantic_band": "B08",
+          "transform": [
+            10.0,
+            0.0,
+            600000.0,
+            0.0,
+            -10.0,
+            5296440.0
+          ],
+          "unit": null,
+          "width": 120
+        },
+        {
+          "band_tags": {},
+          "bounds": [
+            600000.0,
+            5295240.0,
+            601200.0,
+            5296440.0
+          ],
+          "crs": "EPSG:32633",
+          "dtype": "uint16",
+          "filename": "S2A_MSIL2A_20171104T095201_N9999_R079_T33TXN_00_03_B8A.tif",
+          "height": 60,
+          "inf_count": 0,
+          "invalid_value_count": 0,
+          "maximum": 5475.0,
+          "minimum": 731.0,
+          "nan_count": 0,
+          "nodata": 0.0,
+          "offset": 0.0,
+          "percentiles": {
+            "p01": 1150.8400000000001,
+            "p05": 1401.95,
+            "p50": 1897.0,
+            "p95": 2982.0499999999997,
+            "p99": 4454.099999999998
+          },
+          "pixel_size": [
+            20.0,
+            20.0
+          ],
+          "scale": 1.0,
+          "semantic_band": "B8A",
+          "transform": [
+            20.0,
+            0.0,
+            600000.0,
+            0.0,
+            -20.0,
+            5296440.0
+          ],
+          "unit": null,
+          "width": 60
+        },
+        {
+          "band_tags": {},
+          "bounds": [
+            600000.0,
+            5295240.0,
+            601200.0,
+            5296440.0
+          ],
+          "crs": "EPSG:32633",
+          "dtype": "uint16",
+          "filename": "S2A_MSIL2A_20171104T095201_N9999_R079_T33TXN_00_03_B09.tif",
+          "height": 20,
+          "inf_count": 0,
+          "invalid_value_count": 0,
+          "maximum": 4771.0,
+          "minimum": 1552.0,
+          "nan_count": 0,
+          "nodata": 0.0,
+          "offset": 0.0,
+          "percentiles": {
+            "p01": 1616.9,
+            "p05": 1686.55,
+            "p50": 1993.0,
+            "p95": 2859.6999999999994,
+            "p99": 3738.24
+          },
+          "pixel_size": [
+            60.0,
+            60.0
+          ],
+          "scale": 1.0,
+          "semantic_band": "B09",
+          "transform": [
+            60.0,
+            0.0,
+            600000.0,
+            0.0,
+            -60.0,
+            5296440.0
+          ],
+          "unit": null,
+          "width": 20
+        },
+        {
+          "band_tags": {},
+          "bounds": [
+            600000.0,
+            5295240.0,
+            601200.0,
+            5296440.0
+          ],
+          "crs": "EPSG:32633",
+          "dtype": "uint16",
+          "filename": "S2A_MSIL2A_20171104T095201_N9999_R079_T33TXN_00_03_B11.tif",
+          "height": 60,
+          "inf_count": 0,
+          "invalid_value_count": 0,
+          "maximum": 3710.0,
+          "minimum": 702.0,
+          "nan_count": 0,
+          "nodata": 0.0,
+          "offset": 0.0,
+          "percentiles": {
+            "p01": 930.98,
+            "p05": 1049.0,
+            "p50": 1465.0,
+            "p95": 2151.0499999999997,
+            "p99": 2599.129999999997
+          },
+          "pixel_size": [
+            20.0,
+            20.0
+          ],
+          "scale": 1.0,
+          "semantic_band": "B11",
+          "transform": [
+            20.0,
+            0.0,
+            600000.0,
+            0.0,
+            -20.0,
+            5296440.0
+          ],
+          "unit": null,
+          "width": 60
+        },
+        {
+          "band_tags": {},
+          "bounds": [
+            600000.0,
+            5295240.0,
+            601200.0,
+            5296440.0
+          ],
+          "crs": "EPSG:32633",
+          "dtype": "uint16",
+          "filename": "S2A_MSIL2A_20171104T095201_N9999_R079_T33TXN_00_03_B12.tif",
+          "height": 60,
+          "inf_count": 0,
+          "invalid_value_count": 0,
+          "maximum": 2647.0,
+          "minimum": 385.0,
+          "nan_count": 0,
+          "nodata": 0.0,
+          "offset": 0.0,
+          "percentiles": {
+            "p01": 517.98,
+            "p05": 575.0,
+            "p50": 857.0,
+            "p95": 1303.0,
+            "p99": 1813.0199999999995
+          },
+          "pixel_size": [
+            20.0,
+            20.0
+          ],
+          "scale": 1.0,
+          "semantic_band": "B12",
+          "transform": [
+            20.0,
+            0.0,
+            600000.0,
+            0.0,
+            -20.0,
+            5296440.0
+          ],
+          "unit": null,
+          "width": 60
+        }
+      ],
+      "checks": {
+        "s1_s2_footprints_colocated": true,
+        "s1_values_consistent_with_documented_db_domain": true,
+        "s1_vv_vh_grid_aligned": true,
+        "s2_cross_band_footprints_consistent": true,
+        "s2_native_10_20_60m_grids_verified": true
+      },
+      "country": "Austria",
+      "geographic_group_id": "T33TXN_00_03",
+      "s1_name": "S1A_IW_GRDH_1SDV_20171104T165048_33TXN_0_3",
+      "s2_patch_id": "S2A_MSIL2A_20171104T095201_N9999_R079_T33TXN_00_03",
+      "sample_id": "ben2_pair_ceb2b2ff7000d820e6d70028"
+    },
+    {
+      "bands": [
+        {
+          "band_tags": {},
+          "bounds": [
+            499980.0,
+            4329240.0,
+            501180.0,
+            4330440.0
+          ],
+          "crs": "EPSG:32629",
+          "dtype": "float32",
+          "filename": "S1A_IW_GRDH_1SDV_20170706T064300_29SND_0_58_VV.tif",
+          "height": 120,
+          "inf_count": 0,
+          "invalid_value_count": 0,
+          "maximum": 16.51954460144043,
+          "minimum": -24.349458694458008,
+          "nan_count": 0,
+          "nodata": null,
+          "offset": 0.0,
+          "percentiles": {
+            "p01": -17.31528244018555,
+            "p05": -15.05994005203247,
+            "p50": -9.923236846923828,
+            "p95": -1.8404047071933785,
+            "p99": 3.5555912160873513
+          },
+          "pixel_size": [
+            10.0,
+            10.0
+          ],
+          "scale": 1.0,
+          "semantic_band": "VV",
+          "transform": [
+            10.0,
+            0.0,
+            499980.0,
+            0.0,
+            -10.0,
+            4330440.0
+          ],
+          "unit": null,
+          "width": 120
+        },
+        {
+          "band_tags": {},
+          "bounds": [
+            499980.0,
+            4329240.0,
+            501180.0,
+            4330440.0
+          ],
+          "crs": "EPSG:32629",
+          "dtype": "float32",
+          "filename": "S1A_IW_GRDH_1SDV_20170706T064300_29SND_0_58_VH.tif",
+          "height": 120,
+          "inf_count": 0,
+          "invalid_value_count": 0,
+          "maximum": 1.3112999200820923,
+          "minimum": -30.50035858154297,
+          "nan_count": 0,
+          "nodata": null,
+          "offset": 0.0,
+          "percentiles": {
+            "p01": -24.42848148345947,
+            "p05": -21.6056266784668,
+            "p50": -15.814431190490723,
+            "p95": -9.104416847229007,
+            "p99": -4.138039145469657
+          },
+          "pixel_size": [
+            10.0,
+            10.0
+          ],
+          "scale": 1.0,
+          "semantic_band": "VH",
+          "transform": [
+            10.0,
+            0.0,
+            499980.0,
+            0.0,
+            -10.0,
+            4330440.0
+          ],
+          "unit": null,
+          "width": 120
+        },
+        {
+          "band_tags": {},
+          "bounds": [
+            499980.0,
+            4329240.0,
+            501180.0,
+            4330440.0
+          ],
+          "crs": "EPSG:32629",
+          "dtype": "uint16",
+          "filename": "S2A_MSIL2A_20170704T112111_N9999_R037_T29SND_00_58_B01.tif",
+          "height": 20,
+          "inf_count": 0,
+          "invalid_value_count": 0,
+          "maximum": 4116.0,
+          "minimum": 358.0,
+          "nan_count": 0,
+          "nodata": 0.0,
+          "offset": 0.0,
+          "percentiles": {
+            "p01": 380.92,
+            "p05": 449.70000000000005,
+            "p50": 750.5,
+            "p95": 1781.4999999999995,
+            "p99": 2848.639999999995
+          },
+          "pixel_size": [
+            60.0,
+            60.0
+          ],
+          "scale": 1.0,
+          "semantic_band": "B01",
+          "transform": [
+            60.0,
+            0.0,
+            499980.0,
+            0.0,
+            -60.0,
+            4330440.0
+          ],
+          "unit": null,
+          "width": 20
+        },
+        {
+          "band_tags": {},
+          "bounds": [
+            499980.0,
+            4329240.0,
+            501180.0,
+            4330440.0
+          ],
+          "crs": "EPSG:32629",
+          "dtype": "uint16",
+          "filename": "S2A_MSIL2A_20170704T112111_N9999_R037_T29SND_00_58_B02.tif",
+          "height": 120,
+          "inf_count": 0,
+          "invalid_value_count": 0,
+          "maximum": 6488.0,
+          "minimum": 218.0,
+          "nan_count": 0,
+          "nodata": 0.0,
+          "offset": 0.0,
+          "percentiles": {
+            "p01": 274.0,
+            "p05": 337.0,
+            "p50": 697.0,
+            "p95": 2022.0999999999985,
+            "p99": 4312.200000000004
+          },
+          "pixel_size": [
+            10.0,
+            10.0
+          ],
+          "scale": 1.0,
+          "semantic_band": "B02",
+          "transform": [
+            10.0,
+            0.0,
+            499980.0,
+            0.0,
+            -10.0,
+            4330440.0
+          ],
+          "unit": null,
+          "width": 120
+        },
+        {
+          "band_tags": {},
+          "bounds": [
+            499980.0,
+            4329240.0,
+            501180.0,
+            4330440.0
+          ],
+          "crs": "EPSG:32629",
+          "dtype": "uint16",
+          "filename": "S2A_MSIL2A_20170704T112111_N9999_R037_T29SND_00_58_B03.tif",
+          "height": 120,
+          "inf_count": 0,
+          "invalid_value_count": 0,
+          "maximum": 6616.0,
+          "minimum": 437.0,
+          "nan_count": 0,
+          "nodata": 0.0,
+          "offset": 0.0,
+          "percentiles": {
+            "p01": 545.99,
+            "p05": 614.95,
+            "p50": 1016.0,
+            "p95": 2588.0999999999985,
+            "p99": 4660.040000000001
+          },
+          "pixel_size": [
+            10.0,
+            10.0
+          ],
+          "scale": 1.0,
+          "semantic_band": "B03",
+          "transform": [
+            10.0,
+            0.0,
+            499980.0,
+            0.0,
+            -10.0,
+            4330440.0
+          ],
+          "unit": null,
+          "width": 120
+        },
+        {
+          "band_tags": {},
+          "bounds": [
+            499980.0,
+            4329240.0,
+            501180.0,
+            4330440.0
+          ],
+          "crs": "EPSG:32629",
+          "dtype": "uint16",
+          "filename": "S2A_MSIL2A_20170704T112111_N9999_R037_T29SND_00_58_B04.tif",
+          "height": 120,
+          "inf_count": 0,
+          "invalid_value_count": 0,
+          "maximum": 6508.0,
+          "minimum": 243.0,
+          "nan_count": 0,
+          "nodata": 0.0,
+          "offset": 0.0,
+          "percentiles": {
+            "p01": 314.99,
+            "p05": 439.95000000000005,
+            "p50": 1232.0,
+            "p95": 3100.0,
+            "p99": 5132.0
+          },
+          "pixel_size": [
+            10.0,
+            10.0
+          ],
+          "scale": 1.0,
+          "semantic_band": "B04",
+          "transform": [
+            10.0,
+            0.0,
+            499980.0,
+            0.0,
+            -10.0,
+            4330440.0
+          ],
+          "unit": null,
+          "width": 120
+        },
+        {
+          "band_tags": {},
+          "bounds": [
+            499980.0,
+            4329240.0,
+            501180.0,
+            4330440.0
+          ],
+          "crs": "EPSG:32629",
+          "dtype": "uint16",
+          "filename": "S2A_MSIL2A_20170704T112111_N9999_R037_T29SND_00_58_B05.tif",
+          "height": 60,
+          "inf_count": 0,
+          "invalid_value_count": 0,
+          "maximum": 6765.0,
+          "minimum": 627.0,
+          "nan_count": 0,
+          "nodata": 0.0,
+          "offset": 0.0,
+          "percentiles": {
+            "p01": 935.0,
+            "p05": 1059.95,
+            "p50": 1739.0,
+            "p95": 3325.4999999999973,
+            "p99": 5375.2499999999945
+          },
+          "pixel_size": [
+            20.0,
+            20.0
+          ],
+          "scale": 1.0,
+          "semantic_band": "B05",
+          "transform": [
+            20.0,
+            0.0,
+            499980.0,
+            0.0,
+            -20.0,
+            4330440.0
+          ],
+          "unit": null,
+          "width": 60
+        },
+        {
+          "band_tags": {},
+          "bounds": [
+            499980.0,
+            4329240.0,
+            501180.0,
+            4330440.0
+          ],
+          "crs": "EPSG:32629",
+          "dtype": "uint16",
+          "filename": "S2A_MSIL2A_20170704T112111_N9999_R037_T29SND_00_58_B06.tif",
+          "height": 60,
+          "inf_count": 0,
+          "invalid_value_count": 0,
+          "maximum": 6384.0,
+          "minimum": 695.0,
+          "nan_count": 0,
+          "nodata": 0.0,
+          "offset": 0.0,
+          "percentiles": {
+            "p01": 1921.96,
+            "p05": 2084.0,
+            "p50": 2517.0,
+            "p95": 3658.0499999999997,
+            "p99": 5365.309999999992
+          },
+          "pixel_size": [
+            20.0,
+            20.0
+          ],
+          "scale": 1.0,
+          "semantic_band": "B06",
+          "transform": [
+            20.0,
+            0.0,
+            499980.0,
+            0.0,
+            -20.0,
+            4330440.0
+          ],
+          "unit": null,
+          "width": 60
+        },
+        {
+          "band_tags": {},
+          "bounds": [
+            499980.0,
+            4329240.0,
+            501180.0,
+            4330440.0
+          ],
+          "crs": "EPSG:32629",
+          "dtype": "uint16",
+          "filename": "S2A_MSIL2A_20170704T112111_N9999_R037_T29SND_00_58_B07.tif",
+          "height": 60,
+          "inf_count": 0,
+          "invalid_value_count": 0,
+          "maximum": 6209.0,
+          "minimum": 894.0,
+          "nan_count": 0,
+          "nodata": 0.0,
+          "offset": 0.0,
+          "percentiles": {
+            "p01": 2130.99,
+            "p05": 2328.95,
+            "p50": 2817.0,
+            "p95": 3866.2499999999986,
+            "p99": 5347.139999999997
+          },
+          "pixel_size": [
+            20.0,
+            20.0
+          ],
+          "scale": 1.0,
+          "semantic_band": "B07",
+          "transform": [
+            20.0,
+            0.0,
+            499980.0,
+            0.0,
+            -20.0,
+            4330440.0
+          ],
+          "unit": null,
+          "width": 60
+        },
+        {
+          "band_tags": {},
+          "bounds": [
+            499980.0,
+            4329240.0,
+            501180.0,
+            4330440.0
+          ],
+          "crs": "EPSG:32629",
+          "dtype": "uint16",
+          "filename": "S2A_MSIL2A_20170704T112111_N9999_R037_T29SND_00_58_B08.tif",
+          "height": 120,
+          "inf_count": 0,
+          "invalid_value_count": 0,
+          "maximum": 6288.0,
+          "minimum": 969.0,
+          "nan_count": 0,
+          "nodata": 0.0,
+          "offset": 0.0,
+          "percentiles": {
+            "p01": 2104.0,
+            "p05": 2338.0,
+            "p50": 2874.0,
+            "p95": 3990.0999999999985,
+            "p99": 5316.0
+          },
+          "pixel_size": [
+            10.0,
+            10.0
+          ],
+          "scale": 1.0,
+          "semantic_band": "B08",
+          "transform": [
+            10.0,
+            0.0,
+            499980.0,
+            0.0,
+            -10.0,
+            4330440.0
+          ],
+          "unit": null,
+          "width": 120
+        },
+        {
+          "band_tags": {},
+          "bounds": [
+            499980.0,
+            4329240.0,
+            501180.0,
+            4330440.0
+          ],
+          "crs": "EPSG:32629",
+          "dtype": "uint16",
+          "filename": "S2A_MSIL2A_20170704T112111_N9999_R037_T29SND_00_58_B8A.tif",
+          "height": 60,
+          "inf_count": 0,
+          "invalid_value_count": 0,
+          "maximum": 5840.0,
+          "minimum": 1152.0,
+          "nan_count": 0,
+          "nodata": 0.0,
+          "offset": 0.0,
+          "percentiles": {
+            "p01": 2407.83,
+            "p05": 2605.0,
+            "p50": 3132.0,
+            "p95": 4052.0,
+            "p99": 5187.199999999995
+          },
+          "pixel_size": [
+            20.0,
+            20.0
+          ],
+          "scale": 1.0,
+          "semantic_band": "B8A",
+          "transform": [
+            20.0,
+            0.0,
+            499980.0,
+            0.0,
+            -20.0,
+            4330440.0
+          ],
+          "unit": null,
+          "width": 60
+        },
+        {
+          "band_tags": {},
+          "bounds": [
+            499980.0,
+            4329240.0,
+            501180.0,
+            4330440.0
+          ],
+          "crs": "EPSG:32629",
+          "dtype": "uint16",
+          "filename": "S2A_MSIL2A_20170704T112111_N9999_R037_T29SND_00_58_B09.tif",
+          "height": 20,
+          "inf_count": 0,
+          "invalid_value_count": 0,
+          "maximum": 5212.0,
+          "minimum": 1845.0,
+          "nan_count": 0,
+          "nodata": 0.0,
+          "offset": 0.0,
+          "percentiles": {
+            "p01": 2598.77,
+            "p05": 2734.7,
+            "p50": 3125.5,
+            "p95": 3800.05,
+            "p99": 4516.5199999999995
+          },
+          "pixel_size": [
+            60.0,
+            60.0
+          ],
+          "scale": 1.0,
+          "semantic_band": "B09",
+          "transform": [
+            60.0,
+            0.0,
+            499980.0,
+            0.0,
+            -60.0,
+            4330440.0
+          ],
+          "unit": null,
+          "width": 20
+        },
+        {
+          "band_tags": {},
+          "bounds": [
+            499980.0,
+            4329240.0,
+            501180.0,
+            4330440.0
+          ],
+          "crs": "EPSG:32629",
+          "dtype": "uint16",
+          "filename": "S2A_MSIL2A_20170704T112111_N9999_R037_T29SND_00_58_B11.tif",
+          "height": 60,
+          "inf_count": 0,
+          "invalid_value_count": 0,
+          "maximum": 6822.0,
+          "minimum": 1364.0,
+          "nan_count": 0,
+          "nodata": 0.0,
+          "offset": 0.0,
+          "percentiles": {
+            "p01": 1571.99,
+            "p05": 1811.0,
+            "p50": 3168.5,
+            "p95": 4639.0,
+            "p99": 5820.259999999994
+          },
+          "pixel_size": [
+            20.0,
+            20.0
+          ],
+          "scale": 1.0,
+          "semantic_band": "B11",
+          "transform": [
+            20.0,
+            0.0,
+            499980.0,
+            0.0,
+            -20.0,
+            4330440.0
+          ],
+          "unit": null,
+          "width": 60
+        },
+        {
+          "band_tags": {},
+          "bounds": [
+            499980.0,
+            4329240.0,
+            501180.0,
+            4330440.0
+          ],
+          "crs": "EPSG:32629",
+          "dtype": "uint16",
+          "filename": "S2A_MSIL2A_20170704T112111_N9999_R037_T29SND_00_58_B12.tif",
+          "height": 60,
+          "inf_count": 0,
+          "invalid_value_count": 0,
+          "maximum": 5872.0,
+          "minimum": 638.0,
+          "nan_count": 0,
+          "nodata": 0.0,
+          "offset": 0.0,
+          "percentiles": {
+            "p01": 758.99,
+            "p05": 948.0,
+            "p50": 2085.0,
+            "p95": 3833.2499999999986,
+            "p99": 5093.799999999981
+          },
+          "pixel_size": [
+            20.0,
+            20.0
+          ],
+          "scale": 1.0,
+          "semantic_band": "B12",
+          "transform": [
+            20.0,
+            0.0,
+            499980.0,
+            0.0,
+            -20.0,
+            4330440.0
+          ],
+          "unit": null,
+          "width": 60
+        }
+      ],
+      "checks": {
+        "s1_s2_footprints_colocated": true,
+        "s1_values_consistent_with_documented_db_domain": true,
+        "s1_vv_vh_grid_aligned": true,
+        "s2_cross_band_footprints_consistent": true,
+        "s2_native_10_20_60m_grids_verified": true
+      },
+      "country": "Portugal",
+      "geographic_group_id": "T29SND_00_58",
+      "s1_name": "S1A_IW_GRDH_1SDV_20170706T064300_29SND_0_58",
+      "s2_patch_id": "S2A_MSIL2A_20170704T112111_N9999_R037_T29SND_00_58",
+      "sample_id": "ben2_pair_90d4a6de879ee97d50bf2c2d"
+    }
+  ],
+  "sample_ids": [
+    "ben2_pair_54d6cd2db80bec3b88bd1bde",
+    "ben2_pair_ceb2b2ff7000d820e6d70028",
+    "ben2_pair_90d4a6de879ee97d50bf2c2d"
+  ],
+  "schema_version": 1,
+  "status": "measured_from_three_predeclared_train_pairs",
+  "test_pixels_opened": false
+}

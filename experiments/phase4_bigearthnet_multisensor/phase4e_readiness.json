@@ -1,7 +1,16 @@
 {
   "schema_version": 1,
-  "status": "BLOCKED_PHASE4D_NOT_READY",
+  "status": "READY_PHASE4E_VALIDATION",
   "frozen_manifest_sha256": "615e30273cce8eaa8b0838c07256714a3c874019f6dccd50570cbf1ec4c20bd6",
+  "materialization": {
+    "s1": "verified",
+    "s2": "verified"
+  },
+  "native_train_raster_audit": "complete",
+  "preprocessing_contract": "frozen",
+  "test_pixels_opened": false,
+  "phase4d_status": "COMPLETE",
+  "phase4e_validation_ready": true,
   "modalities": {
     "s1": {
       "status": "MATERIALIZED_AND_INTEGRITY_VERIFIED",
@@ -70,12 +79,33 @@
     }
   },
   "representative_native_train_raster_audit": {
-    "status": "PENDING_NATIVE_TRAIN_RASTER_AUDIT",
-    "path": "representative_raster_audit.json"
+    "status": "COMPLETE",
+    "path": "results/representative_raster_audit.json",
+    "sha256": "e01649bf106b546ff65d40300fcaf9b231c5e8f89e43992bb8fe90be5692bf4e",
+    "scope": "Exactly three predeclared TRAIN pairs; not a claim about every dataset raster."
   },
   "phase4d_preprocessing_contract": {
-    "status": "PENDING_NATIVE_TRAIN_RASTER_AUDIT",
+    "status": "FROZEN",
     "path": "bifold_contract.json"
+  },
+  "native_audit_provenance": {
+    "runner_meta": "results/native_audit_runner_meta.json",
+    "git_sha": "93ce0b928068ed4a9de97de79f5b215d0f9f567d",
+    "experiment": "phase4d-native-raster-audit",
+    "input_kernels": [
+      "technobishu/satquery-phase4-materialize-s1",
+      "technobishu/satquery-phase4-materialize-s2"
+    ],
+    "opened_splits": ["train"],
+    "expected_raster_count": 42,
+    "opened_raster_count": 42,
+    "output_raster_count": 0,
+    "transient_rasters_deleted": true,
+    "test_pixels_opened": false,
+    "s1_package_sha256": "c0973f4a05ec2453a9158f766a31f267798810647eec810b6866561562a450b8",
+    "s2_package_sha256": "2df8b97deeead5cc8a62738484b2e61f8bb32154db6b60e29db20625094962e1",
+    "recovery_note": "Both required configured artifacts were recovered successfully. A later Windows Kaggle CLI charmap warning was not a scientific failure and does not require an audit rerun.",
+    "unrecorded_remote_run_metadata": "No Kaggle username, kernel version/run number, or run URL is asserted."
   },
   "test_access_policy": "SEALED; Phase 4E baseline evaluation accepts validation only."
 }

@@ -133,7 +133,14 @@ def _write_gate_fixture(root: Path) -> tuple[Path, Path, Path, Path]:
         json.dumps(
             {
                 "schema_version": 1,
+                "status": "READY_PHASE4E_VALIDATION",
                 "frozen_manifest_sha256": manifest_sha,
+                "materialization": {"s1": "verified", "s2": "verified"},
+                "native_train_raster_audit": "complete",
+                "preprocessing_contract": "frozen",
+                "test_pixels_opened": False,
+                "phase4d_status": "COMPLETE",
+                "phase4e_validation_ready": True,
                 "modalities": {
                     "s1": {
                         "status": "MATERIALIZED_AND_INTEGRITY_VERIFIED",
@@ -175,12 +182,22 @@ def _write_gate_fixture(root: Path) -> tuple[Path, Path, Path, Path]:
         ),
         encoding="utf-8",
     )
+    audit_sha = hashlib.sha256(audit.read_bytes()).hexdigest()
+    readiness_payload = json.loads(readiness.read_text(encoding="utf-8"))
+    readiness_payload["representative_native_train_raster_audit"] = {
+        "status": "COMPLETE",
+        "sha256": audit_sha,
+    }
+    readiness.write_text(json.dumps(readiness_payload), encoding="utf-8")
     preprocessing = root / "bifold_contract.json"
     preprocessing.write_text(
         json.dumps(
             {
                 "status": "FROZEN_AFTER_NATIVE_TRAIN_RASTER_AUDIT",
                 "manifest_sha256": manifest_sha,
+                "native_train_raster_audit": {
+                    "representative_raster_audit_sha256": audit_sha,
+                },
             }
         ),
         encoding="utf-8",
@@ -221,6 +238,41 @@ def test_verified_status_without_integrity_fields_refuses_evaluation(
 def test_test_split_remains_sealed() -> None:
     with pytest.raises(SealedTestAccessError, match="sealed"):
         require_validation_split("test")
+
+
+def test_validation_split_is_allowed() -> None:
+    require_validation_split("validation")
+
+
+def test_joint_phase4e_provenance_is_prohibited() -> None:
+    with pytest.raises(ValueError, match="modality"):
+        Phase4EProvenance(
+            experiment_name="phase4e-bifold-all-validation",
+            git_sha="a" * 40,
+            modality="all",
+            model_id="BIFOLD-BigEarthNetv2-0/resnet50-all-v0.2.0",
+            model_revision="7" * 40,
+            checkpoint_sha256="b" * 64,
+            preprocessing_profile="bifold_resnet50_all_v020",
+            frozen_manifest_sha256=FROZEN_MANIFEST_SHA256,
+            materialized_package_sha256="c" * 64,
+            threshold=0.5,
+        )
+
+
+def test_repository_phase4e_readiness_preflight_passes() -> None:
+    experiment_dir = (
+        Path(__file__).resolve().parents[2]
+        / "experiments"
+        / "phase4_bigearthnet_multisensor"
+    )
+
+    assert_phase4d_ready(
+        experiment_dir / "phase4e_readiness.json",
+        experiment_dir / "results" / "representative_raster_audit.json",
+        experiment_dir / "bifold_contract.json",
+        experiment_dir / "split_manifest.json",
+    )
 
 
 def test_provenance_serialization_preserves_pins() -> None:

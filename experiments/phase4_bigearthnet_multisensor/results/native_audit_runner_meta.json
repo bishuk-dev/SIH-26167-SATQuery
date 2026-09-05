@@ -1,0 +1,42 @@
+{
+  "dirty_worktree": false,
+  "expected_raster_count": 42,
+  "experiment": "phase4d-native-raster-audit",
+  "frozen_manifest_sha256": "615e30273cce8eaa8b0838c07256714a3c874019f6dccd50570cbf1ec4c20bd6",
+  "frozen_train_sample_ids": [
+    "ben2_pair_54d6cd2db80bec3b88bd1bde",
+    "ben2_pair_ceb2b2ff7000d820e6d70028",
+    "ben2_pair_90d4a6de879ee97d50bf2c2d"
+  ],
+  "git_sha": "93ce0b928068ed4a9de97de79f5b215d0f9f567d",
+  "kernel_sources": [
+    "technobishu/satquery-phase4-materialize-s1",
+    "technobishu/satquery-phase4-materialize-s2"
+  ],
+  "opened_splits": [
+    "train"
+  ],
+  "output_raster_count": 0,
+  "reproducible": true,
+  "schema_version": 1,
+  "test_pixels_opened": false,
+  "transient_rasters_deleted": true,
+  "verified_packages": {
+    "s1": {
+      "file_count": 36002,
+      "manifest_sha256": "615e30273cce8eaa8b0838c07256714a3c874019f6dccd50570cbf1ec4c20bd6",
+      "modality": "s1",
+      "package_file": "phase4_s1_selected.tar.zst",
+      "package_sha256": "c0973f4a05ec2453a9158f766a31f267798810647eec810b6866561562a450b8",
+      "package_size_bytes": 1779856431
+    },
+    "s2": {
+      "file_count": 216012,
+      "manifest_sha256": "615e30273cce8eaa8b0838c07256714a3c874019f6dccd50570cbf1ec4c20bd6",
+      "modality": "s2",
+      "package_file": "phase4_s2_selected.tar.zst",
+      "package_sha256": "2df8b97deeead5cc8a62738484b2e61f8bb32154db6b60e29db20625094962e1",
+      "package_size_bytes": 2033492825
+    }
+  }
+}
