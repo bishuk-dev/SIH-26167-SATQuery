@@ -1,0 +1,100 @@
+{
+  "schema_version": 1,
+  "profile_id": "bigearthnet_v2_native_geotiff_v1",
+  "dataset_version": "2.0.0",
+  "scope": "dataset-native representation before any model-specific resampling or normalization",
+  "common": {
+    "patch_ground_extent_m": [1200, 1200],
+    "storage": "separate georeferenced GeoTIFF per channel",
+    "pairing_field": "metadata.s1_name",
+    "model_preprocessing_separation": "A CROMA or other model input profile must derive from, and never replace, this native schema."
+  },
+  "sentinel_1": {
+    "modality": "sar",
+    "source_product": "Sentinel-1 IW GRDH Level-1 dual-polarization scenes",
+    "channels": [
+      {
+        "name": "VV",
+        "polarization": "VV",
+        "native_resolution_m": 10,
+        "native_patch_shape": [120, 120]
+      },
+      {
+        "name": "VH",
+        "polarization": "VH",
+        "native_resolution_m": 10,
+        "native_patch_shape": [120, 120]
+      }
+    ],
+    "satquery_canonical_native_order": ["VV", "VH"],
+    "order_scope": "Canonical SatQuery order for separately stored native channels; this is not an assertion about CROMA tensor position.",
+    "preprocessing_applied": [
+      "precise orbit file application",
+      "border noise removal",
+      "thermal noise removal",
+      "radiometric calibration",
+      "Range-Doppler terrain correction / orthorectification",
+      "linear backscatter conversion to decibels"
+    ],
+    "dem": "SRTM 30 m below 60 degrees latitude; ASTER DEM above 60 degrees latitude",
+    "speckle_filtering": "not applied",
+    "units": "decibel backscatter (dB)",
+    "stored_dtype": null,
+    "nodata_value": null,
+    "invalid_value_policy": "Not documented at per-GeoTIFF value level. Phase 4B must inspect representative headers and finite-value ranges before freezing a model profile.",
+    "unknown_fields": ["stored dtype", "explicit GeoTIFF NoData sentinel", "valid numeric range"]
+  },
+  "sentinel_2": {
+    "modality": "multispectral",
+    "source_product": "Sentinel-2 Level-2A bottom-of-atmosphere surface reflectance",
+    "atmospheric_processor": "sen2cor 2.11",
+    "stored_bands_in_satquery_canonical_order": [
+      {"name": "B01", "semantic_name": "coastal aerosol", "native_resolution_m": 60, "native_patch_shape": [20, 20]},
+      {"name": "B02", "semantic_name": "blue", "native_resolution_m": 10, "native_patch_shape": [120, 120]},
+      {"name": "B03", "semantic_name": "green", "native_resolution_m": 10, "native_patch_shape": [120, 120]},
+      {"name": "B04", "semantic_name": "red", "native_resolution_m": 10, "native_patch_shape": [120, 120]},
+      {"name": "B05", "semantic_name": "vegetation red edge 1", "native_resolution_m": 20, "native_patch_shape": [60, 60]},
+      {"name": "B06", "semantic_name": "vegetation red edge 2", "native_resolution_m": 20, "native_patch_shape": [60, 60]},
+      {"name": "B07", "semantic_name": "vegetation red edge 3", "native_resolution_m": 20, "native_patch_shape": [60, 60]},
+      {"name": "B08", "semantic_name": "near infrared", "native_resolution_m": 10, "native_patch_shape": [120, 120]},
+      {"name": "B8A", "semantic_name": "narrow near infrared", "native_resolution_m": 20, "native_patch_shape": [60, 60]},
+      {"name": "B09", "semantic_name": "water vapour", "native_resolution_m": 60, "native_patch_shape": [20, 20]},
+      {"name": "B11", "semantic_name": "short-wave infrared 1", "native_resolution_m": 20, "native_patch_shape": [60, 60]},
+      {"name": "B12", "semantic_name": "short-wave infrared 2", "native_resolution_m": 20, "native_patch_shape": [60, 60]}
+    ],
+    "order_scope": "Canonical SatQuery order for separately stored native band files; CROMA tensor position remains unresolved in model_audit.json.",
+    "sentinel_2_band_not_stored": {
+      "name": "B10",
+      "semantic_name": "cirrus",
+      "native_resolution_m": 60,
+      "reason": "BigEarthNet/CROMA use the 12-band Level-2A representation with the cirrus band removed."
+    },
+    "selected_model_excluded_stored_bands": [],
+    "selected_model_band_note": "CROMA declares 12 optical channels and therefore does not justify dropping any of BigEarthNet v2's 12 stored bands. Channel-order compatibility is a separate unresolved model-contract check.",
+    "units": "Level-2A bottom-of-atmosphere surface reflectance; the archive documentation does not state the stored scale factor or dtype.",
+    "stored_dtype": null,
+    "stored_scale_factor": null,
+    "nodata_value": null,
+    "invalid_value_policy": "Dataset construction removed patches containing invalid pixels, but the per-GeoTIFF NoData sentinel is not documented. Inspect headers before model preprocessing.",
+    "unknown_fields": ["stored dtype", "stored reflectance scale factor", "explicit GeoTIFF NoData sentinel", "valid numeric range"]
+  },
+  "model_boundary": {
+    "native_data_must_remain_immutable": true,
+    "required_derived_profile_fields": [
+      "explicit input channel order",
+      "per-band resampling from native grids",
+      "numeric scaling and clipping",
+      "NoData masking",
+      "output dtype",
+      "target spatial size",
+      "profile version and provenance"
+    ],
+    "forbidden_shortcut": "Do not create RGB or generic grayscale intermediates for the Phase 4 scientific model path."
+  },
+  "sources": [
+    "https://bigearth.net/static/documents/Description_BigEarthNet_v2.pdf",
+    "https://arxiv.org/abs/2407.03653",
+    "https://bigearth.net/static/documents/BigEarthNet_IGARSS_2019.pdf",
+    "https://step.esa.int/main/wp-content/help/versions/12.0.0/snap-toolboxes/eu.esa.opt.opttbx.s2msi.reader/Sentinel2Overview.html"
+  ]
+}

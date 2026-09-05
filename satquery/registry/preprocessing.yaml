@@ -51,3 +51,66 @@ profiles:
     box_threshold: 0.3
     text_threshold: 0.3
     max_normalized_box_area: 0.8
+  bigearthnet_native_v2:
+    task: multisensor_native
+    version: "2.0.0"
+    dataset: BigEarthNet v2.0.0
+    input_asset_kind: native_geotiff_bands
+    immutable: true
+    s1_band_order: [VV, VH]
+    s2_band_order: [B01, B02, B03, B04, B05, B06, B07, B08, B8A, B09, B11, B12]
+    nodata_policy: preserve_native_mask_fail_closed_for_model_input
+  bifold_resnet50_s1_v020:
+    task: multilabel_land_cover
+    version: "0.2.0"
+    input_asset_kind: native_geotiff_bands
+    band_order: [VV, VH]
+    excluded_native_bands: []
+    width: 120
+    height: 120
+    continuous_resampling: nearest
+    mask_resampling: nearest
+    input_dtype: float32
+    scaling_before_normalization: none
+    means: [-12.643863677978516, -19.352558135986328]
+    stds: [5.133493900299072, 5.590505599975586]
+    statistics_split: official_train
+    statistics_timing: after_120_nearest_resampling
+    nodata_policy: reject_nonfinite_or_masked_required_pixels
+    source_revision: 0a3d4f5c6eae7b4487765a915dc44fa305246891
+  bifold_resnet50_s2_v020:
+    task: multilabel_land_cover
+    version: "0.2.0"
+    input_asset_kind: native_geotiff_bands
+    band_order: [B02, B03, B04, B05, B06, B07, B08, B8A, B11, B12]
+    excluded_native_bands: [B01, B09]
+    width: 120
+    height: 120
+    continuous_resampling: nearest
+    mask_resampling: nearest
+    input_dtype: float32
+    scaling_before_normalization: none
+    means: [438.3720703125, 614.0556640625, 588.4096069335938, 942.8433227539062, 1769.931640625, 2049.551513671875, 2193.2919921875, 2235.556640625, 1568.226806640625, 997.7324829101562]
+    stds: [607.02685546875, 603.2968139648438, 684.56884765625, 738.4326782226562, 1100.4560546875, 1275.805419921875, 1369.3717041015625, 1356.5440673828125, 1070.1612548828125, 813.5276489257812]
+    statistics_split: official_train
+    statistics_timing: after_120_nearest_resampling
+    nodata_policy: reject_nonfinite_or_masked_required_pixels
+    source_revision: 0a3d4f5c6eae7b4487765a915dc44fa305246891
+  bifold_resnet50_all_v020:
+    task: multilabel_land_cover
+    version: "0.2.0"
+    input_asset_kind: native_geotiff_bands
+    band_order: [VV, VH, B02, B03, B04, B05, B06, B07, B08, B8A, B11, B12]
+    excluded_native_bands: [B01, B09]
+    width: 120
+    height: 120
+    continuous_resampling: nearest
+    mask_resampling: nearest
+    input_dtype: float32
+    scaling_before_normalization: none
+    means: [-12.643863677978516, -19.352558135986328, 438.3720703125, 614.0556640625, 588.4096069335938, 942.8433227539062, 1769.931640625, 2049.551513671875, 2193.2919921875, 2235.556640625, 1568.226806640625, 997.7324829101562]
+    stds: [5.133493900299072, 5.590505599975586, 607.02685546875, 603.2968139648438, 684.56884765625, 738.4326782226562, 1100.4560546875, 1275.805419921875, 1369.3717041015625, 1356.5440673828125, 1070.1612548828125, 813.5276489257812]
+    statistics_split: official_train
+    statistics_timing: after_120_nearest_resampling
+    nodata_policy: reject_nonfinite_or_masked_required_pixels
+    source_revision: 0a3d4f5c6eae7b4487765a915dc44fa305246891

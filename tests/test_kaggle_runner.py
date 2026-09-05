@@ -245,6 +245,21 @@ class TestWriteKernelMetadata:
         assert meta["enable_gpu"] is False
         assert meta["enable_internet"] is False
 
+    def test_metadata_resolves_kernel_source_slugs_for_same_user(
+        self, dest_dir: Path
+    ) -> None:
+        runner._write_kernel_metadata(
+            dest_dir=dest_dir,
+            username="testuser",
+            kernel_slug="satquery-s2",
+            notebook_name="test.ipynb",
+            gpu=False,
+            internet=True,
+            kernel_sources=["satquery-s1", "other/source"],
+        )
+        meta = json.loads((dest_dir / "kernel-metadata.json").read_text())
+        assert meta["kernel_sources"] == ["testuser/satquery-s1", "other/source"]
+
 
 # ---------------------------------------------------------------------------
 # Tests — experiment registry
@@ -281,6 +296,21 @@ class TestExperimentRegistry:
         name = next(iter(registry))
         entry = runner._get_experiment(name)
         assert entry["_name"] == name
+
+    def test_phase4_modalities_are_independent_cpu_experiments(self) -> None:
+        registry = runner._load_registry()
+        for modality in ("s1", "s2"):
+            entry = registry[f"phase4-materialize-{modality}"]
+            assert entry["gpu"] is False
+            assert entry["internet"] is True
+            assert entry["large_result_files"] == [
+                f"phase4_{modality}_selected.tar.zst"
+            ]
+            assert entry["download_policy"] == "metadata_only"
+            assert not set(entry["large_result_files"]) & set(entry["result_files"])
+        assert registry["phase4-materialize-s2"]["kernel_sources"] == [
+            "satquery-phase4-materialize-s1"
+        ]
 
 
 # ---------------------------------------------------------------------------
@@ -544,3 +574,47 @@ class TestDownloadArtifacts:
             runner._download_artifacts("u", "s", experiment, out_dir, allow_dirty=True)
 
         assert (out_dir / "results" / ".dirty_worktree").exists()
+
+    def test_metadata_only_policy_never_requests_large_packages(
+        self, tmp_path: Path
+    ) -> None:
+        remote_out = "phase4-bigearthnet-materialize-s1"
+        small_files = ["materialization_report.json", "package_manifest.json"]
+        dl_dir = self._make_fake_download(tmp_path / "dl", remote_out, small_files)
+        out_dir = tmp_path / "out"
+        out_dir.mkdir()
+        experiment = {
+            "remote_output_dir": remote_out,
+            "result_files": small_files,
+            "large_result_files": ["phase4_s1_selected.tar.zst"],
+            "download_policy": "metadata_only",
+        }
+        captured: list[list[str]] = []
+
+        def capturing_run(cmd, **kwargs):
+            captured.append(cmd[:])
+            return self._fake_run_factory(dl_dir, remote_out)(cmd, **kwargs)
+
+        with mock.patch.object(runner, "_run", side_effect=capturing_run):
+            runner._download_artifacts("u", "s", experiment, out_dir, allow_dirty=False)
+
+        pattern = captured[0][captured[0].index("--file-pattern") + 1]
+        assert re.match(pattern, f"satquery-output/{remote_out}/package_manifest.json")
+        assert not re.match(
+            pattern, f"satquery-output/{remote_out}/phase4_s1_selected.tar.zst"
+        )
+
+    def test_metadata_only_policy_rejects_large_package_in_result_files(
+        self, tmp_path: Path
+    ) -> None:
+        experiment = {
+            "remote_output_dir": "phase4",
+            "result_files": ["phase4_s1_selected.tar.zst"],
+            "large_result_files": ["phase4_s1_selected.tar.zst"],
+            "download_policy": "metadata_only",
+        }
+
+        with pytest.raises(ValueError, match="large_result_files"):
+            runner._download_artifacts(
+                "u", "s", experiment, tmp_path / "out", allow_dirty=False
+            )

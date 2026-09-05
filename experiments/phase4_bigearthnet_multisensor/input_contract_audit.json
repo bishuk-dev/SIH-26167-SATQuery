@@ -1,0 +1,191 @@
+{
+  "schema_version": 1,
+  "audit_id": "phase4c_multisensor_input_contract_v1",
+  "audit_date": "2026-09-05",
+  "frozen_manifest": {
+    "path": "experiments/phase4_bigearthnet_multisensor/split_manifest.json",
+    "sha256": "615e30273cce8eaa8b0838c07256714a3c874019f6dccd50570cbf1ec4c20bd6",
+    "modified_by_this_audit": false
+  },
+  "bigearthnet": {
+    "dataset_version": "2.0.0",
+    "order_status": "proven_for_bigearthnet_tensor_semantics",
+    "s1_order": [
+      "VV",
+      "VH"
+    ],
+    "s2_order": [
+      "B01",
+      "B02",
+      "B03",
+      "B04",
+      "B05",
+      "B06",
+      "B07",
+      "B08",
+      "B8A",
+      "B09",
+      "B11",
+      "B12"
+    ],
+    "scope": "This is the explicit semantic stacking order in the maintained BigEarthNet.txt loader. Native BigEarthNet stores one GeoTIFF per named band, so file enumeration must never determine tensor order. This evidence does not establish CROMA checkpoint positions.",
+    "evidence": [
+      {
+        "source": "BigEarthNet.txt ben_txt_datamodule.py",
+        "revision": "72d865f2146f0a85b720f7f3ca1cdbaeafc3d316",
+        "url": "https://huggingface.co/datasets/BIFOLD-BigEarthNetv2-0/BigEarthNet.txt/blob/72d865f2146f0a85b720f7f3ca1cdbaeafc3d316/ben_txt_datamodule.py",
+        "finding": "_s1_bandnames is [VV, VH], _s2_bandnames is [B01, B02, B03, B04, B05, B06, B07, B08, B8A, B09, B11, B12], and stack_and_interpolate stacks by the explicit requested band sequence."
+      },
+      {
+        "source": "BigEarthNet v2 file-format description",
+        "revision": "Zenodo record 10891137, dataset 2.0.0",
+        "url": "https://bigearth.net/static/documents/Description_BigEarthNet_v2.pdf",
+        "finding": "Each S1 polarization and S2 band is a separate named georeferenced GeoTIFF; semantic identity comes from the band suffix, not archive order."
+      }
+    ]
+  },
+  "croma": {
+    "model": "CROMA base",
+    "repository_revision": "59505a6bcadbf36ba20767270154bf9f3067c5e7",
+    "checkpoint_revision": "0dd28e3d633bd6715856ae9890e8c49360040598",
+    "checkpoint_sha256": "0238d814b53108f3574bf1ea240e38a0a6edd46173816d9a6962070561893b63",
+    "order_status": "unresolved",
+    "croma_input_order_status": "unresolved",
+    "s1_order": null,
+    "s1_channel_positions": [
+      {
+        "channel": 0,
+        "semantic": null
+      },
+      {
+        "channel": 1,
+        "semantic": null
+      }
+    ],
+    "s2_order": null,
+    "s2_channel_positions": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    ],
+    "proven_architecture_only": {
+      "pretraining_stacked_tensor": "channels 0..11 are optical and channels 12..13 are radar",
+      "inference_api": "separate 12-channel optical_images and 2-channel SAR_images tensors",
+      "input_size": "120 x 120 by default; dimensions must be divisible by patch size 8",
+      "supported_modes": [
+        "SAR",
+        "optical",
+        "both"
+      ]
+    },
+    "normalization": {
+      "source_status": "official_downstream_usage_example_not_proven_pretraining_transform",
+      "input_cast": "float32",
+      "statistics_scope": "For each modality tensor and channel independently, mean and torch.std are computed across the current batch and both spatial dimensions (B,H,W). They are not per-image or frozen dataset statistics.",
+      "lower_bound": "batch_channel_mean - 2 * batch_channel_std",
+      "upper_bound": "batch_channel_mean + 2 * batch_channel_std",
+      "continuous_path": "Scale linearly between the bounds, then clip to [0,1].",
+      "eight_bit_path": "Scale to [0,255], clip, cast to uint8, then cast to float and divide by 255 before inference.",
+      "epsilon": null,
+      "zero_variance_behavior": "The example has no denominator guard; a zero-standard-deviation channel can produce non-finite intermediate values.",
+      "batch_composition_dependent": true,
+      "deterministic_inference_implication": "A sample's model input changes when other samples in its batch change. SatQuery must not register this as a production preprocessing profile.",
+      "pretraining_transform_reproducible": false,
+      "pretraining_transform_finding": "The frozen repository contains README.md, use_croma.py, pretrain_croma.py, and LICENSE only. It publishes no dataset loader or tensor-construction pipeline. pretrain_croma.py normalizes reconstruction targets patch-wise inside the MAE loss, which does not establish encoder-input normalization."
+    },
+    "preprocessing_status": "unresolved",
+    "evidence": [
+      {
+        "source": "official CROMA repository tree and README usage example",
+        "revision": "59505a6bcadbf36ba20767270154bf9f3067c5e7",
+        "url": "https://github.com/antofuller/CROMA/tree/59505a6bcadbf36ba20767270154bf9f3067c5e7",
+        "finding": "The public contract names only channel counts and modality semantics; it does not name positional VV/VH or optical band order."
+      },
+      {
+        "source": "pretrain_croma.py",
+        "revision": "59505a6bcadbf36ba20767270154bf9f3067c5e7",
+        "url": "https://github.com/antofuller/CROMA/blob/59505a6bcadbf36ba20767270154bf9f3067c5e7/pretrain_croma.py",
+        "finding": "The model slices optical first and radar last, but provides neither semantic positional mapping nor a pretraining data pipeline."
+      },
+      {
+        "source": "CROMA paper",
+        "url": "https://arxiv.org/abs/2311.00566",
+        "finding": "The paper establishes paired SSL4EO-S12 S1 VV/VH and 12-band S2 use, but does not publish the tensor position mapping or a checkpoint-reproducible encoder-input normalization transform."
+      }
+    ]
+  },
+  "decision": {
+    "croma": "BLOCKED",
+    "reasons": [
+      "Neither SAR channel position nor the 12 optical channel positions are established by the frozen checkpoint's authoritative source.",
+      "The only published inference normalization is batch-dependent example code and is not proven to be the checkpoint's pretraining transform."
+    ],
+    "production_registry_action": "Do not register or execute CROMA_base.pt.",
+    "recommended_alternative": {
+      "model": "BIFOLD-BigEarthNetv2-0/resnet50-all-v0.2.0",
+      "reason": "This MIT-licensed safetensors checkpoint was trained directly on BigEarthNet v2.0. Its official training path fixes a 120 x 120, 12-channel contract with [VV, VH, B02, B03, B04, B05, B06, B07, B08, B8A, B11, B12], nearest-neighbor native-grid interpolation, and fixed training-split per-band normalization through ConfigILM rather than batch-dependent inference statistics.",
+      "documented_adaptation": "B01 and B09 are explicitly excluded because the checkpoint uses only S2 10 m and 20 m bands; native assets and their full 12-band semantics remain preserved.",
+      "checkpoint_url": "https://huggingface.co/BIFOLD-BigEarthNetv2-0/resnet50-all-v0.2.0",
+      "training_source": "https://git.tu-berlin.de/rsim/reben-training-scripts",
+      "training_source_revision": "90f7a58a2757bb407df64dd01bfc62b79df2bdd5",
+      "contract_source": "https://lhackel-tub.github.io/ConfigILM/API/ds/api_ds_BENv2.html",
+      "preprocessing_source": "https://github.com/lhackel-tub/ConfigILM/tree/0a3d4f5c6eae7b4487765a915dc44fa305246891",
+      "preprocessing_source_version": "0.7.0",
+      "input_order": [
+        "VV",
+        "VH",
+        "B02",
+        "B03",
+        "B04",
+        "B05",
+        "B06",
+        "B07",
+        "B08",
+        "B8A",
+        "B11",
+        "B12"
+      ],
+      "normalization_120_nearest": {
+        "statistics_scope": "fixed per-band statistics calculated on the official BigEarthNet v2 train split",
+        "mean": [
+          -12.643863677978516,
+          -19.352558135986328,
+          438.3720703125,
+          614.0556640625,
+          588.4096069335938,
+          942.8433227539062,
+          1769.931640625,
+          2049.551513671875,
+          2193.2919921875,
+          2235.556640625,
+          1568.226806640625,
+          997.7324829101562
+        ],
+        "std": [
+          5.133493900299072,
+          5.590505599975586,
+          607.02685546875,
+          603.2968139648438,
+          684.56884765625,
+          738.4326782226562,
+          1100.4560546875,
+          1275.805419921875,
+          1369.3717041015625,
+          1356.5440673828125,
+          1070.1612548828125,
+          813.5276489257812
+        ]
+      },
+      "implementation_status": "recommended_only_not_implemented"
+    }
+  }
+}

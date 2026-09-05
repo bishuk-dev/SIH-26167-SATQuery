@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "audit_id": "phase4d_bifold_v020_contract_v1",
+  "status": "frozen_authoritative_contract_native_raster_validation_pending",
+  "manifest_sha256": "615e30273cce8eaa8b0838c07256714a3c874019f6dccd50570cbf1ec4c20bd6",
+  "models": {
+    "s1": {
+      "model_id": "BIFOLD-BigEarthNetv2-0/resnet50-s1-v0.2.0",
+      "revision": "d417b3c32f2172cbceb14e5b106dd9aa7b77c647",
+      "checkpoint_file": "model.safetensors",
+      "checkpoint_size_bytes": 94423500,
+      "checkpoint_sha256": "87990ba9058bc5413b90d7dc955ed1077cf8c54530db393801336209252b3739",
+      "channels": 2,
+      "input_order": ["VV", "VH"]
+    },
+    "s2": {
+      "model_id": "BIFOLD-BigEarthNetv2-0/resnet50-s2-v0.2.0",
+      "revision": "f5a590cd5876845f62702260ff62ea5a325433bb",
+      "checkpoint_file": "model.safetensors",
+      "checkpoint_size_bytes": 94523860,
+      "checkpoint_sha256": "f55f8a5416d326c7e3139a97c6866e606dfc2e5cde30d52e2ccc47ce5f8b9be5",
+      "channels": 10,
+      "input_order": ["B02", "B03", "B04", "B05", "B06", "B07", "B08", "B8A", "B11", "B12"]
+    },
+    "all": {
+      "model_id": "BIFOLD-BigEarthNetv2-0/resnet50-all-v0.2.0",
+      "revision": "762acdc186cce6b31ecbc896ddab1721847d4c5e",
+      "checkpoint_file": "model.safetensors",
+      "checkpoint_size_bytes": 94548948,
+      "checkpoint_sha256": "b7e5e58d2cf1e384ba9362ac6ce75c117dee159198eac5675927cba3c3960332",
+      "channels": 12,
+      "input_order": ["VV", "VH", "B02", "B03", "B04", "B05", "B06", "B07", "B08", "B8A", "B11", "B12"]
+    }
+  },
+  "common_model_contract": {
+    "architecture": "ConfigILM ResNet-50",
+    "license": "MIT",
+    "classes": 19,
+    "input_size": [120, 120],
+    "checkpoint_serialization": "safetensors",
+    "native_s2_bands_preserved_but_excluded_from_model": ["B01", "B09"]
+  },
+  "preprocessing": {
+    "source": "ConfigILM v0.7.0 BENv2_utils.py",
+    "source_revision": "0a3d4f5c6eae7b4487765a915dc44fa305246891",
+    "training_source_revision": "90f7a58a2757bb407df64dd01bfc62b79df2bdd5",
+    "continuous_resampling": "torch interpolate nearest to 120x120 per semantic band",
+    "mask_resampling": "nearest",
+    "scaling_before_normalization": "none; native arrays are cast directly to float32",
+    "normalization": "(x - fixed per-band mean) / fixed per-band standard deviation",
+    "statistics_source_split": "official BigEarthNet v2 train split",
+    "statistics_timing": "statistics identified as 120_nearest and applied after per-band resampling",
+    "means_all_order": [-12.643863677978516, -19.352558135986328, 438.3720703125, 614.0556640625, 588.4096069335938, 942.8433227539062, 1769.931640625, 2049.551513671875, 2193.2919921875, 2235.556640625, 1568.226806640625, 997.7324829101562],
+    "stds_all_order": [5.133493900299072, 5.590505599975586, 607.02685546875, 603.2968139648438, 684.56884765625, 738.4326782226562, 1100.4560546875, 1275.805419921875, 1369.3717041015625, 1356.5440673828125, 1070.1612548828125, 813.5276489257812],
+    "invalid_value_policy": "BigEarthNet v2 construction removed invalid patches; the published model loader defines no imputation. SatQuery therefore rejects masked, explicit-NoData, NaN, or Inf pixels in required bands.",
+    "batch_dependent_statistics": false
+  },
+  "production_profiles": [
+    "bigearthnet_native_v2",
+    "bifold_resnet50_s1_v020",
+    "bifold_resnet50_s2_v020",
+    "bifold_resnet50_all_v020"
+  ],
+  "croma_registered": false,
+  "remaining_gate": "Materialize canonical files and replace expected native dtype, value-domain, NoData, CRS, affine, and alignment facts with measurements from the three frozen train pairs before Phase 4E.",
+  "primary_sources": [
+    "https://huggingface.co/BIFOLD-BigEarthNetv2-0/resnet50-all-v0.2.0",
+    "https://huggingface.co/BIFOLD-BigEarthNetv2-0/resnet50-s1-v0.2.0",
+    "https://huggingface.co/BIFOLD-BigEarthNetv2-0/resnet50-s2-v0.2.0",
+    "https://github.com/lhackel-tub/ConfigILM/tree/0a3d4f5c6eae7b4487765a915dc44fa305246891",
+    "https://git.tu-berlin.de/rsim/reben-training-scripts/-/tree/90f7a58a2757bb407df64dd01bfc62b79df2bdd5"
+  ]
+}

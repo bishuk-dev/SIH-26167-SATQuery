@@ -1,0 +1,43 @@
+{
+  "archives": {
+    "sentinel_1": {
+      "bytes_read": 128,
+      "canonical_url": "https://zenodo.org/records/10891137/files/BigEarthNet-S1.tar.zst?download=1",
+      "container_markers": {
+        "end_sample_hex": "3b470ee65d08f8b756a2a6b70f220d57c3f1b6359c43aaf1f063103ca3b1514e46b9355c05302537aac0dea7495d48e2ef414b4e4c694b2719173a2a80d5b294",
+        "seekable_zstd_footer_at_end": false,
+        "standard_zstd_frame_at_start": true,
+        "start_magic_hex": "28b52ffd"
+      },
+      "content_length_bytes": 54439153171,
+      "content_range": "bytes 0-63/54439153171",
+      "content_type": "application/octet-stream",
+      "http_range_supported": true,
+      "member_random_access": false,
+      "member_random_access_reason": "HTTP ranges address compressed bytes, while tar member offsets address the decompressed stream. No seekable-zstd footer or published member index was observed, so arbitrary member extraction still requires sequential decompression from the beginning.",
+      "request_runtime_seconds": 4.736,
+      "suffix_content_range": "bytes 54439153107-54439153170/54439153171"
+    },
+    "sentinel_2": {
+      "bytes_read": 128,
+      "canonical_url": "https://zenodo.org/records/10891137/files/BigEarthNet-S2.tar.zst?download=1",
+      "container_markers": {
+        "end_sample_hex": "19d47670a22783d07267783b053ba5ffda22ddcd70f510d99190e8fb729a551465a070ce151f833714109f40b7656dd77e17effb9380c330a0be022aea0c0a20",
+        "seekable_zstd_footer_at_end": false,
+        "standard_zstd_frame_at_start": true,
+        "start_magic_hex": "28b52ffd"
+      },
+      "content_length_bytes": 63251710377,
+      "content_range": "bytes 0-63/63251710377",
+      "content_type": "application/octet-stream",
+      "http_range_supported": true,
+      "member_random_access": false,
+      "member_random_access_reason": "HTTP ranges address compressed bytes, while tar member offsets address the decompressed stream. No seekable-zstd footer or published member index was observed, so arbitrary member extraction still requires sequential decompression from the beginning.",
+      "request_runtime_seconds": 5.338,
+      "suffix_content_range": "bytes 63251710313-63251710376/63251710377"
+    }
+  },
+  "body_byte_limit_per_archive": 128,
+  "probe": "bounded_head_prefix_suffix",
+  "schema_version": 1
+}

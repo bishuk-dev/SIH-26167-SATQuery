@@ -299,6 +299,7 @@ def _write_kernel_metadata(
     notebook_name: str,
     gpu: bool,
     internet: bool,
+    kernel_sources: list[str] | None = None,
 ) -> None:
     """Write kernel-metadata.json into the push working directory."""
     meta = {
@@ -312,7 +313,10 @@ def _write_kernel_metadata(
         "enable_internet": internet,
         "dataset_sources": [],
         "competition_sources": [],
-        "kernel_sources": [],
+        "kernel_sources": [
+            source if "/" in source else f"{username}/{source}"
+            for source in (kernel_sources or [])
+        ],
     }
     (dest_dir / "kernel-metadata.json").write_text(
         json.dumps(meta, indent=2)
@@ -465,7 +469,16 @@ def _download_artifacts(
     """
     kernel_id = f"{username}/{kernel_slug}"
     result_files: list[str] = experiment.get("result_files", [])
+    large_result_files: list[str] = experiment.get("large_result_files", [])
     remote_output_dir: str  = experiment["remote_output_dir"]
+
+    if experiment.get("download_policy") == "metadata_only":
+        overlap = set(result_files) & set(large_result_files)
+        if overlap:
+            raise ValueError(
+                "metadata_only result_files must not contain large_result_files: "
+                + ", ".join(sorted(overlap))
+            )
 
     if not result_files:
         print("⚠️  No result_files configured for this experiment — skipping download.")
@@ -474,6 +487,11 @@ def _download_artifacts(
     pattern = _build_file_pattern(result_files)
     print(f"⬇️   Downloading selected artifacts for {kernel_id}")
     print(f"    file-pattern: {pattern}")
+    if large_result_files:
+        print(
+            "    large packages remain on Kaggle: "
+            + ", ".join(large_result_files)
+        )
 
     with tempfile.TemporaryDirectory(prefix="satquery-kaggle-dl-") as tmp:
         tmp_path = Path(tmp)
@@ -682,6 +700,7 @@ def cmd_run(args: argparse.Namespace) -> None:
         notebook_name=patched_nb.name,
         gpu=gpu,
         internet=internet,
+        kernel_sources=exp.get("kernel_sources", []),
     )
 
     if args.dry_run:

@@ -10,6 +10,7 @@
 #   result_files     - list of relative paths within remote_output_dir to copy locally
 #   gpu              - true/false (passed to kernel-metadata.json)
 #   internet         - true/false (passed to kernel-metadata.json; required to clone repo)
+#   download_policy  - metadata_only excludes declared large_result_files from local retrieval
 
 phase3a-grounding-baseline:
   notebook: notebooks/kaggle_phase3a.ipynb
@@ -54,4 +55,36 @@ phase3-final-grounding-test:
     - final_test_metrics.json
     - final_test_predictions.jsonl
   gpu: true
+  internet: true
+
+phase4-materialize-s1:
+  notebook: notebooks/kaggle_phase4_materialize_s1.ipynb
+  kernel_slug: satquery-phase4-materialize-s1
+  experiment_dir: experiments/phase4_bigearthnet_multisensor
+  remote_output_dir: phase4-bigearthnet-materialize-s1
+  result_files:
+    - materialization_report.json
+    - package_manifest.json
+    - runner_meta.json
+  large_result_files:
+    - phase4_s1_selected.tar.zst
+  download_policy: metadata_only
+  gpu: false
+  internet: true
+
+phase4-materialize-s2:
+  notebook: notebooks/kaggle_phase4_materialize_s2.ipynb
+  kernel_slug: satquery-phase4-materialize-s2
+  experiment_dir: experiments/phase4_bigearthnet_multisensor
+  remote_output_dir: phase4-bigearthnet-materialize-s2
+  result_files:
+    - materialization_report.json
+    - package_manifest.json
+    - runner_meta.json
+  large_result_files:
+    - phase4_s2_selected.tar.zst
+  download_policy: metadata_only
+  kernel_sources:
+    - satquery-phase4-materialize-s1
+  gpu: false
   internet: true

@@ -62,3 +62,29 @@ Phase 3B sweeps six box thresholds on validation only while holding the text
 threshold and all Phase 3A components fixed. Its evaluator runs the model once per
 reference at the lowest threshold and filters the same score-sorted candidates at
 higher thresholds. See `experiments/phase3b_grounding_threshold_calibration/`.
+
+## Phase 4B BigEarthNet metadata freeze
+
+Phase 4B operates only on the two official BigEarthNet v2 Parquet metadata files.
+Install `.[multisensor]`, place the files under
+`data/metadata/bigearthnet_v2/`, and run:
+
+```bash
+python -m ml.evaluation.prepare_phase4_bigearthnet
+```
+
+The command verifies frozen SHA-256 checksums and schema, preserves the official
+geographical split, selects paired S1/S2 geographic groups deterministically, and
+writes the immutable manifest separately from the unresolved materialization plan.
+It contains no imagery or checkpoint download path.
+
+Phase 4D plans the canonical extraction without network access:
+
+```bash
+python -m ml.evaluation.materialize_phase4_bigearthnet --plan
+```
+
+The full 109.61 GiB stream is never implicit. It requires
+`--confirm-full-stream-transfer`. After both modality integrity checks pass,
+`python -m ml.evaluation.inspect_phase4_native_rasters` opens only the three
+predeclared training pairs and records their native raster contract.

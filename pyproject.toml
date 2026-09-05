@@ -36,6 +36,10 @@ training = [
 grounding = [
   "fsspec[http]>=2024.10,<2027",
 ]
+multisensor = [
+  "pyarrow>=18,<24",
+  "zstandard>=0.23,<1",
+]
 
 [tool.setuptools.packages.find]
 include = ["satquery*"]

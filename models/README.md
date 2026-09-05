@@ -13,3 +13,9 @@ checkpoint while registering the final validation-selected inference policy:
 box/text thresholds 0.30/0.30, normalized source-box area below 0.80, and the
 highest model score among eligible detections. The historical Phase 3A entry is
 retained rather than overwritten.
+
+The Phase 4D `bifold_resnet50_{s1,s2,all}_v020` entries pin the official
+BigEarthNet v2 ResNet-50 family as distinct 2-, 10-, and 12-channel safetensors
+checkpoints. Their exact semantic orders and fixed ConfigILM v0.7.0
+normalization profiles are registry-validated. CROMA remains blocked and has no
+registry entry.

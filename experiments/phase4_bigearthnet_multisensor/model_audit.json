@@ -1,0 +1,97 @@
+{
+  "schema_version": 1,
+  "audit_id": "phase4a_croma_candidate_audit_v1",
+  "status": "candidate_accepted_pending_input_contract_verification",
+  "model": {
+    "name": "CROMA",
+    "full_name": "Contrastive Radar-Optical Masked Autoencoders",
+    "official_repository": "https://github.com/antofuller/CROMA",
+    "repository_revision": "59505a6bcadbf36ba20767270154bf9f3067c5e7",
+    "repository_license": "MIT",
+    "paper": "https://arxiv.org/abs/2311.00566",
+    "pretraining_dataset": "SSL4EO-S12 paired Sentinel-1 GRD and Sentinel-2 L2A",
+    "pretraining_patch_resolution_px": [120, 120],
+    "ground_sample_distance_m": 10,
+    "vit_patch_size_px": [8, 8],
+    "supported_modes": ["SAR", "optical", "both"]
+  },
+  "checkpoints": {
+    "official_source": "https://huggingface.co/antofuller/CROMA",
+    "source_revision": "0dd28e3d633bd6715856ae9890e8c49360040598",
+    "files": [
+      {
+        "name": "CROMA_base.pt",
+        "size_bytes": 777563846,
+        "sha256": "0238d814b53108f3574bf1ea240e38a0a6edd46173816d9a6962070561893b63",
+        "phase4_selection": true
+      },
+      {
+        "name": "CROMA_large.pt",
+        "size_bytes": 2690426614,
+        "sha256": "921e69ad4069201298bb5c860dc332f31e0cb01df6864f294a79fa8f921915a7",
+        "phase4_selection": false
+      }
+    ],
+    "serialization_warning": "The official .pt files use PyTorch pickle serialization. Download only from the pinned official source, verify SHA-256 before torch.load, and do not accept user-supplied checkpoints."
+  },
+  "official_input_contract": {
+    "sar_channel_count": 2,
+    "sar_semantics": ["VV", "VH"],
+    "sar_channel_order": null,
+    "optical_channel_count": 12,
+    "optical_semantics": "Sentinel-2 surface-reflectance bands with B10/cirrus removed",
+    "optical_channel_order": null,
+    "input_spatial_size_px": [120, 120],
+    "spatial_size_constraint": "Height and width must be multiples of 8; 120 x 120 is the pretraining/default size.",
+    "reference_normalization": {
+      "source": "official repository README example",
+      "scope": "for each channel, statistics are calculated across the current input tensor batch and spatial axes",
+      "lower": "channel_mean - 2 * channel_std",
+      "upper": "channel_mean + 2 * channel_std",
+      "operation": "min-max scale to [0,1] and clip; the example optionally quantizes through uint8 [0,255] then divides by 255"
+    },
+    "order_finding": "The inspected official paper, README, use_croma.py, and pretrain_croma.py define channel counts and sensor semantics but do not name a positional channel order. An order must not be inferred from convention."
+  },
+  "bigearthnet_v2_compatibility": {
+    "compatible_facts": [
+      "Both use paired Sentinel-1 dual-polarization SAR and Sentinel-2 Level-2A multispectral observations.",
+      "BigEarthNet v2 supplies VV and VH and the same 12 stored Sentinel-2 bands after B10/cirrus exclusion.",
+      "BigEarthNet's 1200 m footprint becomes 120 x 120 at the 10 m CROMA input grid.",
+      "CROMA exposes independent SAR-only and optical-only encoders, matching the required Phase 4 unimodal ablation."
+    ],
+    "mismatches_and_open_contracts": [
+      {
+        "issue": "native_multiresolution_optical",
+        "detail": "BigEarthNet v2 preserves 10 m, 20 m, and 60 m Sentinel-2 grids, whereas CROMA consumes all 12 channels on one 120 x 120 grid.",
+        "required_resolution": "Freeze an explicit per-band resampling profile after validating actual GeoTIFF alignment; do not rewrite native assets."
+      },
+      {
+        "issue": "channel_order_undocumented",
+        "detail": "CROMA's official artifacts do not state whether VV precedes VH or the positional order of the 12 optical bands.",
+        "required_resolution": "Trace or obtain the official SSL4EO/CROMA tensor construction order before implementing the adapter."
+      },
+      {
+        "issue": "normalization_scope",
+        "detail": "The official example uses batch-dependent per-channel mean +/- 2 standard deviations, which makes an image's values depend on batch composition.",
+        "required_resolution": "Reproduce and test the reference behavior, then freeze an inference-safe deterministic profile only if equivalence or a validation decision supports it."
+      },
+      {
+        "issue": "sar_processing_domain",
+        "detail": "BigEarthNet documents terrain-corrected dB backscatter; the CROMA paper names SSL4EO Sentinel-1 GRD VV/VH but does not fully specify the value pipeline in the inference contract.",
+        "required_resolution": "Confirm SSL4EO/CROMA SAR units and inspect a real BigEarthNet sample before asserting distribution compatibility."
+      }
+    ]
+  },
+  "decision": {
+    "candidate": "CROMA_base.pt",
+    "why": "It is a compact, established OSS radar-optical model with separate optical and SAR encoders, a joint path reserved for later work, and a native 120 x 120 Sentinel input scale matching BigEarthNet's 1200 m footprint at 10 m.",
+    "registration_policy": "Do not add CROMA to the production model/preprocessing registries until channel order, resampling, numeric scaling, and NoData behavior are verified and tested in Phase 4B.",
+    "fusion_policy": "Phase 4 uses only optical-only and SAR-only modes. The supported joint mode is not evidence of successful fusion and is out of scope until Phase 5."
+  },
+  "sources": [
+    "https://github.com/antofuller/CROMA",
+    "https://github.com/antofuller/CROMA/blob/main/use_croma.py",
+    "https://arxiv.org/abs/2311.00566",
+    "https://huggingface.co/antofuller/CROMA/tree/main"
+  ]
+}

@@ -1,0 +1,137 @@
+{
+  "schema_version": 1,
+  "audit_id": "phase4a_bigearthnet_v2_source_audit_v1",
+  "audit_date": "2026-09-04",
+  "status": "source_plan_frozen_data_not_materialized",
+  "dataset": {
+    "name": "BigEarthNet v2",
+    "version": "2.0.0",
+    "canonical_record": "https://zenodo.org/records/10891137",
+    "doi": "10.5281/zenodo.10891137",
+    "homepage": "https://bigearth.net/",
+    "license": "Community Data License Agreement - Permissive, Version 1.0",
+    "paired_patch_count": 549488,
+    "patch_ground_extent_m": [1200, 1200],
+    "sentinel_2_source_tiles": 115,
+    "sentinel_1_source_scenes": 312,
+    "acquisition_window": "2017-06 through 2018-05",
+    "countries": [
+      "Austria",
+      "Belgium",
+      "Finland",
+      "Ireland",
+      "Kosovo",
+      "Lithuania",
+      "Luxembourg",
+      "Portugal",
+      "Serbia",
+      "Switzerland"
+    ]
+  },
+  "published_files": [
+    {
+      "name": "BigEarthNet-S1.tar.zst",
+      "role": "all Sentinel-1 patch GeoTIFFs",
+      "size_bytes": 54439153171,
+      "md5": "a55eaa2cdf6a917e296bd6601ec1e348"
+    },
+    {
+      "name": "BigEarthNet-S2.tar.zst",
+      "role": "all Sentinel-2 patch GeoTIFFs",
+      "size_bytes": 63251710377,
+      "md5": "2245ed2d1a93f6ce637d839bc856396e"
+    },
+    {
+      "name": "metadata.parquet",
+      "role": "official recommended metadata excluding patches covered by seasonal snow, cloud, or cloud shadow",
+      "published_size": "3.6 MB",
+      "md5": "55687065e77b6d0b0f1ff604a6e7b49c",
+      "sha256": "408911df2da7092da9ecc72071972a808ec486ba09f6cb048f7716793d14ded6"
+    },
+    {
+      "name": "metadata_for_patches_with_snow_cloud_or_shadow.parquet",
+      "role": "official metadata for excluded contamination cases",
+      "published_size": "710.2 kB",
+      "md5": "fe31856f4986d446c9468b59d6387c91",
+      "sha256": "b6842b35359dfb5281dd92c674211fd4882f7865f0b442ebfec92daea6371c4e"
+    },
+    {
+      "name": "Reference_Maps.tar.zst",
+      "role": "pixel-level CLC2018 reference maps; not required for the Phase 4 classification task",
+      "published_size": "282.4 MB",
+      "md5": "95d85a222fa983faddcac51a19f28917"
+    }
+  ],
+  "official_metadata_contract": {
+    "fields": {
+      "patch_id": "Sentinel-2 v2 patch identifier and primary patch key",
+      "labels": "list of 19-class CLC2018 v2020_u1 land-cover labels",
+      "split": "official train, validation, or test assignment",
+      "country": "country containing the patch",
+      "s1_name": "corresponding Sentinel-1 patch identifier; authoritative S1-to-S2 pairing field",
+      "s2v1_name": "corresponding BigEarthNet v1 Sentinel-2 patch identifier",
+      "contains_seasonal_snow": "official contamination flag",
+      "contains_cloud_or_shadow": "official contamination flag"
+    },
+    "clean_selection_source": "metadata.parquet",
+    "excluded_selection_source": "metadata_for_patches_with_snow_cloud_or_shadow.parquet",
+    "pairing_rule": "Use patch_id -> s1_name only; never derive a pair from filename similarity or acquisition time."
+  },
+  "official_geographical_split": {
+    "field": "split",
+    "assignments": ["train", "validation", "test"],
+    "algorithm": "Per Sentinel-2 tile: outer frame is train, inner frame is validation, innermost square is test.",
+    "target_area_ratio": {
+      "train": 0.5,
+      "validation": 0.25,
+      "test": 0.25
+    },
+    "parameters": {
+      "p": 0.25,
+      "q": 0.25
+    },
+    "leakage_control": "The official construction places same-season overlaps at adjacent Sentinel-2 tile borders in train and increases distance between train and test.",
+    "policy": "SatQuery must retain the official assignment as the outer split and must not reshuffle patches across it.",
+    "exact_clean_row_counts_by_split": {
+      "train": 237871,
+      "validation": 122342,
+      "test": 119825
+    },
+    "count_verification": "Verified in Phase 4B from the checksum-verified clean metadata file; counts were not inferred from the multi-label class-distribution table."
+  },
+  "quality_and_exclusions": {
+    "sentinel_2_processing": "Level-2A bottom-of-atmosphere surface reflectance generated with sen2cor 2.11",
+    "invalid_pixels": "Patches containing invalid pixels were removed during v2 construction.",
+    "insufficient_labels": "Patches with no labels or with less than 75% reference-map label coverage were removed during v2 construction.",
+    "seasonal_snow_cloud_shadow": "These cases remain in the imagery archives but are separated into the dedicated metadata file.",
+    "phase4_policy": "Select only rows from metadata.parquet; do not infer cloud quality from pixels and do not include rows from the contamination metadata file."
+  },
+  "file_and_geospatial_organization": {
+    "compression": "Zstandard-compressed tar archives",
+    "hierarchy": "sensor archive -> source tile/scene directory -> patch directory -> one GeoTIFF per band or polarization",
+    "sentinel_1_patch_files": ["*_VV.tif", "*_VH.tif"],
+    "sentinel_2_patch_files": "one *_Bxx.tif per stored band",
+    "georeferencing": "Each band/polarization is a georeferenced GeoTIFF; the v2 patches preserve the same 1200 m x 1200 m footprints used for the corresponding BigEarthNet patches.",
+    "random_access_constraint": "The canonical S1 and S2 distributions are monolithic tar.zst archives, not a documented per-patch object store. A logical subset therefore may still require downloading both full archives unless an official selective-access path is verified."
+  },
+  "primary_sources": [
+    "https://zenodo.org/records/10891137",
+    "https://bigearth.net/",
+    "https://bigearth.net/static/documents/Description_BigEarthNet_v2.pdf",
+    "https://arxiv.org/abs/2407.03653",
+    "https://github.com/rsim-tu-berlin/bigearthnet-pipeline"
+  ],
+  "source_discrepancies": [
+    {
+      "topic": "Sentinel-2 source tile count",
+      "current_release_value": 115,
+      "detail": "The current BigEarthNet homepage and Zenodo 2.0.0 record state 115 tiles. The reBEN paper's construction narrative says 125 input tiles and six quality-check exclusions (119), while the homepage FAQ separately mentions four v1 tiles dropped. This audit uses the current release record value and treats metadata.patch_id, not a reconstructed tile count, as authoritative for selection.",
+      "blocking": false
+    }
+  ],
+  "audit_limitations": [
+    "No imagery archive was downloaded or opened in Phase 4A.",
+    "Phase 4B verified metadata only; no imagery archive was opened.",
+    "Archive checksums are the publisher-provided MD5 values; Phase 4B must verify them if full archives are acquired."
+  ]
+}

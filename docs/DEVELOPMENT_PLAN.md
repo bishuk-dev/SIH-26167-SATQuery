@@ -47,7 +47,13 @@ These research artifacts are not a code dependency for beginning the Phase 1 geo
 
 ## Phase 4 — Multisensor optical/SAR adaptation plan
 
-**Status: planned, not implemented.** Phase 4 will establish modality-specific Sentinel-1/Sentinel-2 perception before Phase 5 attempts fusion. BigEarthNet v2.0 is the initial dataset candidate because it provides co-registered Sentinel-1 SAR and Sentinel-2 multispectral pairs with land-cover supervision; BigEarthNet.txt may add language supervision only after its public artifacts, license, checksums, and task schemas are verified. This choice satisfies the requirement for a justified open remote-sensing adaptation source without assuming Sentinel-domain results generalize to RISAT or Cartosat.
+**Status: Phase 4A–4C audits are complete and the Phase 4D bounded materialization/preprocessing implementation is transfer-ready; the explicit 109.61 GiB transfer and native-raster measurements remain pending.** The checksum-verified manifest remains byte-identical at SHA-256 `615e30273cce8eaa8b0838c07256714a3c874019f6dccd50570cbf1ec4c20bd6`, with 12,000 train, 3,000 validation, and 3,001 untouched test pairs. No archive transfer, checkpoint loading, training, or evaluation occurred in Phase 4D.
+
+The CROMA decision is `BLOCKED`: its pinned source does not publish positional VV/VH or twelve-band optical semantics, and its batch-dependent README normalization is not established as the checkpoint's pretraining transform. It is not registered. The three official BIFOLD v0.2.0 S1/S2/all safetensors checkpoints and deterministic ConfigILM v0.7.0 `120_nearest` profiles are now pinned. B01 and B09 remain in immutable native data but are excluded from the 10-channel optical and 12-channel joint inputs.
+
+Phase 4D hashes each complete compressed HTTP stream, sequentially decompresses zstd/tar through a strict path/type allowlist, writes selected members only to quarantine, and atomically promotes each modality after byte-count, publisher-MD5, missing, and duplicate checks pass. Test members use an explicit `sealed_test` namespace and ordinary data access refuses them. Plan mode confirms 36,002 selected S1 members, 216,012 selected S2 members, a 117,690,863,548-byte network transfer, and an 8 GiB recommended free-disk floor without networking.
+
+**Phase 4D remaining gate:** after explicit transfer approval, run the gated materializer, require both full archive MD5 checks, and inspect only the three frozen train pairs. Native dtype/range/NoData/scale/CRS/affine measurements must replace documentation expectations before Phase 4E. No training or evaluation belongs in this gate.
 
 Implementation gates:
 

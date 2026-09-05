@@ -44,12 +44,31 @@ class GroundingModelRegistration(ContractModel):
     allow_remote_code: Literal[False]
 
 
+class MultisensorModelRegistration(ContractModel):
+    task: Literal["multilabel_land_cover"]
+    provider: Literal["huggingface"]
+    model_id: str = Field(min_length=1)
+    revision: str = Field(pattern=r"^[0-9a-f]{40}$")
+    checkpoint_file: Literal["model.safetensors"]
+    checkpoint_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    checkpoint_size_bytes: int = Field(gt=0)
+    architecture: Literal["ConfigILM ResNet-50"]
+    license: Literal["MIT"]
+    preprocessing_profile: str = Field(min_length=1)
+    input_channels: int = Field(ge=2, le=12)
+    output_classes: Literal[19]
+    frozen: Literal[True]
+    allow_remote_code: Literal[False]
+
+
 class ModelRegistry(ContractModel):
     schema_version: Literal[1]
     models: dict[
         str,
         Annotated[
-            ModelRegistration | GroundingModelRegistration,
+            ModelRegistration
+            | GroundingModelRegistration
+            | MultisensorModelRegistration,
             Field(discriminator="task"),
         ],
     ]
@@ -111,12 +130,97 @@ class GroundingPreprocessingProfile(ContractModel):
         return value
 
 
+class NativeMultisensorPreprocessingProfile(ContractModel):
+    task: Literal["multisensor_native"]
+    version: str = Field(min_length=1)
+    dataset: Literal["BigEarthNet v2.0.0"]
+    input_asset_kind: Literal["native_geotiff_bands"]
+    immutable: Literal[True]
+    s1_band_order: tuple[Literal["VV", "VH"], Literal["VV", "VH"]]
+    s2_band_order: tuple[str, ...]
+    nodata_policy: Literal["preserve_native_mask_fail_closed_for_model_input"]
+
+    @field_validator("s1_band_order", "s2_band_order", mode="before")
+    @classmethod
+    def normalize_yaml_sequence(cls, value: object) -> object:
+        return tuple(value) if isinstance(value, list) else value
+
+    @field_validator("s1_band_order")
+    @classmethod
+    def require_s1_order(cls, value: tuple[str, str]) -> tuple[str, str]:
+        if value != ("VV", "VH"):
+            raise ValueError("native Sentinel-1 order must be VV, VH")
+        return value
+
+    @field_validator("s2_band_order")
+    @classmethod
+    def require_s2_order(cls, value: tuple[str, ...]) -> tuple[str, ...]:
+        expected = (
+            "B01",
+            "B02",
+            "B03",
+            "B04",
+            "B05",
+            "B06",
+            "B07",
+            "B08",
+            "B8A",
+            "B09",
+            "B11",
+            "B12",
+        )
+        if value != expected:
+            raise ValueError("native Sentinel-2 semantic order changed")
+        return value
+
+
+class BifoldPreprocessingProfile(ContractModel):
+    task: Literal["multilabel_land_cover"]
+    version: Literal["0.2.0"]
+    input_asset_kind: Literal["native_geotiff_bands"]
+    band_order: tuple[str, ...]
+    excluded_native_bands: tuple[str, ...]
+    width: Literal[120]
+    height: Literal[120]
+    continuous_resampling: Literal["nearest"]
+    mask_resampling: Literal["nearest"]
+    input_dtype: Literal["float32"]
+    scaling_before_normalization: Literal["none"]
+    means: tuple[float, ...]
+    stds: tuple[float, ...]
+    statistics_split: Literal["official_train"]
+    statistics_timing: Literal["after_120_nearest_resampling"]
+    nodata_policy: Literal["reject_nonfinite_or_masked_required_pixels"]
+    source_revision: str = Field(pattern=r"^[0-9a-f]{40}$")
+
+    @field_validator(
+        "band_order", "excluded_native_bands", "means", "stds", mode="before"
+    )
+    @classmethod
+    def normalize_yaml_sequences(cls, value: object) -> object:
+        return tuple(value) if isinstance(value, list) else value
+
+    @field_validator("stds")
+    @classmethod
+    def require_positive_stds(cls, value: tuple[float, ...]) -> tuple[float, ...]:
+        if any(item <= 0 for item in value):
+            raise ValueError("normalization standard deviations must be positive")
+        return value
+
+    def model_post_init(self, __context: object) -> None:
+        if len(self.band_order) != len(self.means) or len(self.means) != len(self.stds):
+            raise ValueError("band order and normalization statistics must align")
+
+
 class PreprocessingRegistry(ContractModel):
     schema_version: Literal[1]
     profiles: dict[
         str,
         Annotated[
-            PreprocessingProfile | GroundingPreprocessingProfile,
+            PreprocessingProfile
+            | GroundingPreprocessingProfile
+            | NativeMultisensorPreprocessingProfile
+            | BifoldPreprocessingProfile,
             Field(discriminator="task"),
         ],
     ]

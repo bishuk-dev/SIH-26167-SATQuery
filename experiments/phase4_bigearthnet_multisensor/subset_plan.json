@@ -1,0 +1,139 @@
+{
+  "schema_version": 1,
+  "plan_id": "phase4a_bigearthnet_v2_geographic_subset_v1",
+  "status": "selection_logic_executed_manifest_frozen",
+  "dataset": {
+    "name": "BigEarthNet v2",
+    "version": "2.0.0",
+    "doi": "10.5281/zenodo.10891137",
+    "metadata_file": "metadata.parquet",
+    "metadata_md5": "55687065e77b6d0b0f1ff604a6e7b49c",
+    "metadata_sha256": "408911df2da7092da9ecc72071972a808ec486ba09f6cb048f7716793d14ded6",
+    "excluded_metadata_sha256": "b6842b35359dfb5281dd92c674211fd4882f7865f0b442ebfec92daea6371c4e"
+  },
+  "task": {
+    "type": "19-class multi-label land-cover classification",
+    "label_source": "BigEarthNet v2 CLC2018 v2020_u1 patch labels",
+    "why": "The same target can measure real standalone utility from the optical and SAR branches without forcing language generation or claiming fusion.",
+    "loss": "binary cross entropy with logits",
+    "primary_metrics": ["macro average precision", "micro average precision"],
+    "secondary_metrics": ["macro F1", "micro F1", "per-class average precision"],
+    "threshold_policy": "Any decision thresholds are selected on validation only and frozen before a one-time test evaluation."
+  },
+  "outer_split": {
+    "source_field": "split",
+    "policy": "Retain official BigEarthNet v2 train/validation/test assignments exactly.",
+    "cross_split_reassignment_allowed": false,
+    "test_usage": "Select and checksum the test subset with the same deterministic algorithm, then keep labels unavailable to training/tuning code until the final frozen evaluation."
+  },
+  "eligibility": {
+    "metadata_source": "metadata.parquet only",
+    "requires_nonempty_patch_id": true,
+    "requires_nonempty_s1_name": true,
+    "requires_nonempty_labels": true,
+    "requires_known_official_split": true,
+    "exclude_contamination_metadata_rows": true,
+    "required_modalities": ["Sentinel-1 VV/VH", "Sentinel-2 12-band Level-2A"]
+  },
+  "proposed_targets": {
+    "train_pairs": 12000,
+    "validation_pairs": 3000,
+    "test_pairs": 3000,
+    "total_pairs": 18000,
+    "count_tolerance": "A split may exceed its target by at most one indivisible geographic group's size; geographic integrity wins over an exact row count."
+  },
+  "geographic_group": {
+    "key": "MGRS tile ID + horizontal patch position + vertical patch position parsed from patch_id",
+    "purpose": "Keep repeat acquisitions of the same 1200 m cell together and make the grouping auditable.",
+    "validation": [
+      "Fail if a patch_id cannot be parsed by the documented BigEarthNet v2 naming grammar.",
+      "Fail if a geographic group appears in more than one official split.",
+      "Fail if patch_id or s1_name is duplicated with conflicting metadata.",
+      "Retain the official split even if a custom group assertion fails; stop preparation rather than silently repair it."
+    ],
+    "adjacent_tile_policy": "Rely on the official v2 frame split for adjacent-tile overlap control; do not create a second split assignment."
+  },
+  "deterministic_selection": {
+    "algorithm_version": "ben-v2-grouped-multilabel-greedy-v1",
+    "seed_material": "satquery-phase4-bigearthnet-v2-croma-v1",
+    "algorithm": [
+      "Read and checksum metadata.parquet; sort every list and row using Unicode code-point ordering before hashing.",
+      "Apply eligibility rules and form indivisible geographic groups separately inside each official split.",
+      "Calculate split-local targets for all 19 labels and countries from the eligible official split distribution.",
+      "Greedily select the group that most reduces weighted squared deviation from label and country targets; weight labels by inverse eligible frequency.",
+      "Break every tie by ascending SHA-256 of seed_material, official split, and geographic_group key.",
+      "After distribution targets are met, fill toward the pair target by the same hash order without splitting a geographic group.",
+      "Sort final samples by split then patch_id and serialize canonical UTF-8 JSON with sorted object keys and no volatile timestamp."
+    ],
+    "coverage_assertions": {
+      "all_19_labels_present_each_split": true,
+      "minimum_label_occurrences_train": 25,
+      "minimum_label_occurrences_validation": 10,
+      "minimum_label_occurrences_test": 10,
+      "country_coverage": "Every country represented in an eligible official split must remain represented in that selected split.",
+      "fallback": "If an assertion cannot be met at the proposed size, fail and report availability; do not borrow from another official split or silently enlarge the selection."
+    }
+  },
+  "frozen_manifest_schema": {
+    "file": "split_manifest.json",
+    "top_level_fields": [
+      "schema_version",
+      "manifest_id",
+      "dataset",
+      "source_files",
+      "selection_policy",
+      "sensor_schema_id",
+      "task",
+      "counts",
+      "label_counts",
+      "country_counts",
+      "geographic_groups",
+      "samples"
+    ],
+    "sample_fields": [
+      "sample_id",
+      "patch_id",
+      "s1_name",
+      "s2v1_name",
+      "official_split",
+      "geographic_group_id",
+      "country",
+      "labels",
+      "s1_relative_directory",
+      "s2_relative_directory"
+    ],
+    "materialization_sidecar_fields": [
+      "sample_id",
+      "channel_relative_paths",
+      "channel_sha256",
+      "header_observations",
+      "materialized_at"
+    ],
+    "reproducibility": "The experiment-definition manifest contains no created_at field and is never rewritten by data download. Volatile paths, per-file hashes discovered during extraction, and timestamps live in a separate materialization sidecar.",
+    "manifest_hash": "SHA-256 of canonical JSON bytes after selection; used by training and resume guards."
+  },
+  "experiment_sequence": [
+    "Frozen CROMA optical encoder plus a trainable linear 19-label head.",
+    "Frozen CROMA SAR encoder plus a trainable linear 19-label head.",
+    "One parameter-efficient adaptation configuration selected using training and validation only; no joint/fusion mode in Phase 4."
+  ],
+  "controls_reserved_for_phase4b": [
+    "optical channel removal/corruption",
+    "SAR channel removal/corruption",
+    "explicit missing-modality representation",
+    "runtime and peak VRAM"
+  ],
+  "storage_estimate": {
+    "full_canonical_s1_s2_archive_bytes": 117690863548,
+    "full_canonical_s1_s2_archive_gib": 109.61,
+    "archive_average_bytes_per_pair": 214182.6,
+    "selected_18000_pair_compressed_equivalent_gib": 3.59,
+    "recommended_working_capacity_gib": "8-12 GiB for selected extracted GeoTIFFs, manifests, cache, and the 0.72 GiB base checkpoint",
+    "transfer_warning": "The official imagery is distributed as monolithic tar.zst archives. Until an official selective-access method is verified, materializing this subset may still require transferring the full 109.61 GiB S1+S2 archives."
+  },
+  "not_performed": [
+    "No imagery or checkpoint was downloaded.",
+    "No training or evaluation was run.",
+    "No test result was inspected."
+  ]
+}

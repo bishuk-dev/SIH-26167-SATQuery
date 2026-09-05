@@ -11,6 +11,48 @@
 > The rest of this document describes the manual procedure for reference and
 > for cases where the notebook must be run interactively.
 
+## Phase 4D BigEarthNet materialization
+
+Phase 4D is split into two CPU experiments because each canonical archive must
+restart from byte zero after an interrupted stream. Independent S1 and S2
+outputs prevent an S2 failure from forcing another 54,439,153,171-byte S1
+transfer.
+
+Run from a clean committed worktree:
+
+```bash
+python scripts/kaggle/runner.py run phase4-materialize-s1 --dry-run
+python scripts/kaggle/runner.py run phase4-materialize-s1
+# Review S1 materialization_report.json and package_manifest.json.
+python scripts/kaggle/runner.py run phase4-materialize-s2 --dry-run
+python scripts/kaggle/runner.py run phase4-materialize-s2
+```
+
+The S2 registry entry attaches the successful S1 kernel output as a Kaggle
+input. Before any S2 archive request, the S2 notebook requires one matching S1
+package manifest and verifies the attached package size and SHA-256.
+
+The notebooks clone and detach the exact injected commit under `/tmp`, verify
+the frozen manifest SHA-256 before opening either Zenodo archive, and install
+only `zstandard`. `/kaggle/working` contains only the selected materialized tree
+during execution and final outputs. Each modality is packaged with sorted POSIX
+member names, zero timestamps and ownership, fixed modes, and single-threaded
+Zstandard compression. The package is read back and verified before loose files
+are deleted.
+
+The combined selected-package estimate is 3,856,128,477 bytes (3.59 GiB), below
+Kaggle's 20 GiB notebook output budget. Each notebook prints current free space
+and requires at least 8 GiB before transfer. The estimate is not an integrity
+value; each final manifest records actual package and logical byte counts.
+
+Do not download the multi-GiB packages through the runner. In Kaggle, use each
+successful notebook output as a private input for Phase 4E, or create one
+private Dataset containing both verified packages. Phase 4E must verify package
+SHA-256 values from both package manifests, extract under a transient data root,
+and retain the archive paths (`s1/...` and `s2/...`) unchanged. It must not read
+`sealed_test/` during training, validation, statistics, visualization, or
+preprocessing.
+
 Kaggle is only an execution host. The notebook does not contain dataset, preprocessing, LoRA, training, or evaluation logic; it calls versioned modules from this repository.
 
 ## Notebook setup

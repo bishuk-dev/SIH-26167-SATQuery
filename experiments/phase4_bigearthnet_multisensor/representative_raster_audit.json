@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "audit_id": "phase4c_representative_native_raster_audit_v1",
+  "audit_date": "2026-09-05",
+  "status": "blocked_canonical_native_rasters_not_materialized",
+  "requirement_satisfied": false,
+  "frozen_manifest_sha256": "615e30273cce8eaa8b0838c07256714a3c874019f6dccd50570cbf1ec4c20bd6",
+  "split_policy": {
+    "allowed_for_inspection": [
+      "train"
+    ],
+    "test_imagery_inspected": false
+  },
+  "selected_train_candidates": [
+    {
+      "country": "Ireland",
+      "geographic_group_id": "T29UPU_00_46",
+      "sample_id": "ben2_pair_54d6cd2db80bec3b88bd1bde",
+      "s1_name": "S1A_IW_GRDH_1SDV_20170617T064724_29UPU_0_46",
+      "s2_patch_id": "S2A_MSIL2A_20170617T113321_N9999_R080_T29UPU_00_46"
+    },
+    {
+      "country": "Austria",
+      "geographic_group_id": "T33TXN_00_03",
+      "sample_id": "ben2_pair_ceb2b2ff7000d820e6d70028",
+      "s1_name": "S1A_IW_GRDH_1SDV_20171104T165048_33TXN_0_3",
+      "s2_patch_id": "S2A_MSIL2A_20171104T095201_N9999_R079_T33TXN_00_03"
+    },
+    {
+      "country": "Portugal",
+      "geographic_group_id": "T29SND_00_58",
+      "sample_id": "ben2_pair_90d4a6de879ee97d50bf2c2d",
+      "s1_name": "S1A_IW_GRDH_1SDV_20170706T064300_29SND_0_58",
+      "s2_patch_id": "S2A_MSIL2A_20170704T112111_N9999_R037_T29SND_00_58"
+    }
+  ],
+  "native_geotiff_observations": [],
+  "unresolved_observation_fields": [
+    "filename and semantic verified from an opened selected file",
+    "width and height",
+    "dtype",
+    "minimum, maximum, and percentiles",
+    "NoData value and invalid-value behavior",
+    "CRS",
+    "affine transform",
+    "pixel size",
+    "units and scaling tags"
+  ],
+  "documented_expectations_not_counted_as_measurements": {
+    "sentinel_1": "BigEarthNet documentation describes 120 x 120, 10 m, terrain-corrected dB backscatter for VV/VH.",
+    "sentinel_2": "BigEarthNet documentation describes 120 x 120 at 10 m, 60 x 60 at 20 m, and 20 x 20 at 60 m for Level-2A bands.",
+    "caution": "These remain documentation claims until selected canonical GeoTIFF headers and pixels are inspected. No dtype, numeric range, NoData, scale, CRS, or affine value is asserted here."
+  },
+  "blocker": {
+    "cause": "The canonical S1 and S2 GeoTIFFs are available only inside two monolithic tar.zst objects. HTTP byte ranges work, but the archives publish no seek table or member index, so an arbitrary selected pair cannot be retrieved without sequentially transferring/decompressing preceding archive data or downloading the complete archives.",
+    "why_no_mirror_was_substituted": "The available LMDB/Safetensors distribution is transformed and omits native GeoTIFF georeferencing metadata; the TorchGeo mirror remains a split monolithic compressed archive. Neither can supply the requested canonical native-file audit selectively.",
+    "resolution": "After explicit approval for the full canonical transfer, verify publisher MD5 checksums, stream-extract an allowlist derived from the frozen manifest, and inspect only the three train candidates above before any model work."
+  }
+}

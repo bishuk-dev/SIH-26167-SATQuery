@@ -1,0 +1,92 @@
+{
+  "schema_version": 1,
+  "audit_id": "phase4c_materialization_access_v1",
+  "audit_date": "2026-09-05",
+  "probe_implementation": "ml/evaluation/probe_phase4_materialization.py",
+  "saved_probe_result": "experiments/phase4_bigearthnet_multisensor/results/access_probe.json",
+  "canonical_distribution": {
+    "record": "https://zenodo.org/records/10891137",
+    "archives": [
+      {
+        "name": "BigEarthNet-S1.tar.zst",
+        "url": "https://zenodo.org/records/10891137/files/BigEarthNet-S1.tar.zst?download=1",
+        "content_length_bytes": 54439153171,
+        "size_gib": 50.7003,
+        "publisher_md5": "a55eaa2cdf6a917e296bd6601ec1e348",
+        "range_response": "206 bytes 0-63/54439153171"
+      },
+      {
+        "name": "BigEarthNet-S2.tar.zst",
+        "url": "https://zenodo.org/records/10891137/files/BigEarthNet-S2.tar.zst?download=1",
+        "content_length_bytes": 63251710377,
+        "size_gib": 58.9068,
+        "publisher_md5": "2245ed2d1a93f6ce637d839bc856396e",
+        "range_response": "206 bytes 0-63/63251710377"
+      }
+    ],
+    "total_bytes": 117690863548,
+    "total_gib": 109.6071,
+    "container": "tar stream compressed with a standard zstd frame",
+    "http_byte_ranges": true,
+    "seekable_zstd_footer_observed": false,
+    "published_member_index_found": false,
+    "practical_arbitrary_member_extraction": false,
+    "reason": "Compressed byte offsets do not identify decompressed tar members. Without a seekable frame table or a published compressed-member index, range requests cannot start decompression at an arbitrary selected patch."
+  },
+  "bounded_exploratory_prefix": {
+    "purpose": "Confirm real tar hierarchy without opening raster pixels",
+    "s1_bytes_received_before_termination": 14209024,
+    "s2_bytes_received": 0,
+    "complete_s1_member_names_listed": 291,
+    "bulk_transfer_started": false,
+    "finding": "Members are nested as sensor/source-scene-or-tile/patch/file, adding a parent level absent from the Phase 4B logical directory hints.",
+    "example": "BigEarthNet-S1/S1A_IW_GRDH_1SDV_20170613T165043/S1A_IW_GRDH_1SDV_20170613T165043_33UUP_61_39/S1A_IW_GRDH_1SDV_20170613T165043_33UUP_61_39_VH.tif"
+  },
+  "archive_member_templates": {
+    "sentinel_1": "BigEarthNet-S1/{s1_name without final _MGRS_row_col}/{s1_name}/{s1_name}_{VV|VH}.tif",
+    "sentinel_2": "BigEarthNet-S2/{patch_id without final _row_col}/{patch_id}/{patch_id}_{band}.tif",
+    "manifest_policy": "Do not alter split_manifest.json. The Phase 4D materializer must derive and validate the parent directory while treating manifest patch_id and s1_name as the identity authority."
+  },
+  "alternative_distributions_and_tools": [
+    {
+      "name": "TorchGeo Hugging Face BigEarthNet V2 mirror",
+      "revision": "3cf3a5910a5302d449fdb8e570e5b78de24fe07f",
+      "url": "https://huggingface.co/datasets/torchgeo/bigearthnet/tree/3cf3a5910a5302d449fdb8e570e5b78de24fe07f/V2",
+      "classification": "useful_only_as_full_download_fallback",
+      "finding": "It preserves the BigEarthNet v2 filenames and metadata but re-compresses each sensor archive as two split tar.gz parts totaling about 119 GB. It offers no per-patch objects, and extracted TIFF equality was not independently proven in this audit."
+    },
+    {
+      "name": "rico-hdl",
+      "revision": "dc41c07dee68b0574ccec71f535424a09486eb68",
+      "url": "https://github.com/kai-tub/rico-hdl/tree/dc41c07dee68b0574ccec71f535424a09486eb68",
+      "classification": "transformed_non_equivalent_container",
+      "finding": "This dataset-maintainer tool converts extracted named TIFF arrays into band-keyed Safetensors inside LMDB and documents identical array values. It is useful after canonical extraction, but it is not a distribution and does not preserve the native GeoTIFF container/georeferencing audit surface."
+    },
+    {
+      "name": "BigEarthNet.txt infrastructure",
+      "revision": "72d865f2146f0a85b720f7f3ca1cdbaeafc3d316",
+      "url": "https://huggingface.co/datasets/BIFOLD-BigEarthNetv2-0/BigEarthNet.txt/tree/72d865f2146f0a85b720f7f3ca1cdbaeafc3d316",
+      "classification": "useful_for_semantics_not_image_materialization",
+      "finding": "The repository publishes text metadata and a loader that expects a separately supplied image LMDB; it does not publish per-patch canonical GeoTIFF assets."
+    },
+    {
+      "name": "hackelle/BigEarthNetV2-LMDB",
+      "revision": "118d1b6285c080ba8e4078414e1b8a243b18c9bd",
+      "url": "https://huggingface.co/datasets/hackelle/BigEarthNetV2-LMDB/tree/118d1b6285c080ba8e4078414e1b8a243b18c9bd",
+      "classification": "transformed_unofficial_not_canonical_replacement",
+      "finding": "Its own card labels the 155 GB LMDB an unofficial community pre-conversion. It is larger than the canonical compressed pair, is not selective, and cannot supply native TIFF headers."
+    }
+  ],
+  "recommended_acquisition_route": {
+    "route": "Download one canonical Zenodo archive at a time, verify its publisher MD5, sequentially decompress it once, and allowlist-extract only members belonging to the frozen 18,001-pair manifest. Seal test members from inspection and evaluation.",
+    "why": "This is the only audited route that retains canonical GeoTIFF pixels, headers, patch identity, band semantics, and CDLA-Permissive-1.0 provenance.",
+    "storage_plan": "Processing one sensor at a time requires roughly the larger 58.91 GiB archive plus the Phase 4B estimated 3.591 GiB selected output and working margin, rather than retaining both 109.61 GiB archives simultaneously.",
+    "integrity_gates": [
+      "Verify full-archive MD5 before extraction.",
+      "Derive nested member paths from manifest s1_name and patch_id; never enumerate into tensor order.",
+      "Reject missing, duplicate, unexpected, or path-traversal members.",
+      "Verify exactly two S1 and twelve S2 band files per selected pair.",
+      "Keep split_manifest.json byte-identical and record extracted-file hashes in a separate sidecar."
+    ]
+  }
+}

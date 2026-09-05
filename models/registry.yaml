@@ -37,3 +37,48 @@ models:
     preprocessing_profile: grounding_dino_tiny_phase3_final_v1
     frozen: true
     allow_remote_code: false
+  bifold_resnet50_s1_v020:
+    task: multilabel_land_cover
+    provider: huggingface
+    model_id: BIFOLD-BigEarthNetv2-0/resnet50-s1-v0.2.0
+    revision: d417b3c32f2172cbceb14e5b106dd9aa7b77c647
+    checkpoint_file: model.safetensors
+    checkpoint_sha256: 87990ba9058bc5413b90d7dc955ed1077cf8c54530db393801336209252b3739
+    checkpoint_size_bytes: 94423500
+    architecture: ConfigILM ResNet-50
+    license: MIT
+    preprocessing_profile: bifold_resnet50_s1_v020
+    input_channels: 2
+    output_classes: 19
+    frozen: true
+    allow_remote_code: false
+  bifold_resnet50_s2_v020:
+    task: multilabel_land_cover
+    provider: huggingface
+    model_id: BIFOLD-BigEarthNetv2-0/resnet50-s2-v0.2.0
+    revision: f5a590cd5876845f62702260ff62ea5a325433bb
+    checkpoint_file: model.safetensors
+    checkpoint_sha256: f55f8a5416d326c7e3139a97c6866e606dfc2e5cde30d52e2ccc47ce5f8b9be5
+    checkpoint_size_bytes: 94523860
+    architecture: ConfigILM ResNet-50
+    license: MIT
+    preprocessing_profile: bifold_resnet50_s2_v020
+    input_channels: 10
+    output_classes: 19
+    frozen: true
+    allow_remote_code: false
+  bifold_resnet50_all_v020:
+    task: multilabel_land_cover
+    provider: huggingface
+    model_id: BIFOLD-BigEarthNetv2-0/resnet50-all-v0.2.0
+    revision: 762acdc186cce6b31ecbc896ddab1721847d4c5e
+    checkpoint_file: model.safetensors
+    checkpoint_sha256: b7e5e58d2cf1e384ba9362ac6ce75c117dee159198eac5675927cba3c3960332
+    checkpoint_size_bytes: 94548948
+    architecture: ConfigILM ResNet-50
+    license: MIT
+    preprocessing_profile: bifold_resnet50_all_v020
+    input_channels: 12
+    output_classes: 19
+    frozen: true
+    allow_remote_code: false

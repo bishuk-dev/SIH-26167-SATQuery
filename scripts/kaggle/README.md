@@ -49,6 +49,23 @@ Useful to inspect the patched notebook and `kernel-metadata.json` before committ
 python scripts/kaggle/runner.py run phase3a-grounding-baseline
 ```
 
+Phase 4D uses two independent CPU notebooks. Run S1 first, verify its small
+downloaded manifests, then run S2:
+
+```bash
+python scripts/kaggle/runner.py run phase4-materialize-s1
+python scripts/kaggle/runner.py run phase4-materialize-s2
+```
+
+The S2 kernel automatically uses the S1 kernel output as an input and verifies
+its package SHA-256 before starting the S2 transfer.
+
+Each run keeps its multi-GiB `phase4_<modality>_selected.tar.zst` package in
+Kaggle output. It downloads only `materialization_report.json`,
+`package_manifest.json`, and `runner_meta.json`. The runner rejects registry
+configurations that place a declared large package in `result_files` while
+`download_policy: metadata_only` is active.
+
 The one-time frozen Phase 3 grounding test uses:
 
 ```bash
@@ -136,6 +153,17 @@ my-new-experiment:
     - predictions.jsonl
   gpu: true
   internet: true
+```
+
+For large outputs intended as downstream Kaggle inputs, declare them separately:
+
+```yaml
+  result_files:
+    - materialization_report.json
+    - package_manifest.json
+  large_result_files:
+    - phase4_s1_selected.tar.zst
+  download_policy: metadata_only
 ```
 
 3. Run:
