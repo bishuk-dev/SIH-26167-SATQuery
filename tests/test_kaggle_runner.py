@@ -309,6 +309,7 @@ class TestExperimentRegistry:
 
         assert "'--no-deps', '--ignore-requires-python', 'configilm==0.7.0'" in source
         assert "'timm==0.9.16'" in source
+        assert "'lmdb==1.6.2'" in source
 
     def test_phase4d_native_audit_uses_exact_private_kernel_outputs(self) -> None:
         registry = runner._load_registry()
