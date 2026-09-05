@@ -1,49 +1,5 @@
 {
-  "archives": {
-    "s1": {
-      "canonical_url": "https://zenodo.org/records/10891137/files/BigEarthNet-S1.tar.zst?download=1",
-      "completion_state": "complete",
-      "compressed_bytes_streamed": 54439153171,
-      "duplicate_members": [],
-      "elapsed_seconds": 18577.542,
-      "expected_content_length": 54439153171,
-      "expected_md5": "a55eaa2cdf6a917e296bd6601ec1e348",
-      "extracted_bytes": 2088980048,
-      "materialized_pair_counts": {
-        "sealed_test": 3001,
-        "train": 12000,
-        "validation": 3000
-      },
-      "observed_content_length": 54439153171,
-      "observed_md5": "a55eaa2cdf6a917e296bd6601ec1e348",
-      "rejected_unsafe_archive_members": [],
-      "selected_members_expected": 36002,
-      "selected_members_found": 36002,
-      "selected_members_missing": []
-    },
-    "s2": {
-      "canonical_url": "https://zenodo.org/records/10891137/files/BigEarthNet-S2.tar.zst?download=1",
-      "completion_state": "not_started",
-      "compressed_bytes_streamed": 0,
-      "duplicate_members": [],
-      "elapsed_seconds": 0.0,
-      "expected_content_length": 63251710377,
-      "expected_md5": "2245ed2d1a93f6ce637d839bc856396e",
-      "extracted_bytes": 0,
-      "observed_content_length": null,
-      "observed_md5": null,
-      "rejected_unsafe_archive_members": [],
-      "selected_members_expected": null,
-      "selected_members_found": 0,
-      "selected_members_missing": []
-    }
-  },
-  "manifest_sha256": "615e30273cce8eaa8b0838c07256714a3c874019f6dccd50570cbf1ec4c20bd6",
-  "materialized_pair_counts": {
-    "sealed_test": 0,
-    "train": 0,
-    "validation": 0
-  },
+  "frozen_split_manifest_sha256": "615e30273cce8eaa8b0838c07256714a3c874019f6dccd50570cbf1ec4c20bd6",
   "packages": {
     "s1": {
       "extracted_logical_bytes": 2088980048,
@@ -6077,5 +6033,5 @@
     }
   },
   "schema_version": 1,
-  "test_pixel_accessed": false
+  "sealed_test_policy": "Paths are retained for future one-time final evaluation; packaging does not decode, inspect, summarize, visualize, or preprocess raster pixels."
 }
