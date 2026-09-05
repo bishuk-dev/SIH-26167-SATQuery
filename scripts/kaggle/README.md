@@ -60,6 +60,32 @@ python scripts/kaggle/runner.py run phase4-materialize-s2
 The S2 kernel automatically uses the S1 kernel output as an input and verifies
 its package SHA-256 before starting the S2 transfer.
 
+Once both materialization metadata sets are independently verified, run the
+final train-only native raster audit. It attaches the existing packages from
+`technobishu` directly and never downloads them locally:
+
+```bash
+python scripts/kaggle/runner.py run phase4d-native-raster-audit
+```
+
+The audit verifies both package hashes before archive access, extracts exactly
+42 GeoTIFFs for the three frozen TRAIN pairs into transient Kaggle working
+storage, and retains only its two compact JSON artifacts.
+
+After both packages are verified, the native TRAIN raster audit is complete,
+and the preprocessing contract is frozen, launch the separate Phase 4E
+validation baselines:
+
+```bash
+python scripts/kaggle/runner.py run phase4e-bifold-s1-validation
+python scripts/kaggle/runner.py run phase4e-bifold-s2-validation
+```
+
+These GPU kernels attach both private materialization notebook outputs directly.
+They verify package hashes under `/kaggle/input`, extract validation members only
+to transient `/kaggle/working`, and download only compact prediction, metric,
+and provenance artifacts.
+
 Each run keeps its multi-GiB `phase4_<modality>_selected.tar.zst` package in
 Kaggle output. It downloads only `materialization_report.json`,
 `package_manifest.json`, and `runner_meta.json`. The runner rejects registry

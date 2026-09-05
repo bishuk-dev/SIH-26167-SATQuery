@@ -88,3 +88,47 @@ phase4-materialize-s2:
     - satquery-phase4-materialize-s1
   gpu: false
   internet: true
+
+phase4d-native-raster-audit:
+  notebook: notebooks/kaggle_phase4d_native_raster_audit.ipynb
+  kernel_slug: satquery-phase4d-native-raster-audit
+  experiment_dir: experiments/phase4_bigearthnet_multisensor
+  remote_output_dir: phase4d-native-raster-audit
+  result_files:
+    - representative_raster_audit.json
+    - native_audit_runner_meta.json
+  kernel_sources:
+    - technobishu/satquery-phase4-materialize-s1
+    - technobishu/satquery-phase4-materialize-s2
+  gpu: false
+  internet: true
+
+phase4e-bifold-s1-validation:
+  notebook: notebooks/kaggle_phase4e_bifold_s1.ipynb
+  kernel_slug: satquery-phase4e-bifold-s1-validation
+  experiment_dir: experiments/phase4_bigearthnet_multisensor/phase4e/s1
+  remote_output_dir: phase4e-bifold-s1-validation
+  result_files:
+    - validation_result.json
+    - validation_predictions.jsonl
+    - runner_meta.json
+  kernel_sources:
+    - satquery-phase4-materialize-s1
+    - satquery-phase4-materialize-s2
+  gpu: true
+  internet: true
+
+phase4e-bifold-s2-validation:
+  notebook: notebooks/kaggle_phase4e_bifold_s2.ipynb
+  kernel_slug: satquery-phase4e-bifold-s2-validation
+  experiment_dir: experiments/phase4_bigearthnet_multisensor/phase4e/s2
+  remote_output_dir: phase4e-bifold-s2-validation
+  result_files:
+    - validation_result.json
+    - validation_predictions.jsonl
+    - runner_meta.json
+  kernel_sources:
+    - satquery-phase4-materialize-s1
+    - satquery-phase4-materialize-s2
+  gpu: true
+  internet: true

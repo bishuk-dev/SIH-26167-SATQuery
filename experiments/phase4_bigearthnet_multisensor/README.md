@@ -1,6 +1,12 @@
-# Phase 4A–4D — BigEarthNet v2 multisensor audit and transfer-ready materialization
+# Phase 4A–4E — BigEarthNet v2 multisensor materialization and frozen baselines
 
-Phase 4A froze the source facts, native sensor contract, CROMA candidate, and deterministic subset plan for the first SatQuery optical/SAR experiment. Phase 4B verified the official metadata and produced the immutable paired subset manifest. Phase 4C proved BigEarthNet tensor semantics, audited the pinned CROMA contract, and bounded the canonical archive access path. Phase 4D now provides a fail-closed streaming materializer and pins the official BIFOLD S1, S2, and S1+S2 model/preprocessing contracts. No imagery transfer, checkpoint loading, training, or evaluation has occurred.
+Phase 4A froze the source facts, native sensor contract, CROMA candidate, and deterministic subset plan for the first SatQuery optical/SAR experiment. Phase 4B verified the official metadata and produced the immutable paired subset manifest. Phase 4C proved BigEarthNet tensor semantics, audited the pinned CROMA contract, and bounded the canonical archive access path. Phase 4D now provides a fail-closed streaming materializer and pins the official BIFOLD S1, S2, and S1+S2 model/preprocessing contracts. No checkpoint loading, training, or evaluation has occurred.
+
+S1 and S2 have since materialized successfully and their downloaded metadata
+has been independently cross-checked. `phase4e_readiness.json` records both as
+`MATERIALIZED_AND_INTEGRITY_VERIFIED`; both packages remain in Kaggle. Phase 4D
+and all real Phase 4E evaluation remain blocked until the native TRAIN raster
+audit succeeds and the preprocessing contract is frozen against those results.
 
 ## Frozen source decision
 
@@ -86,6 +92,19 @@ Keep both successful notebook outputs as private Kaggle inputs for Phase 4E.
 The local runner downloads only small provenance JSON files; it never requests
 the selected packages. This avoids a local 3.59 GiB download and later upload.
 
+The final Phase 4D audit also stays inside Kaggle. It attaches the two existing
+private materialization outputs, verifies both complete package hashes before
+opening either archive, and extracts only the 42 native GeoTIFFs belonging to
+the three Phase 4C-frozen TRAIN pairs:
+
+```bash
+python scripts/kaggle/runner.py run phase4d-native-raster-audit
+```
+
+The transient raster tree is removed before completion. Only
+`representative_raster_audit.json` and `native_audit_runner_meta.json` are
+retained as notebook output.
+
 ## Frozen subset manifest
 
 The resulting manifest contains 12,000 train pairs in 3,730 groups, 3,000 validation pairs in 938 groups, and 3,001 untouched test pairs in 969 groups. The one-pair test overage preserves an indivisible geographic group. All 19 classes and all 10 countries appear in every selected split, and no configured class floor is underrepresented.
@@ -95,6 +114,34 @@ The official geographical split is the outer boundary and is never recomputed. I
 `split_manifest.json` is an immutable experiment definition with no volatile timestamp. Its SHA-256 is `615e30273cce8eaa8b0838c07256714a3c874019f6dccd50570cbf1ec4c20bd6`; the selection configuration SHA-256 is `d603790136ffd553590ff669c593ac5d4a683239e524d1a347de924623984544`. Download paths, extraction timestamps, and discovered per-file checksums belong in the separate materialization sidecar so storage decisions cannot alter the split hash.
 
 The first task is 19-class multi-label land-cover classification. Frozen optical and SAR linear probes establish standalone utility; one parameter-efficient adaptation follows only after both branches work. Macro/micro average precision are primary, with macro/micro F1 and per-class AP as supporting metrics. Validation controls all decisions; test remains untouched until the experiment is frozen.
+
+## Phase 4E unimodal baseline infrastructure
+
+The validation-only S1 and S2 BIFOLD wrappers use the pinned model revisions and
+the existing frozen preprocessing profiles. The evaluator preserves all 19
+logits and sigmoid probabilities and reports micro F1, macro F1, per-class F1,
+macro average precision, per-class average precision, sample count, and class
+prevalence in canonical BigEarthNet class order.
+
+Real execution fails before raster or model access unless both modalities are
+integrity-verified against the frozen manifest, the three predeclared native
+TRAIN pairs have been audited, and `bifold_contract.json` is explicitly marked
+`FROZEN_AFTER_NATIVE_TRAIN_RASTER_AUDIT`. Only `validation` is accepted; test
+paths remain sealed.
+
+The two prepared Kaggle experiments are:
+
+```bash
+python scripts/kaggle/runner.py run phase4e-bifold-s1-validation
+python scripts/kaggle/runner.py run phase4e-bifold-s2-validation
+```
+
+Both attach the private S1 and S2 materialization notebook outputs as Kaggle
+kernel inputs. Each notebook verifies the selected package SHA-256 in
+`/kaggle/input`, streams only its validation members into transient
+`/kaggle/working/phase4e-data`, and emits only compact result/provenance JSON.
+The multi-GiB packages never round-trip through the local PC, and loose rasters
+are never placed in notebook output.
 
 ## Artifact map
 
@@ -111,6 +158,7 @@ The first task is 19-class multi-label land-cover classification. Frozen optical
 - `results/access_probe.json` — live 128-byte-per-archive range/format probe output.
 - `results/materialization_report.json` — current network-free plan; later populated with per-modality transfer integrity only when the explicit transfer runs.
 - `bifold_contract.json` — exact BIFOLD model revisions, checkpoint hashes, semantic inputs, fixed statistics, and authoritative source revisions.
+- `phase4e_readiness.json` — fail-closed Phase 4D gate state and independently verified S1 integrity/provenance.
 
 ## Reproduce Phase 4B
 
@@ -142,7 +190,10 @@ python -m ml.evaluation.probe_phase4_materialization
 
 ## Exact next step
 
-Review the materialization report, ensure at least 8 GiB free at the output location, and explicitly approve the one-time canonical stream. Run the gated materializer and then the frozen-train raster inspector. Phase 4E remains blocked until both publisher MD5 checks and the native raster audit pass.
+Commit the verified S1/S2 readiness state and native-audit infrastructure from a
+clean worktree, then run `phase4d-native-raster-audit`. Review its measured TRAIN
+raster evidence against `bifold_contract.json`; do not run Phase 4E until that
+contract is explicitly frozen and the Phase 4D readiness gate passes.
 
 ## Primary sources
 

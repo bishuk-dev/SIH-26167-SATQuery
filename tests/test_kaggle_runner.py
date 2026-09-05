@@ -269,6 +269,42 @@ class TestExperimentRegistry:
     def test_load_registry_returns_dict(self) -> None:
         registry = runner._load_registry()
         assert isinstance(registry, dict)
+
+    @pytest.mark.parametrize("modality", ["s1", "s2"])
+    def test_phase4e_unimodal_baselines_use_kaggle_materialization_outputs(
+        self, modality: str
+    ) -> None:
+        registry = runner._load_registry()
+        entry = registry[f"phase4e-bifold-{modality}-validation"]
+
+        assert entry["notebook"] == f"notebooks/kaggle_phase4e_bifold_{modality}.ipynb"
+        assert entry["kernel_sources"] == [
+            "satquery-phase4-materialize-s1",
+            "satquery-phase4-materialize-s2",
+        ]
+        assert entry["result_files"] == [
+            "validation_result.json",
+            "validation_predictions.jsonl",
+            "runner_meta.json",
+        ]
+        assert entry["gpu"] is True
+        assert entry["internet"] is True
+
+    def test_phase4d_native_audit_uses_exact_private_kernel_outputs(self) -> None:
+        registry = runner._load_registry()
+        entry = registry["phase4d-native-raster-audit"]
+
+        assert entry["notebook"] == "notebooks/kaggle_phase4d_native_raster_audit.ipynb"
+        assert entry["kernel_sources"] == [
+            "technobishu/satquery-phase4-materialize-s1",
+            "technobishu/satquery-phase4-materialize-s2",
+        ]
+        assert entry["result_files"] == [
+            "representative_raster_audit.json",
+            "native_audit_runner_meta.json",
+        ]
+        assert entry["gpu"] is False
+        assert entry["internet"] is True
         assert len(registry) > 0
 
     def test_known_experiments_have_required_fields(self) -> None:

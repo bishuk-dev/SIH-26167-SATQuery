@@ -1,43 +1,30 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working in code in this repository.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Project Overview
 
 **SatQuery AI** — Evidence-grounded, sensor-aware remote-sensing analysis via natural-language queries (Problem Statement ID: 26167). The system combines PyTorch-based vision-language models, deterministic GIS, and a constrained orchestration layer so that every answer is tied to sensor data and spatial evidence rather than LLM hallucination.
 
-## Tech Stack
+## Tech Stack & Key Commands
 
 - **Python 3.11+**, managed with `pip`/`uv` (see `pyproject.toml`)
 - **Backend:** FastAPI + Uvicorn; app entry at `apps/api/app/main.py`
 - **ML:** PyTorch, HuggingFace Transformers, PEFT/LoRA; models registered in `models/registry.yaml`
 - **Geospatial:** Rasterio, Affine, Pillow, GDAL ecosystem; `rio-tiler`/TiTiler optional
-- **Frontend:** React + TypeScript + Vite + OpenLayers + Tailwind CSS (`apps/web/`)
+- **Frontend:** React + TypeScript + Vite + OpenLayers + Tailwind CSS (`apps/web/`) — scaffolded, not built
 - **Storage:** Filesystem-first; SQLite for metadata; Postgres optional at scale
 - **Orchestration:** Docker + Docker Compose (when topology is runnable)
 - **Training infra:** Kaggle GPU runner (`scripts/kaggle/runner.py`), `accelerate`
-
-## Project Layout
-
-- `satquery/` — reusable scientific/domain package: `ingestion`, `geo`, `inference`, `orchestration`, `registry`, `verification`, `evidence`, `reporting`, `visualization`
-- `apps/api/` — FastAPI transport boundary (uploads, observations, VQA, grounding, tiles)
-- `apps/web/` — React frontend (imagery-first, not chat-first)
-- `ml/` — offline model work: `adapters`, `preprocessing`, `training`, `inference`, `evaluation`, `configs`
-- `models/registry.yaml` — single source of truth for model checkpoint IDs, revisions, preprocessing profiles
-- `scripts/kaggle/` — Kaggle GPU runner
-- `tests/` — pytest test suite
-- `experiments/` — versioned experiment records (results, manifests, configs)
-- `data/` — immutable dataset storage; never commit large artifacts to Git
-
-## Key Commands
 
 ```bash
 # Install dev dependencies
 pip install -e ".[dev]"
 
-# Install with optional extras
-pip install -e ".[multisensor]"   # Parquet/zstd for BigEarthNet
+# Optional extras
 pip install -e ".[training]"      # PEFT/accelerate/tensorboard
+pip install -e ".[multisensor]"   # Parquet/zstd for BigEarthNet
+pip install -e ".[grounding]"     # fsspec[http]
 
 # Run the FastAPI server
 uvicorn apps.api.app.main:app --reload
@@ -46,20 +33,13 @@ uvicorn apps.api.app.main:app --reload
 python -m pytest
 
 # Run a single test file
-python -m pytest tests/geo/test_coordinate_mapping.py
-
-# Phase 2A frozen VQA baseline
-python -m ml.evaluation.run_phase2a_baseline --allow-download
+python -m pytest tests/geo/test_coordinates.py
 
 # Phase 2B LoRA adaptation
 python -m ml.training.phase2b --config ml/configs/phase2b_smolvlm_lora.yaml --output-dir outputs/phase2b_smolvlm_lora
-python -m ml.training.phase2b --config ml/configs/phase2b_smolvlm_lora.yaml --stability-smoke
 
 # Phase 3A grounding
 python -m ml.evaluation.run_phase3a_grounding --allow-download
-
-# Phase 4B BigEarthNet metadata manifest
-python -m ml.evaluation.prepare_phase4_bigearthnet
 
 # Phase 4D materialization (requires --confirm-full-stream-transfer)
 python -m ml.evaluation.materialize_phase4_bigearthnet --plan
@@ -69,9 +49,7 @@ python -m ml.evaluation.materialize_phase4_bigearthnet --confirm-full-stream-tra
 python scripts/kaggle/runner.py
 ```
 
-## Architecture Principles
-
-The following rules are non-negotiable and must hold in all code:
+## Architecture Principles (Non-Negotiable)
 
 1. **Sensor metadata is first-class.** Every observation carries CRS, GSD, bands, modality, polarity, acquisition time. Never discard it in preprocessing.
 2. **Language models explain evidence; they never manufacture it.** Numeric claims (area, counts) come from deterministic GIS operations.
@@ -84,30 +62,73 @@ The following rules are non-negotiable and must hold in all code:
 
 ## Module Boundaries
 
-- `satquery/` holds reusable scientific logic (domain-agnostic, no framework coupling)
-- `apps/api/` holds FastAPI-specific transport code (schemas, routes, upload handling)
-- `ml/` holds offline model code; training code must NOT be required by the API runtime
-- `models/registry.yaml` is the canonical model catalog; add entries only when a real implementation satisfies its contract
-- `apps/web/` owns all UI code; `satquery/` must remain frontend-agnostic
+- `satquery/` — reusable scientific/domain package: `ingestion`, `geo`, `inference`, `orchestration`, `registry`, `verification`, `evidence`, `reporting`, `visualization`
+- `apps/api/` — FastAPI transport boundary (uploads, observations, VQA, grounding, tiles)
+- `apps/web/` — React frontend (imagery-first, not chat-first)
+- `ml/` — offline model work: `adapters`, `preprocessing`, `training`, `inference`, `evaluation`, `configs`
+- `models/registry.yaml` — single source of truth for model checkpoint IDs, revisions, preprocessing profiles
+- `scripts/kaggle/` — Kaggle GPU runner
+- `tests/` — pytest test suite
+- `experiments/` — versioned experiment records (results, manifests, configs)
+- `data/` — immutable dataset storage; never commit large artifacts to Git
+
+## Development Workflow
+
+**Git:** Feature branches (`feat/...`, `fix/...`) + PR reviews. Conventional commits preferred.
+
+**Code style:** Ruff (linting) + Black (formatting). Configure in `pyproject.toml` when adding.
+
+**No CI workflows yet** — `.github/workflows/` does not exist.
 
 ## Testing Strategy
 
 Three layers (per README):
-1. **Deterministic GIS tests** — strict unit tests for pixel↔world coordinate transforms, CRS conversion, area calculation, overlap detection
-2. **Model evaluation** — fixed benchmark/golden datasets; evaluate every approved checkpoint against VQA, grounding, SAR, optical-SAR, change, cross-sensor
-3. **Orchestration tests** — validate routing rules (e.g., 1 image + change query → `MISSING_TEMPORAL_PAIR`; RGB + NDVI → `MISSING_NIR_BAND`)
+1. **Deterministic GIS tests** — strict unit tests for pixel↔world coordinate transforms, CRS conversion, area calculation, overlap detection (`tests/geo/`, `tests/ingestion/`)
+2. **Model evaluation** — fixed benchmark/golden datasets; evaluate every approved checkpoint against VQA, grounding, SAR, optical-SAR, change, cross-sensor (`tests/ml/`)
+3. **Orchestration tests** — validate routing rules (e.g., 1 image + change query → `MISSING_TEMPORAL_PAIR`; RGB + NDVI → `MISSING_NIR_BAND`) (`tests/routing/`)
 
-## Environment
+```bash
+python -m pytest                          # all
+python -m pytest tests/geo/               # layer
+python -m pytest tests/geo/test_coordinates.py::test_name  # single
+```
 
-- Copy `.env.example` → `.env` before running locally
-- `ENABLE_REMOTE_NETWORK=false` by default (models only load from local cache after first verified download)
-- Upload limits enforced in env: `MAX_UPLOAD_SIZE_MB`, `MAX_RASTER_WIDTH/HEIGHT/PIXELS/BANDS`
-- Model cache lives under `models/cache/` (gitignored); checkpoints verified by SHA-256 before loading
+Integration tests in `tests/integration/` use `httpx` async client against the live FastAPI app.
 
-## Development Notes
+## Key Gotchas
 
-- Phase status is tracked in `docs/DEVELOPMENT_PLAN.md` (Phase 1A–4D are complete; Phases 4E+ pending)
-- The frozen Phase 3 grounding policy (threshold 0.30, 80% area cap) must not be changed without a documented rationale
-- Experiment results go under `experiments/<phase_name>/` with versioned manifests and result summaries
-- Never download datasets or checkpoints into Git; use `data/` (gitignored) and `models/cache/` (gitignored)
-- Kaggle-specific setup, resume, and artifact paths documented in `docs/KAGGLE.md`
+**Raster upload limits** (enforced by the inspector):
+- `MAX_UPLOAD_SIZE_MB=512`
+- `MAX_RASTER_WIDTH=50000`, `MAX_RASTER_HEIGHT=50000`
+- `MAX_RASTER_PIXELS=150000000`
+- `MAX_RASTER_BANDS=32`
+
+**VQA inference defaults:**
+- `GPU_DEVICE=cpu` — frozen VQA runs on CPU by default
+- `ENABLE_REMOTE_NETWORK=false` — network access is opt-in
+- `VQA_CPU_THREADS=2`, `GROUNDING_CPU_THREADS=2`
+
+**Model cache:** HuggingFace Hub caches weights at `~/.cache/huggingface/`. No custom cache path configured.
+
+**Model registry checksum verification:** Every registered model in `models/registry.yaml` has a `checkpoint_sha256`. Downloads are verified before use.
+
+**No Git LFS:** Large model weights not in Git. Fetched from HuggingFace or Kaggle at runtime. `.gitignore` excludes `models/checkpoints/`, `models/cache/`, `*.safetensors`, `*.pt`, `*.ckpt`.
+
+**Data root:** `DATA_ROOT=./data` stores observations, analyses, SQLite database (`DATABASE_URL=sqlite:///./data/satquery.db`).
+
+**BigEarthNet materialization:** Phase 4D requires ~109 GiB HTTP transfer from Zenodo. CROMA model explicitly blocked (no positional band semantics published).
+
+**Kaggle GPU requirements:** Notebook bootstrap uninstalls `torchao`, pins `torch==2.8.0+cu126`, BF16 only on compute capability >= 8.0 (Ampere+). P100 falls back to FP16 after stability smoke pass.
+
+**Phase 3 grounding policy:** Threshold 0.30 + normalized-area cap 0.80 is the frozen production policy. Test run once on untouched data; will not be rerun.
+
+**Frontend is not yet built:** `apps/web/` contains only a `README.md` placeholder.
+
+## Environment Setup
+
+```bash
+cp .env.example .env
+# Edit .env as needed
+```
+
+Key env vars: `ENABLE_REMOTE_NETWORK=false` (default), upload limits, GPU device, CPU threads, data root, database URL.

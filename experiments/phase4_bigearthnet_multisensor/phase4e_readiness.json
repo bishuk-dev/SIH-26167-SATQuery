@@ -1,0 +1,81 @@
+{
+  "schema_version": 1,
+  "status": "BLOCKED_PHASE4D_NOT_READY",
+  "frozen_manifest_sha256": "615e30273cce8eaa8b0838c07256714a3c874019f6dccd50570cbf1ec4c20bd6",
+  "modalities": {
+    "s1": {
+      "status": "MATERIALIZED_AND_INTEGRITY_VERIFIED",
+      "expected_compressed_bytes": 54439153171,
+      "observed_compressed_bytes": 54439153171,
+      "publisher_md5": "a55eaa2cdf6a917e296bd6601ec1e348",
+      "selected_member_count": 36002,
+      "missing_member_count": 0,
+      "duplicate_member_count": 0,
+      "unsafe_rejected_member_count": 0,
+      "package_member_count": 36002,
+      "package_name": "phase4_s1_selected.tar.zst",
+      "package_size_bytes": 1779856431,
+      "package_sha256": "c0973f4a05ec2453a9158f766a31f267798810647eec810b6866561562a450b8",
+      "sealed_test_member_count": 6002,
+      "test_pixel_accessed": false,
+      "materialization_report": "results/s1/materialization_report.json",
+      "package_manifest": "results/s1/package_manifest.json",
+      "runner_meta": "results/s1/runner_meta.json",
+      "verification_method": "Manifest SHA recomputed locally; all transfer and package fields cross-checked between downloaded metadata. Package bytes remained in Kaggle and were not downloaded locally, so package SHA-256 was not recomputed locally.",
+      "provenance": {
+        "git_sha": "0f546f03d9cee759e1e8fe2e233685643d96eead",
+        "kaggle_experiment": "phase4-materialize-s1",
+        "kernel_slug": "satquery-phase4-materialize-s1",
+        "remote_output_dir": "phase4-bigearthnet-materialize-s1",
+        "reproducible": true,
+        "dirty_worktree": false,
+        "remote_run_identity_limit": "Kaggle username, kernel version/run number, and run URL were not recorded by the completed job."
+      }
+    },
+    "s2": {
+      "status": "MATERIALIZED_AND_INTEGRITY_VERIFIED",
+      "expected_compressed_bytes": 63251710377,
+      "observed_compressed_bytes": 63251710377,
+      "publisher_md5": "2245ed2d1a93f6ce637d839bc856396e",
+      "selected_member_count": 216012,
+      "missing_member_count": 0,
+      "duplicate_member_count": 0,
+      "unsafe_rejected_member_count": 0,
+      "package_member_count": 216012,
+      "package_name": "phase4_s2_selected.tar.zst",
+      "package_size_bytes": 2033492825,
+      "package_sha256": "2df8b97deeead5cc8a62738484b2e61f8bb32154db6b60e29db20625094962e1",
+      "logical_extracted_size_bytes": 2962244560,
+      "sealed_test_member_count": 36012,
+      "test_pixel_accessed": false,
+      "materialization_report": "results/s2/materialization_report.json",
+      "package_manifest": "results/s2/package_manifest.json",
+      "runner_meta": "results/s2/runner_meta.json",
+      "verification_method": "Manifest SHA recomputed locally; all transfer and package fields cross-checked between downloaded metadata. Package bytes remained in Kaggle and were not downloaded locally, so package SHA-256 was not recomputed locally.",
+      "provenance": {
+        "git_sha": "fcd5d6ea68a4b6c9750b9585f183b3b1b5846a86",
+        "kaggle_experiment": "phase4-materialize-s2",
+        "kernel_slug_from_pinned_registry": "satquery-phase4-materialize-s2",
+        "remote_output_dir_from_pinned_registry": "phase4-bigearthnet-materialize-s2",
+        "returned_runner_meta_fields": [
+          "git_sha",
+          "experiment",
+          "reproducible",
+          "dirty_worktree"
+        ],
+        "reproducible": true,
+        "dirty_worktree": false,
+        "remote_run_identity_limit": "Kaggle username, kernel version/run number, and run URL were not recorded by the completed job."
+      }
+    }
+  },
+  "representative_native_train_raster_audit": {
+    "status": "PENDING_NATIVE_TRAIN_RASTER_AUDIT",
+    "path": "representative_raster_audit.json"
+  },
+  "phase4d_preprocessing_contract": {
+    "status": "PENDING_NATIVE_TRAIN_RASTER_AUDIT",
+    "path": "bifold_contract.json"
+  },
+  "test_access_policy": "SEALED; Phase 4E baseline evaluation accepts validation only."
+}
