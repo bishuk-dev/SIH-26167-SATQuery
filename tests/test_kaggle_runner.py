@@ -290,6 +290,26 @@ class TestExperimentRegistry:
         assert entry["gpu"] is True
         assert entry["internet"] is True
 
+    @pytest.mark.parametrize("modality", ["s1", "s2"])
+    def test_phase4e_notebook_installs_pinned_configilm_on_python_312(
+        self, modality: str
+    ) -> None:
+        notebook_path = (
+            Path(__file__).parent.parent
+            / "notebooks"
+            / f"kaggle_phase4e_bifold_{modality}.ipynb"
+        )
+        notebook = json.loads(notebook_path.read_text(encoding="utf-8"))
+        source = "".join(
+            line
+            for cell in notebook["cells"]
+            if cell["cell_type"] == "code"
+            for line in cell["source"]
+        )
+
+        assert "'--no-deps', '--ignore-requires-python', 'configilm==0.7.0'" in source
+        assert "'timm==0.9.16'" in source
+
     def test_phase4d_native_audit_uses_exact_private_kernel_outputs(self) -> None:
         registry = runner._load_registry()
         entry = registry["phase4d-native-raster-audit"]
