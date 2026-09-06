@@ -299,6 +299,28 @@ def load_prediction_artifact(path: Path) -> tuple[Phase4EPrediction, ...]:
     return rows
 
 
+def load_metrics_artifact(path: Path) -> MultilabelMetrics:
+    """Load a validation result across Pydantic JSON tuple/list versions."""
+
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        raw_metrics = payload.get("metrics") if isinstance(payload, Mapping) else None
+        if not isinstance(raw_metrics, Mapping):
+            raise ValueError("Validation result does not contain metrics")
+        metrics = dict(raw_metrics)
+        for field in (
+            "class_order",
+            "per_class_f1",
+            "per_class_average_precision",
+            "class_prevalence",
+        ):
+            if field in metrics:
+                metrics[field] = tuple(metrics[field])
+        return MultilabelMetrics.model_validate(metrics)
+    except (OSError, json.JSONDecodeError, TypeError, ValueError) as exc:
+        raise ValueError(f"Cannot load metrics artifact: {path}") from exc
+
+
 def _validate_complementarity_inputs(
     predictions: Mapping[str, Sequence[Phase4EPrediction]],
     metrics: Mapping[str, MultilabelMetrics],

@@ -189,3 +189,16 @@ def test_phase5a_writer_uses_the_registered_artifact_names(tmp_path) -> None:
     assert result.prediction_artifact == "phase5a_joint_validation_predictions.jsonl"
     assert (tmp_path / "phase5a_joint_validation_result.json").is_file()
     assert (tmp_path / "phase5a_joint_validation_predictions.jsonl").is_file()
+
+
+def test_phase5a_loads_json_metrics_with_serialized_lists(tmp_path) -> None:
+    result_path = tmp_path / "validation_result.json"
+    result_path.write_text(
+        __import__("json").dumps({"metrics": _metrics(0.6).model_dump(mode="json")}),
+        encoding="utf-8",
+    )
+
+    metrics = phase5a_bifold_joint.load_metrics_artifact(result_path)
+
+    assert metrics.class_order == BIGEARTHNET_19_CLASS_ORDER
+    assert metrics.per_class_f1 == (0.6,) * 19
