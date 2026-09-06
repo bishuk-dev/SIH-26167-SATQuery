@@ -61,6 +61,21 @@ class MultisensorModelRegistration(ContractModel):
     allow_remote_code: Literal[False]
 
 
+class BiTemporalChangeVqaModelRegistration(ContractModel):
+    task: Literal["bitemporal_change_vqa"]
+    provider: Literal["huggingface"]
+    model_id: str = Field(min_length=1)
+    revision: str = Field(pattern=r"^[0-9a-f]{40}$")
+    checkpoint_file: str = Field(min_length=1)
+    checkpoint_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    architecture: str = Field(min_length=1)
+    license: str = Field(min_length=1)
+    preprocessing_profile: str = Field(min_length=1)
+    frozen: Literal[True]
+    allow_remote_code: Literal[False]
+    max_new_tokens: int = Field(gt=0, le=64)
+
+
 class ModelRegistry(ContractModel):
     schema_version: Literal[1]
     models: dict[
@@ -68,7 +83,8 @@ class ModelRegistry(ContractModel):
         Annotated[
             ModelRegistration
             | GroundingModelRegistration
-            | MultisensorModelRegistration,
+            | MultisensorModelRegistration
+            | BiTemporalChangeVqaModelRegistration,
             Field(discriminator="task"),
         ],
     ]
@@ -212,6 +228,33 @@ class BifoldPreprocessingProfile(ContractModel):
             raise ValueError("band order and normalization statistics must align")
 
 
+class BiTemporalChangeVqaPreprocessingProfile(ContractModel):
+    task: Literal["bitemporal_change_vqa"]
+    version: str = Field(min_length=1)
+    input_asset_kind: Literal["visualization_pair"]
+    image_mode: Literal["RGB"]
+    resize: Literal["fit_pad"]
+    width: int = Field(gt=0, le=4096)
+    height: int = Field(gt=0, le=4096)
+    resampling: Literal["bilinear"]
+    padding_rgb: tuple[
+        Annotated[int, Field(ge=0, le=255)],
+        Annotated[int, Field(ge=0, le=255)],
+        Annotated[int, Field(ge=0, le=255)],
+    ]
+    nodata_policy: Literal["alpha_to_padding"]
+    processor_source: Literal["checkpoint"]
+    processor_resize: Literal["disabled"]
+    prompt_template: str = Field(min_length=1)
+
+    @field_validator("padding_rgb", mode="before")
+    @classmethod
+    def normalize_yaml_color(cls, value: object) -> object:
+        if isinstance(value, list):
+            return tuple(value)
+        return value
+
+
 class PreprocessingRegistry(ContractModel):
     schema_version: Literal[1]
     profiles: dict[
@@ -220,7 +263,8 @@ class PreprocessingRegistry(ContractModel):
             PreprocessingProfile
             | GroundingPreprocessingProfile
             | NativeMultisensorPreprocessingProfile
-            | BifoldPreprocessingProfile,
+            | BifoldPreprocessingProfile
+            | BiTemporalChangeVqaPreprocessingProfile,
             Field(discriminator="task"),
         ],
     ]

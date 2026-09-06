@@ -10,3 +10,19 @@ class GeospatialError(ValueError):
 class CoordinateTransformError(GeospatialError):
     """Raised when coordinates cannot be transformed safely."""
 
+
+class MeasurementError(GeospatialError):
+    """Raised when deterministic GIS measurements cannot be computed."""
+
+
+class CrsMeasurementError(MeasurementError):
+    """Raised when CRS is invalid, angular, or missing for metric measurement."""
+
+
+class SpectralIndexError(GeospatialError):
+    """Raised when spectral index calculation fails or is invalid."""
+
+
+class MissingBandError(SpectralIndexError):
+    """Raised when required spectral bands are missing."""
+

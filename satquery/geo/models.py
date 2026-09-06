@@ -103,3 +103,40 @@ class PixelWindow(ContractModel):
     width: float = Field(gt=0.0)
     height: float = Field(gt=0.0)
 
+
+class MeasurementUnit(StrEnum):
+    M2 = "m2"
+    HA = "ha"
+    KM2 = "km2"
+    COUNT = "count"
+
+
+class MeasurementResult(ContractModel):
+    """Deterministic geospatial measurement result."""
+
+    pixel_count: int = Field(ge=0)
+    area: float = Field(ge=0.0)
+    unit: MeasurementUnit
+    crs: str | None = None
+    calculation_path: str = Field(min_length=1)
+    pixel_area_m2: float = Field(ge=0.0)
+
+
+class SpectralIndex(StrEnum):
+    NDVI = "ndvi"
+    NDWI = "ndwi"
+    NDWI_GAO = "ndwi_gao"
+    NBR = "nbr"
+
+
+class SpectralIndexStats(ContractModel):
+    """Summary statistics of a computed spectral index."""
+
+    index_name: str = Field(min_length=1)
+    min_value: float
+    max_value: float
+    mean_value: float
+    std_value: float
+    valid_pixels: int = Field(ge=0)
+    nodata_pixels: int = Field(ge=0)
+

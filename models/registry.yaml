@@ -13,6 +13,19 @@ models:
     frozen: true
     allow_remote_code: false
     max_new_tokens: 16
+  smolvlm_bitemporal_change_vqa_v1:
+    task: bitemporal_change_vqa
+    provider: huggingface
+    model_id: HuggingFaceTB/SmolVLM-256M-Instruct
+    revision: 7e3e67edbbed1bf9888184d9df282b700a323964
+    checkpoint_file: model.safetensors
+    checkpoint_sha256: 74dea5904032e5ae99a2e0eef5179e6ac0f1dedc3ab0c7c2a5d4d387c843203e
+    architecture: SmolVLM / Idefics3 Multi-Image
+    license: Apache-2.0
+    preprocessing_profile: smolvlm_bitemporal_change_vqa_v1
+    frozen: true
+    allow_remote_code: false
+    max_new_tokens: 32
   grounding_dino_tiny_v1:
     task: text_guided_grounding
     provider: huggingface

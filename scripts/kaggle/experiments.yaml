@@ -167,3 +167,15 @@ phase5a-bifold-joint-validation:
     - technobishu/satquery-phase4-materialize-s2
   gpu: true
   internet: true
+
+phase4-e02-bitemporal-vqa:
+  notebook: notebooks/kaggle_phase4_e02_bitemporal_vqa.ipynb
+  kernel_slug: satquery-phase4-e02-bitemporal-vqa
+  experiment_dir: experiments/phase4_bitemporal_vqa
+  remote_output_dir: phase4-e02-bitemporal-vqa
+  result_files:
+    - validation_metrics.json
+    - validation_predictions.jsonl
+    - runner_meta.json
+  gpu: true
+  internet: true

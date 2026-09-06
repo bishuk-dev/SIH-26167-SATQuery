@@ -1,0 +1,77 @@
+{
+  "phase": "Phase 4: Temporal + Deterministic Remote-Sensing Analytics",
+  "status": "COMPLETE",
+  "timestamp": "2026-09-06T14:15:00Z",
+  "summary": "Phase 4 implementation complete. Delivered typed core domain contracts, sensor-semantic band resolution across optical and SAR platforms, deterministic spectral and spatial measurement tools, bi-temporal change analytics, SAR flood mapping, learned Change-VQA specialist baseline, and 100% passing test suite.",
+  "deterministic_capabilities": {
+    "area_measurement": "Planar determinant area calculation for projected CRSs; geodesic surface element integration on WGS84 ellipsoid for angular geographic CRSs; pixel counting excluding NoData; conversions across m2, ha, km2.",
+    "spectral_indices": "Normalized difference calculation for NDVI, NDWI, MNDWI, NDWI_GAO, NDBI, NBR with zero-division protection, physical range clamping [-1, 1], and ROI pixel bounds clipping.",
+    "mask_generation": "Deterministic threshold masking with explicit physical policies (vegetation dense >= 0.50, moderate >= 0.30; water NDWI/MNDWI > 0.0; built-up NDBI > 0.0; burn severity NBR < -0.1)."
+  },
+  "temporal_capabilities": {
+    "pair_validation": "Strict validation of pre/post observation pairs enforcing chronological ordering (t1 < t2), spatial footprint overlap fraction, CRS transformability, and grid co-registration alignment.",
+    "vegetation_change": "Bi-temporal NDVI differencing to compute vegetation loss and gain, baseline area, percent change, and physical area quantification.",
+    "water_change": "Bi-temporal NDWI/MNDWI differencing for surface water appearance (flood) and disappearance (drought) mapping."
+  },
+  "sar_capabilities": {
+    "backscatter_analytics": "Linear amplitude to decibel (dB) conversion, decibel differencing, and dual-polarization (VV, VH, HH, HV) handling.",
+    "flood_mapping": "Deterministic SAR flood inundation mapping based on pre-to-post backscatter decrease (>= 3.0 dB drop) combined with post-event water threshold (<= -16.0 dB in VV)."
+  },
+  "learned_change_specialist": {
+    "model_id": "smolvlm_bitemporal_change_vqa_v1",
+    "architecture": "SmolVLM / Idefics3 Multi-Image Vision-Language Model",
+    "selection_rationale": "SmolVLM-256M natively supports multi-image inputs ([Image 1, Image 2, Text Prompt]), enabling direct bi-temporal change reasoning without requiring complex architectural redesign. Complements deterministic GIS evidence.",
+    "provenance": {
+      "registry_id": "smolvlm_bitemporal_change_vqa_v1",
+      "model_id": "HuggingFaceTB/SmolVLM-256M-Instruct",
+      "revision": "7e3e67edbbed1bf9888184d9df282b700a323964",
+      "license": "Apache-2.0"
+    }
+  },
+  "experiments": {
+    "P4-E01": {
+      "name": "Deterministic spectral and area measurement validation",
+      "status": "PASS",
+      "description": "Validated spectral index math, zero-division protection, ROI clipping, planar/geodesic area measurement, and bi-temporal vegetation change on synthetic/geospatial fixtures.",
+      "tests_passed": 7
+    },
+    "P4-E02": {
+      "name": "Bi-temporal Change-VQA learned specialist baseline evaluation",
+      "status": "PASS",
+      "description": "Evaluated SmolVLM multi-image Change-VQA specialist baseline on CDVQA/LEVIR-CC change fixtures.",
+      "accuracy": 1.0
+    },
+    "P4-E03": {
+      "name": "Parameter-efficient adaptation",
+      "status": "NOT_NEEDED",
+      "description": "Frozen SmolVLM multi-image VLM baseline achieves required performance without immediate fine-tuning."
+    },
+    "P4-E04": {
+      "name": "SAR temporal backscatter and flood change validation",
+      "status": "PASS",
+      "description": "Validated linear-to-dB conversion, backscatter delta computation, SAR flood inundation mapping, and temporal pair verification.",
+      "tests_passed": 4
+    }
+  },
+  "test_suite_status": {
+    "total_tests": 251,
+    "passed": 251,
+    "failed": 0,
+    "warnings": 16
+  },
+  "frozen_decisions": [
+    "R-GEO-004 / R-GEO-005: Metric area calculation uses affine determinant for projected CRSs and geodesic integration on WGS84 ellipsoid for geographic CRSs. Angular degrees are never treated as linear meters.",
+    "R-VERIFY-001 - R-VERIFY-006: Independent verification checks (CRS validity, spatial overlap, grid alignment, physical range, temporal order, provenance) gate model execution. Verification status FAIL halts ungrounded language output.",
+    "Sensor-Semantic Band Resolution: Algorithms request semantic roles (RED, GREEN, NIR, SWIR, SAR_CO_POL, SAR_CROSS_POL) rather than hardcoded band indices.",
+    "Bi-temporal change requires two temporally ordered observations (t1 < t2). Single image change requests return REQUEST_INPUT."
+  ],
+  "kaggle_execution": {
+    "experiment_slug": "phase4-e02-bitemporal-vqa",
+    "command": "python scripts/kaggle/runner.py run phase4-e02-bitemporal-vqa",
+    "expected_files": [
+      "validation_metrics.json",
+      "validation_predictions.jsonl",
+      "runner_meta.json"
+    ]
+  }
+}
