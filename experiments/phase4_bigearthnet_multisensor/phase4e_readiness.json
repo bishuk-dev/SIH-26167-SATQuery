@@ -11,6 +11,9 @@
   "test_pixels_opened": false,
   "phase4d_status": "COMPLETE",
   "phase4e_validation_ready": true,
+  "phase4e_status": "COMPLETE",
+  "phase4e_closeout": "phase4e_closeout.json",
+  "phase4f_training_ready": true,
   "modalities": {
     "s1": {
       "status": "MATERIALIZED_AND_INTEGRITY_VERIFIED",

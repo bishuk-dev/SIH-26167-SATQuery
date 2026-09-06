@@ -47,13 +47,15 @@ These research artifacts are not a code dependency for beginning the Phase 1 geo
 
 ## Phase 4 — Multisensor optical/SAR adaptation plan
 
-**Status: Phase 4D is COMPLETE and Phase 4E unimodal validation is ready.** The checksum-verified manifest remains byte-identical at SHA-256 `615e30273cce8eaa8b0838c07256714a3c874019f6dccd50570cbf1ec4c20bd6`, with 12,000 train, 3,000 validation, and 3,001 untouched test pairs. S1 and S2 materialization passed integrity verification, and exactly three predeclared TRAIN pairs passed the native-raster audit. No model inference, training, adaptation, or test-pixel access occurred during closeout.
+**Status: Phase 4E is COMPLETE and Phase 4F is prepared but not launched.** The checksum-verified manifest remains byte-identical at SHA-256 `615e30273cce8eaa8b0838c07256714a3c874019f6dccd50570cbf1ec4c20bd6`, with 12,000 train, 3,000 validation, and 3,001 sealed test pairs. Frozen validation macro AP is 0.6430083750431579 for S1 and 0.7420321532834496 for S2 at threshold 0.5. The six result hashes and paired-sample checks are frozen in `phase4e_closeout.json`; test was not accessed.
 
 The CROMA decision is `BLOCKED`: its pinned source does not publish positional VV/VH or twelve-band optical semantics, and its batch-dependent README normalization is not established as the checkpoint's pretraining transform. It is not registered. The three official BIFOLD v0.2.0 S1/S2/all safetensors checkpoints and deterministic ConfigILM v0.7.0 `120_nearest` profiles are now pinned. B01 and B09 remain in immutable native data but are excluded from the 10-channel optical and 12-channel joint inputs.
 
 Phase 4D hashed each complete compressed HTTP stream, sequentially decompressed zstd/tar through a strict path/type allowlist, wrote selected members only to quarantine, and atomically promoted each modality after byte-count, publisher-MD5, missing, and duplicate checks passed. Test members use an explicit `sealed_test` namespace and ordinary data access refuses them. The native audit opened all 42 expected rasters from TRAIN only, emitted zero rasters, deleted transient rasters, and preserved test sealing.
 
 **Phase 4E gate:** validation is allowed for the separately registered S1 and S2 BIFOLD v0.2.0 experiments. The preprocessing implementation and profile IDs remain frozen: direct float32 casting with no reflectance scaling, nearest-neighbor resize to 120 × 120, official-training-split fixed mean/std normalization, VV/VH S1 order, ten-band S2 model order, native B01/B09 preservation with model exclusion, and fail-closed required pixels. Test remains refused, joint BIFOLD remains prohibited, and manifest/audit mismatches fail closed.
+
+**Phase 4F gate:** one S2-only head adaptation is registered as `phase4f-bifold-s2-head-adaptation`. The official aligned 19-class `vision_encoder.fc` is retained and is the only trainable module (38,931 trainable / 23,529,984 frozen parameters). `phase4f_plan.json` freezes AdamW 1e-3, weight decay 0.01, batch 128, accumulation 1, 10 maximum epochs, cosine scheduling, validation-mAP early stopping with patience 2, seed 20260906, and threshold 0.5. It uses the frozen S2 package and preprocessing profile, records expanded runtime provenance, and does not expose test, S1 adaptation, joint inference, or fusion.
 
 Implementation gates:
 

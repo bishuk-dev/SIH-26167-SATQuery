@@ -79,6 +79,7 @@ validation baselines:
 ```bash
 python scripts/kaggle/runner.py run phase4e-bifold-s1-validation
 python scripts/kaggle/runner.py run phase4e-bifold-s2-validation
+python scripts/kaggle/runner.py run phase4f-bifold-s2-head-adaptation
 ```
 
 These GPU kernels attach both private materialization notebook outputs directly.

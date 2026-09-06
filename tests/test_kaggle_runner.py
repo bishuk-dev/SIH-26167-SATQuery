@@ -330,6 +330,25 @@ class TestExperimentRegistry:
         assert entry["internet"] is True
         assert len(registry) > 0
 
+    def test_phase4f_s2_head_adaptation_is_single_modality_and_metadata_only(
+        self,
+    ) -> None:
+        entry = runner._load_registry()["phase4f-bifold-s2-head-adaptation"]
+
+        assert entry["notebook"] == "notebooks/kaggle_phase4f_s2_head.ipynb"
+        assert entry["kernel_sources"] == ["satquery-phase4-materialize-s2"]
+        assert entry["result_files"] == [
+            "phase4f_s2_training_result.json",
+            "phase4f_s2_validation_result.json",
+            "phase4f_s2_validation_predictions.jsonl",
+            "phase4f_s2_adapter_or_checkpoint_manifest.json",
+            "phase4f_runner_meta.json",
+        ]
+        assert entry["large_result_files"] == ["phase4f_s2_head.safetensors"]
+        assert entry["download_policy"] == "metadata_only"
+        assert entry["gpu"] is True
+        assert entry["internet"] is True
+
     def test_known_experiments_have_required_fields(self) -> None:
         registry = runner._load_registry()
         required = {"notebook", "kernel_slug", "experiment_dir", "remote_output_dir", "result_files"}

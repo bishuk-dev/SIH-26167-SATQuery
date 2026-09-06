@@ -1,0 +1,106 @@
+{
+  "schema_version": 1,
+  "status": "READY_TO_LAUNCH_NOT_EXECUTED",
+  "experiment": "phase4f-bifold-s2-head-adaptation",
+  "kernel_slug": "satquery-phase4f-bifold-s2-head-adaptation",
+  "goal": "Measure whether one deterministic head-only adaptation on the frozen 12000-pair TRAIN subset improves validation mAP over the frozen official S2 checkpoint.",
+  "splits": {
+    "train": 12000,
+    "validation": 3000,
+    "test": 3001,
+    "test_status": "SEALED"
+  },
+  "manifest_sha256": "615e30273cce8eaa8b0838c07256714a3c874019f6dccd50570cbf1ec4c20bd6",
+  "model": {
+    "model_id": "BIFOLD-BigEarthNetv2-0/resnet50-s2-v0.2.0",
+    "revision": "f5a590cd5876845f62702260ff62ea5a325433bb",
+    "checkpoint_sha256": "f55f8a5416d326c7e3139a97c6866e606dfc2e5cde30d52e2ccc47ce5f8b9be5",
+    "architecture": "ConfigILM timm ResNet-50 image classifier",
+    "adaptation": "Retain and train only vision_encoder.fc; freeze the complete ResNet-50 backbone, including BatchNorm state.",
+    "head_initialization": "Retain the official checkpoint's aligned 19-class head.",
+    "trainable_parameter_names": [
+      "model.vision_encoder.fc.weight",
+      "model.vision_encoder.fc.bias"
+    ],
+    "trainable_parameter_count": 38931,
+    "frozen_parameter_count": 23529984,
+    "total_parameter_count": 23568915,
+    "class_order": [
+      "Agro-forestry areas",
+      "Arable land",
+      "Beaches, dunes, sands",
+      "Broad-leaved forest",
+      "Coastal wetlands",
+      "Complex cultivation patterns",
+      "Coniferous forest",
+      "Industrial or commercial units",
+      "Inland waters",
+      "Inland wetlands",
+      "Land principally occupied by agriculture, with significant areas of natural vegetation",
+      "Marine waters",
+      "Mixed forest",
+      "Moors, heathland and sclerophyllous vegetation",
+      "Natural grassland and sparsely vegetated areas",
+      "Pastures",
+      "Permanent crops",
+      "Transitional woodland, shrub",
+      "Urban fabric"
+    ]
+  },
+  "preprocessing_profile": "bifold_resnet50_s2_v020",
+  "input_bands": ["B02", "B03", "B04", "B05", "B06", "B07", "B08", "B8A", "B11", "B12"],
+  "normalization_statistics": "Use the frozen official-training-split profile; do not recompute.",
+  "training": {
+    "loss": "BCEWithLogitsLoss",
+    "optimizer": "AdamW",
+    "learning_rate": 0.001,
+    "weight_decay": 0.01,
+    "batch_size": 128,
+    "gradient_accumulation_steps": 1,
+    "max_epochs": 10,
+    "scheduler": "CosineAnnealingLR",
+    "scheduler_eta_min": 0.0001,
+    "early_stopping_metric": "validation_macro_average_precision",
+    "early_stopping_mode": "max",
+    "early_stopping_patience": 2,
+    "early_stopping_min_delta": 0.0,
+    "restore_best_epoch": true,
+    "random_seed": 20260906,
+    "threshold": 0.5,
+    "threshold_tuning": false,
+    "hyperparameter_sweep": false
+  },
+  "baseline_link": {
+    "phase4e_closeout": "phase4e_closeout.json",
+    "s2_validation_result_sha256": "82f72da05442ef50d8a5bb5cc59fb3dea2d2346e70b6222fe06c11bf988a1bd4",
+    "macro_average_precision": 0.7420321532834496,
+    "micro_f1": 0.7325822442541685,
+    "macro_f1": 0.6452843453433793
+  },
+  "decision_rule": {
+    "useful_status": "ADAPTATION_USEFUL",
+    "requirements": [
+      "validation macro average precision delta is greater than zero",
+      "validation macro F1 delta is at least -0.02 at the frozen 0.5 threshold",
+      "all integrity and provenance checks pass"
+    ],
+    "macro_f1_severe_regression_guardrail": -0.02,
+    "note": "The mAP criterion requires any positive measured improvement, not an arbitrary five-point gain; the exact delta is always retained."
+  },
+  "resources": {
+    "kaggle_machine_shape": "NvidiaTeslaT4",
+    "expected_gpu_configuration": "T4 x2",
+    "multi_gpu_execution": "torch DataParallel when both GPUs are visible",
+    "estimated_runtime": "15-35 minutes including package verification/extraction, up to 10 epochs, and final validation",
+    "estimated_peak_gpu_memory": "approximately 3-6 GiB per T4 at batch size 128 split across two GPUs"
+  },
+  "outputs": [
+    "phase4f_s2_training_result.json",
+    "phase4f_s2_validation_result.json",
+    "phase4f_s2_validation_predictions.jsonl",
+    "phase4f_s2_adapter_or_checkpoint_manifest.json",
+    "phase4f_runner_meta.json"
+  ],
+  "checkpoint_output": "phase4f_s2_head.safetensors (Kaggle output only; bytes are not committed to Git)",
+  "launch_command": "python scripts/kaggle/runner.py run phase4f-bifold-s2-head-adaptation"
+}

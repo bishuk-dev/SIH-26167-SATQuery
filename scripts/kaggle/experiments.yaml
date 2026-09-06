@@ -132,3 +132,22 @@ phase4e-bifold-s2-validation:
     - satquery-phase4-materialize-s2
   gpu: true
   internet: true
+
+phase4f-bifold-s2-head-adaptation:
+  notebook: notebooks/kaggle_phase4f_s2_head.ipynb
+  kernel_slug: satquery-phase4f-bifold-s2-head-adaptation
+  experiment_dir: experiments/phase4_bigearthnet_multisensor/phase4f/s2
+  remote_output_dir: phase4f-bifold-s2-head-adaptation
+  result_files:
+    - phase4f_s2_training_result.json
+    - phase4f_s2_validation_result.json
+    - phase4f_s2_validation_predictions.jsonl
+    - phase4f_s2_adapter_or_checkpoint_manifest.json
+    - phase4f_runner_meta.json
+  large_result_files:
+    - phase4f_s2_head.safetensors
+  download_policy: metadata_only
+  kernel_sources:
+    - satquery-phase4-materialize-s2
+  gpu: true
+  internet: true

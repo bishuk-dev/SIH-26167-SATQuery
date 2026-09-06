@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "status": "COMPLETE",
+  "manifest_sha256": "615e30273cce8eaa8b0838c07256714a3c874019f6dccd50570cbf1ec4c20bd6",
+  "threshold_policy": "FROZEN_AT_0.5_NOT_TUNED",
+  "test_accessed": false,
+  "s1": {
+    "model_id": "BIFOLD-BigEarthNetv2-0/resnet50-s1-v0.2.0",
+    "sample_count": 3000,
+    "threshold": 0.5,
+    "micro_f1": 0.6521492141639841,
+    "macro_f1": 0.5454367309004353,
+    "macro_average_precision": 0.6430083750431579
+  },
+  "s2": {
+    "model_id": "BIFOLD-BigEarthNetv2-0/resnet50-s2-v0.2.0",
+    "sample_count": 3000,
+    "threshold": 0.5,
+    "micro_f1": 0.7325822442541685,
+    "macro_f1": 0.6452843453433793,
+    "macro_average_precision": 0.7420321532834496,
+    "validation_result_sha256": "82f72da05442ef50d8a5bb5cc59fb3dea2d2346e70b6222fe06c11bf988a1bd4"
+  },
+  "s2_minus_s1": {
+    "micro_f1": 0.08043303009018443,
+    "macro_f1": 0.09984761444294399,
+    "macro_average_precision": 0.09902377824029174
+  },
+  "artifact_sha256": {
+    "s1_runner_meta": "e0ab6e6b0aa6f4d0162c2fa312e467bf61b1a67ebba0ccd5da2aca02628cb63d",
+    "s1_validation_result": "c5de9a4734fb16a17fb65fc75e5018d286fe9edacc2b31b4cd052c7ae79aa986",
+    "s1_predictions": "b46d6048d28d5fbba768d87c45207beecbdf08137b1420a1fb4f124d812a6c6e",
+    "s2_runner_meta": "e64e7299428c02e69164ce8346d568f3a2e27f81432ac9bb47f89cf61da5735e",
+    "s2_validation_result": "82f72da05442ef50d8a5bb5cc59fb3dea2d2346e70b6222fe06c11bf988a1bd4",
+    "s2_predictions": "986c60f9591ded6b15497ff2d42d9a956c06290e499881a517c6e392dd5de1a6"
+  },
+  "paired_validation_checks": {
+    "same_3000_sample_ids": true,
+    "same_targets": true,
+    "s2_ap_exceeds_s1_for_all_19_classes": true,
+    "s1_fixed_threshold_f1_exceeds_s2_only_for": [
+      "Agro-forestry areas",
+      "Inland waters",
+      "Industrial or commercial units"
+    ],
+    "interpretation": "The three threshold-dependent F1 differences are not evidence that SAR is superior for those classes."
+  },
+  "runtime_metadata_limitation": "Phase 4E did not retain runtime, device, CUDA, PyTorch, Python, or peak-memory metadata and is not rerun solely to recover it."
+}
