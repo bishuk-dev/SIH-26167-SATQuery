@@ -1,0 +1,9 @@
+{
+  "experiment": "phase4-e02-bitemporal-vqa",
+  "task": "bitemporal_change_description",
+  "primary_benchmark": "LEVIR-CC",
+  "model_id": "HuggingFaceTB/SmolVLM-256M-Instruct",
+  "device": "cuda",
+  "cuda_available": true,
+  "status": "success"
+}
