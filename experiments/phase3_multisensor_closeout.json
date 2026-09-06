@@ -1,0 +1,93 @@
+{
+  "schema_version": 1,
+  "canonical_phase": "PHASE 3 — MULTISENSOR INTELLIGENCE",
+  "status": "COMPLETE",
+  "historical_workstreams": {
+    "old_phase4a": {"artifact": "phase4_bigearthnet_multisensor/source_audit.json", "purpose": "BigEarthNet v2 source and provenance audit"},
+    "old_phase4b": {"artifact": "phase4_bigearthnet_multisensor/preparation_report.json", "purpose": "metadata preparation and frozen split selection"},
+    "old_phase4c": {"artifact": "phase4_bigearthnet_multisensor/input_contract_audit.json", "purpose": "input-contract and model-family audit"},
+    "old_phase4d": {"artifact": "phase4_bigearthnet_multisensor/results/representative_raster_audit.json", "purpose": "native TRAIN raster audit"},
+    "old_phase4e": {"artifact": "phase4_bigearthnet_multisensor/phase4e_closeout.json", "purpose": "official S1 and S2 validation baselines"},
+    "old_phase4f": {"artifact": "phase4_bigearthnet_multisensor/phase4f_closeout.json", "purpose": "one S2 classifier-head adaptation"},
+    "old_phase5a": {"artifact": "phase4_bigearthnet_multisensor/phase5a/results/phase5a_joint_validation_result.json", "purpose": "official S1+S2 controlled validation and complementarity audit"}
+  },
+  "source_provenance": {
+    "dataset": "BigEarthNet v2.0.0",
+    "canonical_record": "https://zenodo.org/records/10891137",
+    "doi": "10.5281/zenodo.10891137",
+    "license": "Community Data License Agreement - Permissive, Version 1.0",
+    "source_audit_sha256": "76d33b057a5e138ae090a8924ebbc62e79029fbf0e1665b0ff3f4c41df063dea"
+  },
+  "frozen_data_contract": {
+    "manifest_sha256": "615e30273cce8eaa8b0838c07256714a3c874019f6dccd50570cbf1ec4c20bd6",
+    "validation_sample_count": 3000,
+    "s1_materialization_package_sha256": "c0973f4a05ec2453a9158f766a31f267798810647eec810b6866561562a450b8",
+    "s2_materialization_package_sha256": "2df8b97deeead5cc8a62738484b2e61f8bb32154db6b60e29db20625094962e1",
+    "native_train_raster_audit_sha256": "e01649bf106b546ff65d40300fcaf9b231c5e8f89e43992bb8fe90be5692bf4e",
+    "native_raster_audit_scope": "Exactly three predeclared TRAIN pairs; representative evidence only, not a claim about every dataset raster."
+  },
+  "frozen_bifold_contract": {
+    "s1": {"model_id": "BIFOLD-BigEarthNetv2-0/resnet50-s1-v0.2.0", "revision": "d417b3c32f2172cbceb14e5b106dd9aa7b77c647", "checkpoint_sha256": "87990ba9058bc5413b90d7dc955ed1077cf8c54530db393801336209252b3739", "preprocessing_profile": "bifold_resnet50_s1_v020"},
+    "s2": {"model_id": "BIFOLD-BigEarthNetv2-0/resnet50-s2-v0.2.0", "revision": "f5a590cd5876845f62702260ff62ea5a325433bb", "checkpoint_sha256": "f55f8a5416d326c7e3139a97c6866e606dfc2e5cde30d52e2ccc47ce5f8b9be5", "preprocessing_profile": "bifold_resnet50_s2_v020"},
+    "joint": {"model_id": "BIFOLD-BigEarthNetv2-0/resnet50-all-v0.2.0", "revision": "762acdc186cce6b31ecbc896ddab1721847d4c5e", "checkpoint_sha256": "b7e5e58d2cf1e384ba9362ac6ce75c117dee159198eac5675927cba3c3960332", "preprocessing_profile": "bifold_resnet50_all_v020", "input_order": ["VV", "VH", "B02", "B03", "B04", "B05", "B06", "B07", "B08", "B8A", "B11", "B12"]},
+    "preprocessing_policy": "Direct float32 cast without reflectance scaling, nearest-neighbor 120x120 resampling, fixed official-training-split per-band normalization, and fail-closed required invalid/NoData pixels."
+  },
+  "official_controlled_validation": {
+    "threshold": 0.5,
+    "s1": {"macro_average_precision": 0.6430083750431579, "micro_f1": 0.6521492141639841, "macro_f1": 0.5454367309004353},
+    "s2": {"macro_average_precision": 0.7420321532834496, "micro_f1": 0.7325822442541685, "macro_f1": 0.6452843453433793},
+    "joint_s1_s2": {"macro_average_precision": 0.7425103702661673, "micro_f1": 0.7340750044859142, "macro_f1": 0.6390323602909698},
+    "joint_minus_s2": {"macro_average_precision": 0.0004782169827176608, "micro_f1": 0.0014927602317457156, "macro_f1": -0.006251985052409537}
+  },
+  "phase5a_decision": {
+    "pre_frozen_rule": "joint mAP > official S2 mAP",
+    "formal_decision": "MULTISENSOR_GLOBAL_BENEFIT",
+    "scientific_interpretation": "MARGINAL_GLOBAL_BENEFIT_WITH_CLASS_CONDITIONAL_COMPLEMENTARITY",
+    "claim_boundary": "This is not a broad or strong fusion improvement."
+  },
+  "complementarity": {
+    "joint_ap_improves_over_s2_class_count": 12,
+    "joint_ap_degrades_vs_s2_class_count": 7,
+    "largest_positive_joint_minus_s2_ap": {
+      "Coastal wetlands": 0.11952431040141942,
+      "Beaches, dunes, sands": 0.03871565031360258,
+      "Inland waters": 0.03811040260923826,
+      "Complex cultivation patterns": 0.02317913904618152,
+      "Permanent crops": 0.01567073458836954,
+      "Broad-leaved forest": 0.013031944506746052
+    },
+    "important_negative_joint_minus_s2_ap": {
+      "Moors, heathland and sclerophyllous vegetation": -0.14331016524361334,
+      "Industrial or commercial units": -0.07027564182663149
+    },
+    "paired_label_comparison": {"joint_rescue_over_s2": 1494, "joint_harm_vs_s2": 1488, "both_correct": 49578, "both_wrong": 4440},
+    "scene_level_multilabel_f1": {"joint_gt_s2": 809, "s2_gt_joint": 792, "tie": 1399, "definition": "Per-sample multilabel F1 over 19 threshold-0.5 binary decisions; empty-target/empty-prediction scenes score 0."},
+    "causal_caution": "A joint-model rescue is associated with the additional S1 input. The output comparison alone does NOT establish that SAR caused the correction."
+  },
+  "adapted_s2_secondary_comparison": {
+    "role": "Not part of the primary controlled S1/S2/joint comparison.",
+    "adapted_s2_macro_average_precision": 0.7496551979598234,
+    "official_joint_macro_average_precision": 0.7425103702661673,
+    "adapted_s2_minus_official_joint_macro_average_precision": 0.0071448276936561,
+    "interpretation": "Simple optical adaptation produced a larger overall validation improvement than the official joint S1+S2 checkpoint. This does not establish that SAR is unnecessary."
+  },
+  "product_conclusion": "On the frozen BigEarthNet v2 validation split, optical S2 is the stronger standalone modality. The official joint S1+S2 model provides only marginal global improvement over official S2, while producing meaningful class-specific gains and losses. SAR therefore provides conditional complementary evidence rather than a universally beneficial signal. SatQuery should use sensor-aware, task-aware evidence selection and disagreement handling instead of assuming multimodal fusion is always superior. The language model may explain evidence; it may not manufacture evidence.",
+  "test_sealing": {"status": "SEALED", "test_pixels_opened": false, "final_test_executed": false},
+  "known_limitations": [
+    "The joint global mAP improvement is marginal and macro F1 declined versus official S2.",
+    "The Phase 4F adaptation is one seed and is not a statistical replication claim.",
+    "Output comparisons are not causal attribution for SAR.",
+    "No joint adaptation, S1 training, threshold tuning, missing-modality experiment, cloud simulation, or final test evaluation was performed.",
+    "CROMA remains blocked because its checkpoint channel semantics and preprocessing contract were not sufficiently established."
+  ],
+  "historical_artifact_sha256": {
+    "phase4b_preparation_report": "6ac1c53d0edab11c1f3d731424b6a270230e3f14fb24df21830a7a36006cc957",
+    "phase4c_input_contract_audit": "369a822e9cc1ce2a01ac15f6f5f30d2e10c89fc1409d4835d703fa7981e82f81",
+    "phase4e_closeout": "8f7b34976e1dc0a8c33a68c01d38d37cd5d7a4928ca541f8ec7649e5d0de0900",
+    "phase4f_closeout": "626bb6c16829097aeb5c5594603a2ca534d8702e796ebf99d3ff1b3ec9c189fa",
+    "phase5a_joint_validation_result": "e613fb55ccec1599b76319be7cdc03c54052d961b10c19d60e32753412d6dae3",
+    "phase5a_joint_validation_predictions": "41c68448e00dca3a21314866ac9633efed140e03f25dbcaad390084b42246f78",
+    "phase5a_complementarity_report": "fd7e416a50f49ef7327c57976eab102d3cf10057e209f3d14f9a12a8d0879c56",
+    "phase5a_runner_meta": "43cceacd67c84e5c5978e126a85c600df38344dda06fd3ec9006c0916e65a583"
+  }
+}

@@ -199,22 +199,29 @@ declined, with early stopping complete after epoch 4. This does not authorize
 further tuning. The retained head artifact is `phase4f_s2_head.safetensors`,
 SHA-256 `0a5c1b6ff095f1944f06dfc39eaddac37c68e9bce51e1880785ba9ae9a7592bb`.
 
-## Phase 5A prepared official joint control
+## Historical Phase 5A completed official joint control
 
-`phase5a-bifold-joint-validation` is registered but not launched. It evaluates
+`phase5a-bifold-joint-validation` evaluated
 the official S1, S2, and 12-channel S1+S2 BIFOLD checkpoints on the same frozen
 3,000 validation samples, threshold 0.5, and frozen manifest. The joint arm
 requires both verified Kaggle materialization packages, verifies their hashes,
 uses `bifold_resnet50_all_v020` with `VV, VH, B02, B03, B04, B05, B06, B07,
 B08, B8A, B11, B12`, and refuses adapted checkpoints and all test access.
 
-After joint inference, its complementarity report will fail closed unless the
-three prediction files have identical IDs, targets, counts, and 19-class order.
-It will report global/per-class AP and F1, paired label rescues/harms, and
-scene-level multilabel-F1 comparisons. The Phase 4F adapted S2 mAP is an
-explicitly secondary reference, not a primary comparator. The frozen decision
-rule is in `phase5a_plan.json`; no minimum percentage-point threshold is
-invented.
+The result meets the pre-frozen formal decision `MULTISENSOR_GLOBAL_BENEFIT`:
+joint mAP 0.7425103702661673 exceeds official S2 by 0.0004782169827176608.
+Scientifically, it is frozen as
+`MARGINAL_GLOBAL_BENEFIT_WITH_CLASS_CONDITIONAL_COMPLEMENTARITY`, not a broad
+or strong fusion improvement: macro F1 declined by 0.006251985052409537, while
+joint AP improved for 12 of 19 classes and degraded for 7. The paired audit
+records 1,494 joint rescues and 1,488 harms versus S2; output comparison alone
+does not establish that SAR caused any correction. The Phase 4F adapted S2 mAP
+is an explicitly secondary reference, not a primary comparator.
+
+All historical Phase 4A–4F and Phase 5A work is canonically closed as Phase 3
+— Multisensor Intelligence in `../phase3_multisensor_closeout.json`. Test
+remains sealed; no final test evaluation, joint adaptation, S1 training, or
+threshold tuning is authorized.
 
 ## Artifact map
 
@@ -238,6 +245,10 @@ invented.
 - `phase4f_plan.json` — frozen head-only strategy, parameter counts, hyperparameters, decision rule, outputs, and launch identity.
 - `phase4f_closeout.json` — completed one-seed S2 adaptation metrics, dynamics, provenance, test sealing, checkpoint identity, and hashes for every recovered JSON/JSONL artifact.
 - `phase5a_plan.json` — pre-execution official S1/S2/joint comparison contract, package and manifest hashes, complementarity audit, and frozen decision rule.
+- `phase5a/results/phase5a_joint_validation_result.json` — frozen official joint validation output.
+- `phase5a/results/phase5a_complementarity_report.json` — complete official S1/S2/joint paired audit.
+- `phase5a/results/phase5a_runner_meta.json` — joint-run device, software, model, package, manifest, and test-sealing provenance.
+- `../phase3_multisensor_closeout.json` — canonical Phase 3 conclusion, historical-workstream references, frozen decisions, limitations, and artifact hashes.
 
 ## Reproduce Phase 4B
 
@@ -269,15 +280,10 @@ python -m ml.evaluation.probe_phase4_materialization
 
 ## Exact next step
 
-Phase 4F is complete. After committing this preparation, the only authorized
-next execution is the validation-only Phase 5A control:
-
-```bash
-python scripts/kaggle/runner.py run phase5a-bifold-joint-validation
-```
-
-Do not run it as part of closeout. Do not adapt S1 or joint BIFOLD, open test
-pixels, tune thresholds, construct learned fusion, or start further Phase 5 work.
+Canonical Phase 3 is complete. The next canonical implementation phase is
+Phase 4 — Temporal + Deterministic Remote-Sensing Analytics. Do not start it
+as part of this closeout. Do not adapt S1 or joint BIFOLD, open test pixels,
+tune thresholds, construct learned fusion, or create Phase 5B.
 
 ## Primary sources
 

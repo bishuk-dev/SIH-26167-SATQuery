@@ -1,0 +1,23 @@
+{
+  "git_sha": "4e084e185706edb617604ab8b77e6b00440e8a3d",
+  "experiment": "phase5a-bifold-joint-validation",
+  "reproducible": true,
+  "dirty_worktree": false,
+  "kernel_slug": "satquery-phase5a-bifold-joint-validation",
+  "runtime_seconds": 157.22496225999998,
+  "gpu_devices": [
+    "Tesla T4",
+    "Tesla T4"
+  ],
+  "cuda_version": "12.8",
+  "torch_version": "2.10.0+cu128",
+  "python_version": "3.12.13",
+  "peak_gpu_memory_bytes_per_device_max": 244346880,
+  "model_revision": "762acdc186cce6b31ecbc896ddab1721847d4c5e",
+  "checkpoint_sha256": "b7e5e58d2cf1e384ba9362ac6ce75c117dee159198eac5675927cba3c3960332",
+  "s1_materialized_package_sha256": "c0973f4a05ec2453a9158f766a31f267798810647eec810b6866561562a450b8",
+  "s2_materialized_package_sha256": "2df8b97deeead5cc8a62738484b2e61f8bb32154db6b60e29db20625094962e1",
+  "manifest_sha256": "615e30273cce8eaa8b0838c07256714a3c874019f6dccd50570cbf1ec4c20bd6",
+  "preprocessing_profile": "bifold_resnet50_all_v020",
+  "test_accessed": false
+}
