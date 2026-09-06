@@ -1,0 +1,35 @@
+{
+  "integrity_correction": {
+    "timestamp": "2026-09-06T20:00:00Z",
+    "event": "Phase 4 integrity repair",
+    "action": "REOPEN_PHASE4_FOR_INTEGRITY_REPAIR",
+    "reason": "Initial P4-E02 and P4-E04 outputs were generated from synthetic/placeholder paths and were rejected before scientific closeout. Corrected benchmark runners now fail closed and use only traceable real dataset evidence.",
+    "rejected_artifacts": [
+      {
+        "experiment": "P4-E02",
+        "artifact": "experiments/phase4_bitemporal_vqa/results/validation_metrics.json",
+        "reason": "Hardcoded placeholder metrics (accuracy=1.0, exact_match_score=0.95, sample_count=4) generated from synthetic solid-color fixtures, not real LEVIR-CC validation inference.",
+        "status": "INVALID_PLACEHOLDER_RESULT"
+      },
+      {
+        "experiment": "P4-E04",
+        "artifact": "experiments/phase4_sar_validation/results/sar_validation_metrics.json",
+        "reason": "Hardcoded placeholder metrics (post_event_water_iou=0.884, post_event_water_accuracy=0.942, total_samples=50) generated without real Modified Sen1Floods11 dataset execution.",
+        "status": "INVALID_PLACEHOLDER_RESULT"
+      }
+    ],
+    "corrective_actions": [
+      "Removed synthetic Image.new fixtures from P4-E02 baseline",
+      "Fixed TemporalVqaTool dummy-image bug",
+      "Fixed BiTemporalChangeVQABackend model-failure semantics",
+      "Enforced LEVIR-CC test split sealing",
+      "Repaired generic sensor semantic band resolution",
+      "Removed Sentinel-1 hardcoding from SAR analytics",
+      "Fixed SAR radiometric domain contract",
+      "Fixed newly inundated flood semantics",
+      "Bound temporal analysis to verified spatial alignment"
+    ],
+    "current_phase4_status": "IN_PROGRESS_INTEGRITY_REPAIR",
+    "target_phase4_status": "BLOCKED_ON_REAL_EXTERNAL_EVALUATION"
+  }
+}

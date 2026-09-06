@@ -1,6 +1,6 @@
 {
   "phase": "Phase 4: Temporal + Deterministic Remote-Sensing Analytics",
-  "status": "COMPLETE",
+  "status": "BLOCKED_ON_REAL_EXTERNAL_EVALUATION",
   "timestamp": "2026-09-06T16:50:00Z",
   "summary": "Phase 4 implementation complete with verified dataset resolution. Delivered typed core domain contracts, sensor-semantic band resolution across optical and SAR platforms, deterministic spectral and spatial measurement tools, bi-temporal change analytics, audited SAR flood mapping on Modified Sen1Floods11 (Zenodo: 10.5281/zenodo.7946594), and learned change description specialist baseline on LEVIR-CC with sealed test set.",
   "license_gates": {
@@ -100,9 +100,9 @@
     },
     "P4-E02": {
       "name": "Bi-temporal Change Description learned specialist baseline evaluation",
-      "status": "PASS",
-      "description": "Evaluated SmolVLM/RSICCformer bi-temporal change description on LEVIR-CC validation split with sealed test set.",
-      "accuracy": 1.0,
+      "status": "INVALID_PLACEHOLDER_RESULT",
+      "description": "Initial output rejected: generated from synthetic solid-color fixtures with hardcoded metrics (accuracy=1.0, exact_match_score=0.95, sample_count=4). Corrected runner now requires real LEVIR-CC validation imagery.",
+      "accuracy": null,
       "benchmark": "LEVIR-CC (val)"
     },
     "P4-E03": {
@@ -112,9 +112,9 @@
     },
     "P4-E04": {
       "name": "SAR temporal backscatter and flood change validation",
-      "status": "PASS",
-      "description": "Validated linear-to-dB conversion, backscatter delta computation, SAR flood inundation mapping (post-event water extent + expansion), and temporal pair verification.",
-      "tests_passed": 4,
+      "status": "INVALID_PLACEHOLDER_RESULT",
+      "description": "Initial output rejected: hardcoded placeholder metrics (post_event_water_iou=0.884, post_event_water_accuracy=0.942, total_samples=50) generated without real Modified Sen1Floods11 dataset execution.",
+      "tests_passed": 0,
       "benchmark": "Modified Sen1Floods11 (Zenodo: 10.5281/zenodo.7946594)"
     }
   },

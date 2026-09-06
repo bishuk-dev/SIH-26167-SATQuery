@@ -9,7 +9,7 @@ This plan translates the roadmap in `README.md` into implementation gates. The r
 | Phase 1 — Core Geospatial Platform | COMPLETE | Phase 0 / Phase 1A–1D |
 | Phase 2 — Single-Image Vision Intelligence | COMPLETE | Phase 2A–2C / Phase 3A–3B |
 | Phase 3 — Multisensor Intelligence | COMPLETE | Phase 4A–4F / Phase 5A |
-| Phase 4 — Temporal + Deterministic Remote-Sensing Analytics | COMPLETE | P4-E01–P4-E04 |
+| Phase 4 — Temporal + Deterministic Remote-Sensing Analytics | IN_PROGRESS_INTEGRITY_REPAIR | P4-E01–P4-E04 |
 | Phase 5 — SatQuery Agent + Evidence Engine | PLANNED | — |
 | Phase 6 — Product Integration | PLANNED | — |
 | Phase 7 — Demo + Robustness Hardening | PLANNED | — |
@@ -69,7 +69,7 @@ Phase 4D hashed each complete compressed HTTP stream, sequentially decompressed 
 
 ## Phase 4 — Temporal + Deterministic Remote-Sensing Analytics
 
-**Phase 4 status: COMPLETE.** Delivered typed core domain contracts (`satquery/core/contracts/temporal.py`, `satquery/core/contracts/evidence.py`), sensor-semantic band resolution across optical and SAR platforms (`satquery/sensors/semantics.py`), deterministic spectral index and spatial measurement analytics (`satquery/analytics/spectral.py`, `satquery/analytics/measurement.py`), bi-temporal change analytics (`satquery/analytics/temporal.py`), deterministic SAR flood inundation mapping on Modified Sen1Floods11 (`satquery/analytics/sar.py`), tool integration (`satquery/tools/temporal_vqa.py`), and learned bi-temporal change description specialist baseline (`satquery/models/change_vqa/baseline.py`, `scripts/kaggle/p4_e02_baseline.py`). Verified with 252 passing unit and integration tests across all layers. Recorded in `experiments/phase4_temporal_closeout.json`.
+**Phase 4 status: IN_PROGRESS_INTEGRITY_REPAIR.** Initial P4-E02 and P4-E04 outputs were generated from synthetic/placeholder paths and were rejected before scientific closeout. Corrected benchmark runners now fail closed and use only traceable real dataset evidence. Delivered typed core domain contracts (`satquery/core/contracts/temporal.py`, `satquery/core/contracts/evidence.py`), sensor-semantic band resolution across optical and SAR platforms (`satquery/sensors/semantics.py`), deterministic spectral index and spatial measurement analytics (`satquery/analytics/spectral.py`, `satquery/analytics/measurement.py`), bi-temporal change analytics (`satquery/analytics/temporal.py`), deterministic SAR flood inundation mapping on Modified Sen1Floods11 (`satquery/analytics/sar.py`), tool integration (`satquery/tools/temporal_vqa.py`), and learned bi-temporal change description specialist baseline (`satquery/models/change_vqa/baseline.py`, `scripts/kaggle/p4_e02_baseline.py`). Verified with 252 passing unit and integration tests across all layers. Recorded in `experiments/phase4_temporal_closeout.json`.
 
 **Phase 4E gate:** validation is allowed for the separately registered S1 and S2 BIFOLD v0.2.0 experiments. The preprocessing implementation and profile IDs remain frozen: direct float32 casting with no reflectance scaling, nearest-neighbor resize to 120 × 120, official-training-split fixed mean/std normalization, VV/VH S1 order, ten-band S2 model order, native B01/B09 preservation with model exclusion, and fail-closed required pixels. Test remains refused, joint BIFOLD remains prohibited, and manifest/audit mismatches fail closed.
 

@@ -38,97 +38,137 @@ def run_p4_e02_evaluation(output_dir: Path) -> dict[str, Any]:
         backend = load_change_vqa_model(settings=settings)
         model_loaded = True
     except Exception as exc:
-        print(f"[P4-E02] Warning: Could not load model: {exc}")
-        backend = None
-        model_loaded = False
+        print(f"[P4-E02] Model load failed: {exc}")
+        failure_meta = {
+            "experiment": "P4-E02",
+            "task": "bitemporal_change_description",
+            "device": device,
+            "status": "MODEL_UNAVAILABLE",
+            "failure_reason": str(exc),
+            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        }
+        failure_path = output_dir / "evaluation_failure.json"
+        with open(failure_path, "w", encoding="utf-8") as f:
+            json.dump(failure_meta, f, indent=2)
+        print("[P4-E02] Aborting: cannot evaluate without loaded model.")
+        return failure_meta
 
-    # Synthetic / benchmark test fixtures for reproducible evaluation
-    test_fixtures = [
-        {
-            "fixture_id": "fix_veg_loss_01",
-            "question": "What changed in the vegetation area?",
-            "expected_ground_truth": "Vegetation decreased significantly.",
-            "category": "vegetation_loss",
-            "img_t1_color": (30, 160, 30),  # Dense green
-            "img_t2_color": (160, 120, 50),  # Cleared ground
-        },
-        {
-            "fixture_id": "fix_water_gain_01",
-            "question": "Has there been any flood or new water body?",
-            "expected_ground_truth": "New water body appeared due to flooding.",
-            "category": "water_appearance",
-            "img_t1_color": (150, 150, 150),  # Dry land
-            "img_t2_color": (20, 50, 180),   # Water
-        },
-        {
-            "fixture_id": "fix_urban_growth_01",
-            "question": "What human activity or land cover change occurred?",
-            "expected_ground_truth": "New buildings were constructed.",
-            "category": "urban_expansion",
-            "img_t1_color": (40, 120, 40),
-            "img_t2_color": (200, 200, 200),
-        },
-        {
-            "fixture_id": "fix_no_change_01",
-            "question": "Did any significant change happen?",
-            "expected_ground_truth": "No significant change.",
-            "category": "no_change",
-            "img_t1_color": (100, 100, 100),
-            "img_t2_color": (100, 100, 100),
-        },
-    ]
+    from satquery.analytics.temporal import TemporalAnalytics
+
+    levir_cc_root = os.environ.get("LEVIR_CC_ROOT", "")
+    if not levir_cc_root or not Path(levir_cc_root).exists():
+        failure_meta = {
+            "experiment": "P4-E02",
+            "task": "bitemporal_change_description",
+            "device": device,
+            "status": "DATASET_UNAVAILABLE",
+            "failure_reason": f"LEVIR_CC_ROOT not set or missing: {levir_cc_root}",
+            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        }
+        failure_path = output_dir / "evaluation_failure.json"
+        with open(failure_path, "w", encoding="utf-8") as f:
+            json.dump(failure_meta, f, indent=2)
+        print("[P4-E02] Aborting: real LEVIR-CC dataset unavailable.")
+        return failure_meta
+
+    levir_root = Path(levir_cc_root)
+    val_image_dirs = sorted([d for d in levir_root.glob("val/A") if d.is_dir()])
+    if not val_image_dirs:
+        failure_meta = {
+            "experiment": "P4-E02",
+            "task": "bitemporal_change_description",
+            "device": device,
+            "status": "DATASET_UNAVAILABLE",
+            "failure_reason": "No val/A directory found in LEVIR_CC_ROOT",
+            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        }
+        failure_path = output_dir / "evaluation_failure.json"
+        with open(failure_path, "w", encoding="utf-8") as f:
+            json.dump(failure_meta, f, indent=2)
+        print("[P4-E02] Aborting: LEVIR-CC validation directory missing.")
+        return failure_meta
+
+    val_a_dir = val_image_dirs[0]
+    val_b_dir = levir_root / "val" / "B"
+    if not val_b_dir.exists():
+        failure_meta = {
+            "experiment": "P4-E02",
+            "task": "bitemporal_change_description",
+            "device": device,
+            "status": "DATASET_UNAVAILABLE",
+            "failure_reason": "LEVIR-CC val/B directory missing",
+            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        }
+        failure_path = output_dir / "evaluation_failure.json"
+        with open(failure_path, "w", encoding="utf-8") as f:
+            json.dump(failure_meta, f, indent=2)
+        print("[P4-E02] Aborting: LEVIR-CC val/B directory missing.")
+        return failure_meta
+
+    image_pairs: list[dict[str, Any]] = []
+    for img_path in sorted(val_a_dir.glob("*.png")):
+        stem = img_path.stem
+        pair_b = val_b_dir / f"{stem}.png"
+        if pair_b.exists():
+            image_pairs.append({
+                "pair_id": stem,
+                "t1_path": str(img_path),
+                "t2_path": str(pair_b),
+            })
+    if not image_pairs:
+        failure_meta = {
+            "experiment": "P4-E02",
+            "task": "bitemporal_change_description",
+            "device": device,
+            "status": "DATASET_UNAVAILABLE",
+            "failure_reason": "No matching image pairs found in LEVIR-CC validation split",
+            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        }
+        failure_path = output_dir / "evaluation_failure.json"
+        with open(failure_path, "w", encoding="utf-8") as f:
+            json.dump(failure_meta, f, indent=2)
+        print("[P4-E02] Aborting: no LEVIR-CC validation pairs found.")
+        return failure_meta
 
     predictions: list[dict[str, Any]] = []
-    correct_count = 0
-
-    for fix in test_fixtures:
-        img1 = Image.new("RGB", (256, 256), color=fix["img_t1_color"])
-        img2 = Image.new("RGB", (256, 256), color=fix["img_t2_color"])
-
-        if backend is not None and model_loaded:
-            # Evaluate change description (LEVIR-CC task)
+    for pair in image_pairs:
+        try:
+            img_t1 = Image.open(pair["t1_path"]).convert("RGB")
+            img_t2 = Image.open(pair["t2_path"]).convert("RGB")
             desc_res = backend.describe_changes(
-                img1,
-                img2,
-                pair_id=fix["fixture_id"],
+                img_t1,
+                img_t2,
+                pair_id=pair["pair_id"],
                 evaluation_split="val",
             )
             pred_text = desc_res.description
-        else:
-            # Deterministic fallback response when offline
-            pred_text = f"Deterministic change description for {fix['category']}."
+            record = {
+                "pair_id": pair["pair_id"],
+                "category": "real_levircc",
+                "question": "Describe the visual differences and changes between Image 1 (T1 before) and Image 2 (T2 after) in detail.",
+                "expected_ground_truth": "",
+                "predicted_answer": pred_text,
+                "matched_ground_truth": False,
+                "dataset_source": "LEVIR-CC",
+                "evaluation_split": "val",
+                "t1_path": pair["t1_path"],
+                "t2_path": pair["t2_path"],
+            }
+            predictions.append(record)
+        except Exception as exc:
+            print(f"[P4-E02] Warning: pair {pair['pair_id']} failed: {exc}")
+            continue
 
-        # Compute simple keyword match metric against reference caption
-        key_terms = fix["expected_ground_truth"].lower().split()
-        match = any(term in pred_text.lower() for term in key_terms if len(term) > 3)
-        if match:
-            correct_count += 1
-
-        record = {
-            "fixture_id": fix["fixture_id"],
-            "category": fix["category"],
-            "question": fix["question"],
-            "expected_ground_truth": fix["expected_ground_truth"],
-            "predicted_answer": pred_text,
-            "matched_ground_truth": match,
-            "dataset_source": "LEVIR-CC",
-            "evaluation_split": "val",
-        }
-        predictions.append(record)
-
-    accuracy = float(correct_count / len(test_fixtures)) if test_fixtures else 0.0
+    sample_count = len(predictions)
     elapsed = time.time() - start_time
 
     metrics = {
         "experiment": "P4-E02",
         "task": "bitemporal_change_description",
-        "model_id": "smolvlm_bitemporal_change_vqa_v1",
+        "model_id": "HuggingFaceTB/SmolVLM-256M-Instruct",
         "device": device,
-        "sample_count": len(test_fixtures),
-        "accuracy": accuracy,
-        "exact_match_score": accuracy,
-        "execution_time_seconds": elapsed,
-        "status": "PASS" if model_loaded or len(predictions) > 0 else "FAIL",
+        "sample_count": sample_count,
+        "status": "PASS" if sample_count > 0 else "FAIL",
         "license_gates": {
             "cdvqa_annotation_license": "Apache-2.0",
             "second_dataset_access": "public",
@@ -146,20 +186,18 @@ def run_p4_e02_evaluation(output_dir: Path) -> dict[str, Any]:
                 "test": 1930,
             },
         },
+        "execution_time_seconds": elapsed,
     }
 
-    # Save metrics JSON
     metrics_path = output_dir / "validation_metrics.json"
     with open(metrics_path, "w", encoding="utf-8") as f:
         json.dump(metrics, f, indent=2)
 
-    # Save predictions JSONL
     preds_path = output_dir / "validation_predictions.jsonl"
     with open(preds_path, "w", encoding="utf-8") as f:
         for p in predictions:
             f.write(json.dumps(p) + "\n")
 
-    # Save runner metadata JSON
     runner_meta = {
         "experiment": "P4-E02",
         "task": "bitemporal_change_description",
@@ -168,11 +206,13 @@ def run_p4_e02_evaluation(output_dir: Path) -> dict[str, Any]:
         "cuda_available": torch.cuda.is_available(),
         "gpu_name": torch.cuda.get_device_name(0) if torch.cuda.is_available() else "None",
         "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "sample_count": sample_count,
+        "status": "PASS" if sample_count > 0 else "FAIL",
     }
     with open(output_dir / "runner_meta.json", "w", encoding="utf-8") as f:
         json.dump(runner_meta, f, indent=2)
 
-    print(f"[P4-E02] Completed evaluation in {elapsed:.2f}s. Accuracy: {accuracy:.2%}")
+    print(f"[P4-E02] Completed evaluation in {elapsed:.2f}s. Samples: {sample_count}")
     return metrics
 
 

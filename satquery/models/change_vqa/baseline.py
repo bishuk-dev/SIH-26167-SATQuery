@@ -161,7 +161,7 @@ class BiTemporalChangeVQABackend:
             return ChangeVQAResult(
                 query=question,
                 answer=answer if answer else "No change detected.",
-                confidence=None,  # Uncalibrated raw LLM generation
+                confidence=None,
                 pair_id=pair_id,
                 supporting_evidence_ids=supporting_evidence_ids,
                 model_provenance=model_provenance,
@@ -170,24 +170,14 @@ class BiTemporalChangeVQABackend:
                     "Numeric change claims require verification by deterministic GIS analytics.",
                 ),
             )
+        except ModelUnavailableError:
+            raise
+        except ModelExecutionError:
+            raise
         except Exception as exc:
-            # High quality fallback when offline or CPU execution fails
-            fallback_answer = (
-                f"Bi-temporal Change-VQA specialist offline ({exc}). "
-                "Refer to deterministic spectral and SAR change evidence."
-            )
-            return ChangeVQAResult(
-                query=question,
-                answer=fallback_answer,
-                confidence=None,
-                pair_id=pair_id,
-                supporting_evidence_ids=supporting_evidence_ids,
-                model_provenance=model_provenance,
-                limitations=(
-                    "Model execution unavailable in current runtime environment.",
-                    "Falling back to deterministic GIS evidence.",
-                ),
-            )
+            raise ModelExecutionError(
+                f"Bi-temporal Change-VQA inference failed: {exc}"
+            ) from exc
 
     def describe_changes(
         self,

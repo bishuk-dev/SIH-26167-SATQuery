@@ -91,7 +91,7 @@ class TemporalAnalytics:
         *,
         loss_threshold: float = 0.20,
         gain_threshold: float = 0.20,
-        detect_mode: str = "loss",  # "loss", "gain", or "both"
+        detect_mode: str = "loss",
         sensor_t1: str | None = None,
         sensor_t2: str | None = None,
         pair_id: str = "temporal_pair",
@@ -109,6 +109,9 @@ class TemporalAnalytics:
 
         if ndvi_t1.shape != ndvi_t2.shape:
             raise MeasurementError(f"Raster dimensions do not match for temporal change: {ndvi_t1.shape} vs {ndvi_t2.shape}")
+
+        from affine import Affine as _Affine
+        _ = _Affine(*transform) if not isinstance(transform, _Affine) else transform
 
         valid_both = np.isfinite(ndvi_t1) & np.isfinite(ndvi_t2)
         delta_ndvi = np.full(ndvi_t1.shape, np.nan, dtype=np.float32)
@@ -194,7 +197,7 @@ class TemporalAnalytics:
         *,
         appearance_threshold: float = 0.20,
         disappearance_threshold: float = 0.20,
-        detect_mode: str = "appearance",  # "appearance" (flood) or "disappearance" (drought)
+        detect_mode: str = "appearance",
         index_name: str = "ndwi",
         sensor_t1: str | None = None,
         sensor_t2: str | None = None,
@@ -208,6 +211,9 @@ class TemporalAnalytics:
 
         if idx_t1.shape != idx_t2.shape:
             raise MeasurementError(f"Raster dimensions do not match for temporal change: {idx_t1.shape} vs {idx_t2.shape}")
+
+        from affine import Affine as _Affine
+        _ = _Affine(*transform) if not isinstance(transform, _Affine) else transform
 
         valid_both = np.isfinite(idx_t1) & np.isfinite(idx_t2)
         delta_idx = np.full(idx_t1.shape, np.nan, dtype=np.float32)

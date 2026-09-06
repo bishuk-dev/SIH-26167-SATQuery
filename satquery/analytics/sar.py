@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+from enum import StrEnum
 from typing import Any, Mapping
 import uuid
 
@@ -34,23 +35,33 @@ DEFAULT_SAR_THRESHOLDS: dict[str, dict[str, float]] = {
 }
 
 
+class SarRadiometricDomain(StrEnum):
+    SAR_DB_POWER = "SAR_DB_POWER"
+    SAR_LINEAR_POWER = "SAR_LINEAR_POWER"
+    SAR_LINEAR_AMPLITUDE = "SAR_LINEAR_AMPLITUDE"
+    SAR_UNKNOWN = "SAR_UNKNOWN"
+
+
 class SarTemporalAnalytics:
     """Deterministic SAR temporal processing and flood mapping engine."""
 
     @classmethod
-    def linear_to_db(cls, linear_arr: np.ndarray) -> np.ndarray:
-        """Convert linear amplitude or intensity backscatter to decibels (dB).
+    def linear_to_db(cls, linear_arr: np.ndarray, domain: SarRadiometricDomain = SarRadiometricDomain.SAR_LINEAR_POWER) -> np.ndarray:
+        """Convert linear backscatter to decibels (dB).
 
         Applies numerical protection against non-positive and non-finite values.
         """
         arr = np.asarray(linear_arr, dtype=np.float32)
         valid = np.isfinite(arr) & (arr > 1e-10)
         db_arr = np.full(arr.shape, np.nan, dtype=np.float32)
-        db_arr[valid] = 10.0 * np.log10(arr[valid])
+        if domain == SarRadiometricDomain.SAR_LINEAR_AMPLITUDE:
+            db_arr[valid] = 20.0 * np.log10(arr[valid])
+        else:
+            db_arr[valid] = 10.0 * np.log10(arr[valid])
         return db_arr
 
     @classmethod
-    def db_to_linear(cls, db_arr: np.ndarray) -> np.ndarray:
+    def db_to_linear(cls, db_arr: np.ndarray, domain: SarRadiometricDomain = SarRadiometricDomain.SAR_LINEAR_POWER) -> np.ndarray:
         """Convert decibel backscatter (dB) to linear intensity."""
         arr = np.asarray(db_arr, dtype=np.float32)
         valid = np.isfinite(arr)
@@ -111,6 +122,7 @@ class SarTemporalAnalytics:
         polarization_role: SemanticBandRole | str = SemanticBandRole.SAR_CO_POL,
         decrease_threshold_db: float | None = None,
         water_max_threshold_db: float | None = None,
+        radiometric_domain: SarRadiometricDomain | str = SarRadiometricDomain.SAR_DB_POWER,
         pre_observation_id: str = "sar_pre",
         post_observation_id: str = "sar_post",
     ) -> tuple[np.ndarray, SarChangeResult, ChangeMaskEvidence]:
@@ -119,22 +131,21 @@ class SarTemporalAnalytics:
         Physical principle: Specular reflection over smooth floodwater causes a sharp
         decrease in SAR backscatter relative to dry baseline conditions.
         """
+        domain = radiometric_domain if isinstance(radiometric_domain, SarRadiometricDomain) else SarRadiometricDomain(radiometric_domain)
         pol_name_pre, arr_pre = get_semantic_band(bands_pre, polarization_role, sensor="sentinel1")
         pol_name_post, arr_post = get_semantic_band(bands_post, polarization_role, sensor="sentinel1")
 
         data_pre = np.asarray(arr_pre, dtype=np.float32)
         data_post = np.asarray(arr_post, dtype=np.float32)
 
-        # Check if already in dB (typical values between -40 and +10 dB) or linear amplitude/intensity
-        # If mean is positive and > 50, it is likely raw amplitude or linear DN
-        if np.nanmean(data_pre) > 50.0:
-            pre_db = cls.linear_to_db(data_pre)
+        if domain == SarRadiometricDomain.SAR_UNKNOWN:
+            raise MeasurementError("SAR radiometric domain is unknown; cannot safely process backscatter.")
+
+        if domain in (SarRadiometricDomain.SAR_LINEAR_POWER, SarRadiometricDomain.SAR_LINEAR_AMPLITUDE):
+            pre_db = cls.linear_to_db(data_pre, domain=domain)
+            post_db = cls.linear_to_db(data_post, domain=domain)
         else:
             pre_db = data_pre
-
-        if np.nanmean(data_post) > 50.0:
-            post_db = cls.linear_to_db(data_post)
-        else:
             post_db = data_post
 
         # Resolve thresholds
@@ -160,14 +171,17 @@ class SarTemporalAnalytics:
         #    (SatQuery deterministic evidence of newly inundated land subtracting permanent water baseline)
         valid = np.isfinite(delta_db) & np.isfinite(post_db)
         post_water_mask = valid & (post_db <= water_thresh)
-        flood_expansion_mask = valid & (delta_db <= -abs(dec_thresh)) & (post_db <= water_thresh)
+        flood_expansion_mask = valid & (delta_db <= -abs(dec_thresh)) & post_water_mask
 
         # Measure areas for both
         post_water_area_res = calculate_area(post_water_mask, transform, crs, target_unit=MeasurementUnit.M2)
         expansion_area_res = calculate_area(flood_expansion_mask, transform, crs, target_unit=MeasurementUnit.M2)
 
-        flood_detected = expansion_area_res.pixel_count > 0
-        mean_delta = stats["mean_delta_db"]
+        flood_detected = bool(np.any(flood_expansion_mask))
+        mean_delta = float(np.nanmean(delta_db[valid])) if np.any(valid) else 0.0
+
+        post_water_pixels = int(np.count_nonzero(post_water_mask))
+        expansion_pixels = int(np.count_nonzero(flood_expansion_mask))
 
         evidence_mask_id = f"sar_mask_{uuid.uuid4().hex[:16]}"
         mask_evidence = ChangeMaskEvidence(

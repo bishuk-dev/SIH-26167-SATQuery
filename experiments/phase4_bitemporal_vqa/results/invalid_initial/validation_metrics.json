@@ -4,9 +4,8 @@
   "model_id": "HuggingFaceTB/SmolVLM-256M-Instruct",
   "device": "cuda",
   "sample_count": 4,
-  "accuracy": 1.0,
-  "exact_match_score": 0.95,
-  "status": "PASS",
+  "status": "INVALID_PLACEHOLDER_RESULT",
+  "rejection_reason": "Generated from synthetic solid-color fixtures with hardcoded metrics. No real LEVIR-CC inference was performed.",
   "license_gates": {
     "cdvqa_annotation_license": "Apache-2.0",
     "second_dataset_access": "public",
@@ -15,14 +14,15 @@
   },
   "primary_benchmark": {
     "name": "LEVIR-CC",
-    "task": "change_description",
-    "provenance": "Chenyang Liu et al. (IEEE TGRS 2022) / LEVIR Lab (Beihang University)",
-    "upstream_imagery": "LEVIR-CD (academic / non-commercial research use only)",
-    "test_set_policy": "SEALED (evaluated on validation split)",
+    "provenance": "Chenyang Liu et al. (IEEE TGRS 2022) / LEVIR Lab (Beihang Univ)",
+    "upstream_imagery": "LEVIR-CD (Academic / non-commercial research use only)",
+    "test_set_policy": "SEALED (evaluated on validation set)",
     "split_pairs": {
       "train": 6815,
       "val": 1332,
       "test": 1930
     }
+  }
+}
   }
 }

@@ -1,0 +1,10 @@
+{
+  "experiment": "P4-E04",
+  "benchmark": "Modified Sen1Floods11 Dataset for Change Detection",
+  "doi": "10.5281/zenodo.7946594",
+  "license": "CC BY 4.0",
+  "status": "INVALID_PLACEHOLDER_RESULT",
+  "rejection_reason": "Generated with hardcoded placeholder metrics without real Modified Sen1Floods11 dataset execution.",
+  "label_audit": "post_event_water_extent",
+  "expansion_evidence_separated": true
+}

@@ -50,15 +50,25 @@ class TemporalVqaTool:
                 ),
             )
 
-        # Create dummy RGB images if not provided (e.g. unit testing or headless mode)
-        img1 = image_t1 if image_t1 is not None else Image.new("RGB", (256, 256), color=(50, 100, 50))
-        img2 = image_t2 if image_t2 is not None else Image.new("RGB", (256, 256), color=(100, 50, 50))
+        if image_t1 is None or image_t2 is None:
+            return ChangeVQAResult(
+                query=query,
+                answer="Missing visual inputs; cannot perform learned bi-temporal inference.",
+                confidence=0.0,
+                pair_id=pair.pair_id,
+                supporting_evidence_ids=supporting_evidence_ids,
+                model_provenance=None,
+                limitations=(
+                    "Missing actual visual input for learned bi-temporal inference.",
+                    "Both image_t1 and image_t2 are required.",
+                ),
+            )
 
         # 2. Run learned Change-VQA specialist
         backend = load_change_vqa_model(settings=settings)
         return backend.answer_change_vqa(
-            image_t1=img1,
-            image_t2=img2,
+            image_t1=image_t1,
+            image_t2=image_t2,
             question=query,
             pair_id=pair.pair_id,
             supporting_evidence_ids=supporting_evidence_ids,
