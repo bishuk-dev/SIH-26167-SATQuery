@@ -79,13 +79,22 @@ validation baselines:
 ```bash
 python scripts/kaggle/runner.py run phase4e-bifold-s1-validation
 python scripts/kaggle/runner.py run phase4e-bifold-s2-validation
-python scripts/kaggle/runner.py run phase4f-bifold-s2-head-adaptation
 ```
 
 These GPU kernels attach both private materialization notebook outputs directly.
 They verify package hashes under `/kaggle/input`, extract validation members only
 to transient `/kaggle/working`, and download only compact prediction, metric,
 and provenance artifacts.
+
+Phase 4F is closed. The next registered validation-only control is Phase 5A:
+
+```bash
+python scripts/kaggle/runner.py run phase5a-bifold-joint-validation
+```
+
+It attaches and verifies both private S1/S2 packages, extracts validation
+members only, evaluates the official 12-channel BIFOLD checkpoint, and writes
+the joint result, prediction, provenance, and paired complementarity artifacts.
 
 Each run keeps its multi-GiB `phase4_<modality>_selected.tar.zst` package in
 Kaggle output. It downloads only `materialization_report.json`,

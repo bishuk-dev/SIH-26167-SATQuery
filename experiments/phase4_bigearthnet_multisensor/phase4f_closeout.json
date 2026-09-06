@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "status": "COMPLETE",
+  "result_classification": "ADAPTATION_USEFUL_BUT_MODEST",
+  "scope": "One deterministic S2-only classifier-head adaptation on the frozen TRAIN/validation split; this is not a statistical replication claim.",
+  "test_accessed": false,
+  "threshold_policy": "FROZEN_AT_0.5_NOT_TUNED",
+  "strategy": "official_19_class_head_only",
+  "base": {
+    "model_id": "BIFOLD-BigEarthNetv2-0/resnet50-s2-v0.2.0",
+    "revision": "f5a590cd5876845f62702260ff62ea5a325433bb",
+    "checkpoint_sha256": "f55f8a5416d326c7e3139a97c6866e606dfc2e5cde30d52e2ccc47ce5f8b9be5"
+  },
+  "parameters": {
+    "trainable": 38931,
+    "frozen": 23529984
+  },
+  "best_epoch": 1,
+  "validation_baseline": {
+    "macro_average_precision": 0.7420321532834496,
+    "micro_f1": 0.7325822442541685,
+    "macro_f1": 0.6452843453433793
+  },
+  "adapted": {
+    "macro_average_precision": 0.7496551979598234,
+    "micro_f1": 0.7700548081714002,
+    "macro_f1": 0.6707376231170578
+  },
+  "deltas": {
+    "macro_average_precision": 0.007623044676373758,
+    "micro_f1": 0.03747256391723164,
+    "macro_f1": 0.02545327777367845
+  },
+  "training_dynamics": {
+    "epochs_completed": 4,
+    "best_validation_map_epoch": 1,
+    "train_loss": [0.15231932271668253, 0.14612684398889542, 0.14336469341465768, 0.14135308381407818],
+    "validation_loss": [0.22681549998621145, 0.22898383624851704, 0.22871442697942257, 0.2316187353183826],
+    "validation_macro_average_precision": [0.7496551979598234, 0.7495298062189506, 0.7490408614895797, 0.7481800273316107],
+    "interpretation": "Best validation mAP occurred at epoch 1. Train loss continued decreasing, validation loss increased overall, and validation mAP gradually declined afterward. Early stopping completed after epoch 4. This does not justify further tuning."
+  },
+  "adapted_classifier_artifact": {
+    "artifact": "phase4f_s2_head.safetensors",
+    "sha256": "0a5c1b6ff095f1944f06dfc39eaddac37c68e9bce51e1880785ba9ae9a7592bb",
+    "storage": "Kaggle output only; bytes are not committed to Git."
+  },
+  "artifact_sha256": {
+    "phase4f_runner_meta.json": "496c72bda633c2e540549cf3de92da4edfecf0189b130c3ec8d170c5704f9dcc",
+    "phase4f_s2_adapter_or_checkpoint_manifest.json": "c7ebc74272e717fb7dfee7b6eddbdbd477ce3e9b22981738994b1510d69eb623",
+    "phase4f_s2_training_result.json": "6dc555c9300d18c7c79620238f455f570a3da1932c4f4fef50bce6f31230514d",
+    "phase4f_s2_validation_predictions.jsonl": "5fcc419e5438c3a2137292d3f87fcaafbccca93f2b729fb952bb0b122e31fa8c",
+    "phase4f_s2_validation_result.json": "70969de98b69f5d7cf77b8272bfa70594cb0b9d8a7762b86246d0633e469c10c"
+  },
+  "provenance": {
+    "git_sha": "f36039eb9b0b21e4bba7320be10e86d7e7e25748",
+    "dirty_worktree": false,
+    "runtime_seconds": 567.9757915900001,
+    "device": "Tesla T4, Tesla T4",
+    "cuda_version": "12.8",
+    "torch_version": "2.10.0+cu128",
+    "python_version": "3.12.13",
+    "peak_gpu_memory_bytes": 570920448,
+    "manifest_sha256": "615e30273cce8eaa8b0838c07256714a3c874019f6dccd50570cbf1ec4c20bd6",
+    "preprocessing_profile": "bifold_resnet50_s2_v020"
+  },
+  "further_phase4_training_authorized": false,
+  "prohibited_follow_ups": ["train_s1", "unfreeze_s2_backbone", "alter_threshold", "launch_another_seed", "access_test"]
+}

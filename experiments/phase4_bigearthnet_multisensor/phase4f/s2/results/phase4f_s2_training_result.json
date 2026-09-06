@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "status": "TRAINING_COMPLETE",
+  "strategy": "official_19_class_head_only",
+  "training_config": {
+    "optimizer": "AdamW",
+    "learning_rate": 0.001,
+    "weight_decay": 0.01,
+    "batch_size": 128,
+    "gradient_accumulation_steps": 1,
+    "max_epochs": 10,
+    "early_stopping_metric": "validation_macro_average_precision",
+    "early_stopping_mode": "max",
+    "early_stopping_patience": 2,
+    "early_stopping_min_delta": 0.0,
+    "scheduler": "CosineAnnealingLR",
+    "scheduler_eta_min": 0.0001,
+    "random_seed": 20260906,
+    "threshold": 0.5
+  },
+  "parameters": {
+    "trainable_names": [
+      "model.vision_encoder.fc.weight",
+      "model.vision_encoder.fc.bias"
+    ],
+    "trainable": 38931,
+    "frozen": 23529984
+  },
+  "epochs_completed": 4,
+  "best_epoch": 1,
+  "train_loss": [
+    0.15231932271668253,
+    0.14612684398889542,
+    0.14336469341465768,
+    0.14135308381407818
+  ],
+  "validation_loss": [
+    0.22681549998621145,
+    0.22898383624851704,
+    0.22871442697942257,
+    0.2316187353183826
+  ],
+  "validation_macro_average_precision": [
+    0.7496551979598234,
+    0.7495298062189506,
+    0.7490408614895797,
+    0.7481800273316107
+  ],
+  "decision": "ADAPTATION_USEFUL",
+  "test_accessed": false
+}

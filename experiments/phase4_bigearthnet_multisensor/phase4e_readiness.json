@@ -13,7 +13,11 @@
   "phase4e_validation_ready": true,
   "phase4e_status": "COMPLETE",
   "phase4e_closeout": "phase4e_closeout.json",
-  "phase4f_training_ready": true,
+  "phase4f_training_ready": false,
+  "phase4f_status": "COMPLETE",
+  "phase4f_closeout": "phase4f_closeout.json",
+  "phase5a_validation_ready": true,
+  "phase5a_plan": "phase5a_plan.json",
   "modalities": {
     "s1": {
       "status": "MATERIALIZED_AND_INTEGRITY_VERIFIED",

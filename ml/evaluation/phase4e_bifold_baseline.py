@@ -253,6 +253,13 @@ class BifoldS2Inference(_BifoldUnimodalInference):
     expected_channels = 10
 
 
+class BifoldJointInference(_BifoldUnimodalInference):
+    """Frozen 12-channel official S1+S2 BIFOLD inference wrapper."""
+
+    registry_id = "bifold_resnet50_all_v020"
+    expected_channels = 12
+
+
 def logits_to_probabilities(logits: torch.Tensor) -> torch.Tensor:
     """Apply the fixed multilabel sigmoid conversion without calibration."""
 

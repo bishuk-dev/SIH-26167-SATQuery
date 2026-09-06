@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "status": "READY_TO_LAUNCH_NOT_EXECUTED",
+  "status": "COMPLETE",
   "experiment": "phase4f-bifold-s2-head-adaptation",
   "kernel_slug": "satquery-phase4f-bifold-s2-head-adaptation",
   "goal": "Measure whether one deterministic head-only adaptation on the frozen 12000-pair TRAIN subset improves validation mAP over the frozen official S2 checkpoint.",
@@ -102,5 +102,7 @@
     "phase4f_runner_meta.json"
   ],
   "checkpoint_output": "phase4f_s2_head.safetensors (Kaggle output only; bytes are not committed to Git)",
-  "launch_command": "python scripts/kaggle/runner.py run phase4f-bifold-s2-head-adaptation"
+  "launch_command": "python scripts/kaggle/runner.py run phase4f-bifold-s2-head-adaptation",
+  "closeout": "phase4f_closeout.json",
+  "further_phase4_training_authorized": false
 }

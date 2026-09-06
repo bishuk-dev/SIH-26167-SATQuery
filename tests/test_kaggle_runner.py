@@ -349,6 +349,23 @@ class TestExperimentRegistry:
         assert entry["gpu"] is True
         assert entry["internet"] is True
 
+    def test_phase5a_joint_validation_uses_both_verified_packages(self) -> None:
+        entry = runner._load_registry()["phase5a-bifold-joint-validation"]
+
+        assert entry["notebook"] == "notebooks/kaggle_phase5a_bifold_joint.ipynb"
+        assert entry["kernel_sources"] == [
+            "technobishu/satquery-phase4-materialize-s1",
+            "technobishu/satquery-phase4-materialize-s2",
+        ]
+        assert entry["result_files"] == [
+            "phase5a_joint_validation_result.json",
+            "phase5a_joint_validation_predictions.jsonl",
+            "phase5a_runner_meta.json",
+            "phase5a_complementarity_report.json",
+        ]
+        assert entry["gpu"] is True
+        assert entry["internet"] is True
+
     def test_known_experiments_have_required_fields(self) -> None:
         registry = runner._load_registry()
         required = {"notebook", "kernel_slug", "experiment_dir", "remote_output_dir", "result_files"}

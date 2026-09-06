@@ -151,3 +151,19 @@ phase4f-bifold-s2-head-adaptation:
     - satquery-phase4-materialize-s2
   gpu: true
   internet: true
+
+phase5a-bifold-joint-validation:
+  notebook: notebooks/kaggle_phase5a_bifold_joint.ipynb
+  kernel_slug: satquery-phase5a-bifold-joint-validation
+  experiment_dir: experiments/phase4_bigearthnet_multisensor/phase5a
+  remote_output_dir: phase5a-bifold-joint-validation
+  result_files:
+    - phase5a_joint_validation_result.json
+    - phase5a_joint_validation_predictions.jsonl
+    - phase5a_runner_meta.json
+    - phase5a_complementarity_report.json
+  kernel_sources:
+    - technobishu/satquery-phase4-materialize-s1
+    - technobishu/satquery-phase4-materialize-s2
+  gpu: true
+  internet: true

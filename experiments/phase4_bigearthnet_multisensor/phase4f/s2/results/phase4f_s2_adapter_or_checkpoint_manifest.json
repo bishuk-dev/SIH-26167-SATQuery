@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "format": "safetensors",
+  "artifact": "phase4f_s2_head.safetensors",
+  "sha256": "0a5c1b6ff095f1944f06dfc39eaddac37c68e9bce51e1880785ba9ae9a7592bb",
+  "base_model_id": "BIFOLD-BigEarthNetv2-0/resnet50-s2-v0.2.0",
+  "base_model_revision": "f5a590cd5876845f62702260ff62ea5a325433bb",
+  "base_checkpoint_sha256": "f55f8a5416d326c7e3139a97c6866e606dfc2e5cde30d52e2ccc47ce5f8b9be5",
+  "state_dict_keys": [
+    "bias",
+    "weight"
+  ],
+  "class_order": [
+    "Agro-forestry areas",
+    "Arable land",
+    "Beaches, dunes, sands",
+    "Broad-leaved forest",
+    "Coastal wetlands",
+    "Complex cultivation patterns",
+    "Coniferous forest",
+    "Industrial or commercial units",
+    "Inland waters",
+    "Inland wetlands",
+    "Land principally occupied by agriculture, with significant areas of natural vegetation",
+    "Marine waters",
+    "Mixed forest",
+    "Moors, heathland and sclerophyllous vegetation",
+    "Natural grassland and sparsely vegetated areas",
+    "Pastures",
+    "Permanent crops",
+    "Transitional woodland, shrub",
+    "Urban fabric"
+  ],
+  "trainable_parameter_count": 38931,
+  "test_accessed": false
+}

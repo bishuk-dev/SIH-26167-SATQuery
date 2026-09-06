@@ -1,0 +1,18 @@
+{
+  "git_sha": "f36039eb9b0b21e4bba7320be10e86d7e7e25748",
+  "experiment": "phase4f-bifold-s2-head-adaptation",
+  "reproducible": true,
+  "dirty_worktree": false,
+  "kernel_slug": "satquery-phase4f-bifold-s2-head-adaptation",
+  "runtime_seconds": 567.9757915900001,
+  "gpu_devices": [
+    "Tesla T4",
+    "Tesla T4"
+  ],
+  "cuda_version": "12.8",
+  "torch_version": "2.10.0+cu128",
+  "python_version": "3.12.13",
+  "peak_gpu_memory_bytes_per_device_max": 570920448,
+  "checkpoint_output_sha256": "0a5c1b6ff095f1944f06dfc39eaddac37c68e9bce51e1880785ba9ae9a7592bb",
+  "test_accessed": false
+}

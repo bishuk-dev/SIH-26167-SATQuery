@@ -172,7 +172,7 @@ commercial units. Those threshold-dependent differences are not proof of SAR
 superiority. Phase 4E did not retain runtime/device/software metadata and is
 not rerun to recover it. Test was not accessed and threshold 0.5 was not tuned.
 
-## Phase 4F prepared S2 adaptation
+## Phase 4F complete S2 adaptation
 
 Inspection of pinned reBEN revision
 `90f7a58a2757bb407df64dd01bfc62b79df2bdd5` and ConfigILM revision
@@ -182,18 +182,39 @@ is a timm ResNet-50 exposed as `model.vision_encoder`, with its aligned
 official head initialization, trains its 38,931 parameters, and freezes the
 remaining 23,529,984 parameters and BatchNorm state.
 
-`phase4f_plan.json` freezes the single primary run: AdamW, learning rate 1e-3,
+`phase4f_plan.json` froze the single primary run: AdamW, learning rate 1e-3,
 weight decay 0.01, batch size 128, accumulation 1, at most 10 epochs,
 CosineAnnealingLR to 1e-4, seed 20260906, and validation-mAP early stopping with
 patience 2. The unchanged `bifold_resnet50_s2_v020` profile supplies the ten S2
 bands and frozen normalization statistics. Model selection uses validation
 only; the fixed 0.5 threshold is not tuned.
 
-The predeclared decision is `ADAPTATION_USEFUL` only when validation mAP has a
-positive delta, macro F1 does not regress by more than 0.02, and all integrity
-and provenance checks pass. The exact result is retained even if small or
-negative. The Kaggle job targets T4 x2, records runtime/device/software/VRAM
-and checkpoint SHA-256, and leaves checkpoint bytes in Kaggle rather than Git.
+The one completed run is frozen as `ADAPTATION_USEFUL_BUT_MODEST` in
+`phase4f_closeout.json`: mAP 0.7496551979598234 (+0.007623044676373758), micro
+F1 0.7700548081714002 (+0.03747256391723164), and macro F1
+0.6707376231170578 (+0.02545327777367845). This is one seed, not a statistical
+replication claim. Best validation mAP was epoch 1; training loss decreased
+afterward while validation loss increased overall and validation mAP gradually
+declined, with early stopping complete after epoch 4. This does not authorize
+further tuning. The retained head artifact is `phase4f_s2_head.safetensors`,
+SHA-256 `0a5c1b6ff095f1944f06dfc39eaddac37c68e9bce51e1880785ba9ae9a7592bb`.
+
+## Phase 5A prepared official joint control
+
+`phase5a-bifold-joint-validation` is registered but not launched. It evaluates
+the official S1, S2, and 12-channel S1+S2 BIFOLD checkpoints on the same frozen
+3,000 validation samples, threshold 0.5, and frozen manifest. The joint arm
+requires both verified Kaggle materialization packages, verifies their hashes,
+uses `bifold_resnet50_all_v020` with `VV, VH, B02, B03, B04, B05, B06, B07,
+B08, B8A, B11, B12`, and refuses adapted checkpoints and all test access.
+
+After joint inference, its complementarity report will fail closed unless the
+three prediction files have identical IDs, targets, counts, and 19-class order.
+It will report global/per-class AP and F1, paired label rescues/harms, and
+scene-level multilabel-F1 comparisons. The Phase 4F adapted S2 mAP is an
+explicitly secondary reference, not a primary comparator. The frozen decision
+rule is in `phase5a_plan.json`; no minimum percentage-point threshold is
+invented.
 
 ## Artifact map
 
@@ -215,6 +236,8 @@ and checkpoint SHA-256, and leaves checkpoint bytes in Kaggle rather than Git.
 - `phase4e_readiness.json` — fail-closed Phase 4D gate state and independently verified S1/S2 integrity/provenance.
 - `phase4e_closeout.json` — frozen Phase 4E metrics, paired-result checks, artifact hashes, and test-sealing record.
 - `phase4f_plan.json` — frozen head-only strategy, parameter counts, hyperparameters, decision rule, outputs, and launch identity.
+- `phase4f_closeout.json` — completed one-seed S2 adaptation metrics, dynamics, provenance, test sealing, checkpoint identity, and hashes for every recovered JSON/JSONL artifact.
+- `phase5a_plan.json` — pre-execution official S1/S2/joint comparison contract, package and manifest hashes, complementarity audit, and frozen decision rule.
 
 ## Reproduce Phase 4B
 
@@ -246,15 +269,15 @@ python -m ml.evaluation.probe_phase4_materialization
 
 ## Exact next step
 
-Phase 4E is complete. After committing this preparation, the only authorized
-next execution is:
+Phase 4F is complete. After committing this preparation, the only authorized
+next execution is the validation-only Phase 5A control:
 
 ```bash
-python scripts/kaggle/runner.py run phase4f-bifold-s2-head-adaptation
+python scripts/kaggle/runner.py run phase5a-bifold-joint-validation
 ```
 
-Do not run it as part of closeout. Do not adapt S1, run joint BIFOLD, open test
-pixels, tune thresholds, sweep hyperparameters, or begin Phase 5.
+Do not run it as part of closeout. Do not adapt S1 or joint BIFOLD, open test
+pixels, tune thresholds, construct learned fusion, or start further Phase 5 work.
 
 ## Primary sources
 

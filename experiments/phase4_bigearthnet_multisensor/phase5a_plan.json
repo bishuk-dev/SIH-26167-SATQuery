@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "status": "READY_TO_LAUNCH_NOT_EXECUTED",
+  "experiment": "phase5a-bifold-joint-validation",
+  "kernel_slug": "satquery-phase5a-bifold-joint-validation",
+  "scope": "Official frozen S1, S2, and joint BIFOLD validation-only control. No training, adaptation, threshold tuning, or test access.",
+  "validation_sample_count": 3000,
+  "manifest_sha256": "615e30273cce8eaa8b0838c07256714a3c874019f6dccd50570cbf1ec4c20bd6",
+  "threshold": 0.5,
+  "models": {
+    "s1": {"model_id": "BIFOLD-BigEarthNetv2-0/resnet50-s1-v0.2.0", "revision": "d417b3c32f2172cbceb14e5b106dd9aa7b77c647"},
+    "s2": {"model_id": "BIFOLD-BigEarthNetv2-0/resnet50-s2-v0.2.0", "revision": "f5a590cd5876845f62702260ff62ea5a325433bb"},
+    "joint": {"model_id": "BIFOLD-BigEarthNetv2-0/resnet50-all-v0.2.0", "revision": "762acdc186cce6b31ecbc896ddab1721847d4c5e", "checkpoint_sha256": "b7e5e58d2cf1e384ba9362ac6ce75c117dee159198eac5675927cba3c3960332"}
+  },
+  "joint_preprocessing": {"profile": "bifold_resnet50_all_v020", "input_order": ["VV", "VH", "B02", "B03", "B04", "B05", "B06", "B07", "B08", "B8A", "B11", "B12"]},
+  "required_materialization_packages": {"s1_sha256": "c0973f4a05ec2453a9158f766a31f267798810647eec810b6866561562a450b8", "s2_sha256": "2df8b97deeead5cc8a62738484b2e61f8bb32154db6b60e29db20625094962e1"},
+  "comparison": {"primary": ["official_s1", "official_s2", "official_joint_s1_s2"], "adapted_s2_reference": {"role": "secondary_not_primary_control", "macro_average_precision": 0.7496551979598234, "source": "phase4f_closeout.json"}},
+  "complementarity_requirements": {"identical_sample_ids": true, "identical_targets": true, "identical_19_class_order": true, "global_metrics": ["macro_average_precision", "micro_f1", "macro_f1"], "per_class_metrics": ["average_precision", "f1_at_0.5"], "paired_label_metrics": ["s1_s2_correctness", "joint_rescue_over_s2", "joint_harm_vs_s2"], "sample_score": "Per-sample multilabel F1 over 19 threshold-0.5 decisions; empty-target/empty-prediction scenes score 0."},
+  "frozen_decision_rule": {"MULTISENSOR_GLOBAL_BENEFIT": "joint mAP > official S2 mAP", "MULTISENSOR_CONDITIONAL_BENEFIT": "Even without global mAP improvement, the paired audit shows non-trivial, repeatable classes/scenes where joint repairs S2 errors without unacceptable overall degradation.", "NO_DEMONSTRATED_BENEFIT": "Joint neither improves global performance nor provides convincing conditional complementarity.", "minimum_percentage_point_threshold": "No minimum percentage-point threshold is invented."},
+  "test_status": "SEALED",
+  "outputs": ["phase5a_joint_validation_result.json", "phase5a_joint_validation_predictions.jsonl", "phase5a_runner_meta.json", "phase5a_complementarity_report.json"],
+  "launch_command": "python scripts/kaggle/runner.py run phase5a-bifold-joint-validation"
+}
