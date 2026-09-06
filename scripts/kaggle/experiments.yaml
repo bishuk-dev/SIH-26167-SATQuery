@@ -179,3 +179,15 @@ phase4-e02-bitemporal-vqa:
     - runner_meta.json
   gpu: true
   internet: true
+
+phase4-e04-sar-validation:
+  notebook: notebooks/kaggle_phase4_e04_sar_flood.ipynb
+  kernel_slug: satquery-phase4-e04-sar-validation
+  experiment_dir: experiments/phase4_sar_validation
+  remote_output_dir: phase4-e04-sar-validation
+  result_files:
+    - sar_validation_metrics.json
+    - sar_validation_predictions.jsonl
+    - runner_meta.json
+  gpu: false
+  internet: true

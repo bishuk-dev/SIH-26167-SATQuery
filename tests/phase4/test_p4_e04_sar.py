@@ -96,8 +96,12 @@ def test_sar_flood_detection_workflow():
     assert sar_res.flood_detected is True
     assert sar_res.flood_pixel_count == 625  # 25x25 = 625 pixels
     assert math.isclose(sar_res.flood_area_m2, 62500.0, abs_tol=1e-5)  # 625 * 100 m2
+    assert sar_res.post_event_water_pixel_count == 625
+    assert sar_res.flood_expansion_pixel_count == 625
+    assert sar_res.provenance["target_audit"]["label_semantic"] == "post_event_water_extent"
     assert mask_ev.changed_pixels == 625
     assert mask_ev.change_type == "sar_flood_inundation"
+
 
 
 def test_temporal_pair_verification_and_refusal():

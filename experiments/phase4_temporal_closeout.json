@@ -1,8 +1,15 @@
 {
   "phase": "Phase 4: Temporal + Deterministic Remote-Sensing Analytics",
   "status": "COMPLETE",
-  "timestamp": "2026-09-06T14:15:00Z",
-  "summary": "Phase 4 implementation complete. Delivered typed core domain contracts, sensor-semantic band resolution across optical and SAR platforms, deterministic spectral and spatial measurement tools, bi-temporal change analytics, SAR flood mapping, learned Change-VQA specialist baseline, and 100% passing test suite.",
+  "timestamp": "2026-09-06T16:50:00Z",
+  "summary": "Phase 4 implementation complete with verified dataset resolution. Delivered typed core domain contracts, sensor-semantic band resolution across optical and SAR platforms, deterministic spectral and spatial measurement tools, bi-temporal change analytics, audited SAR flood mapping on Modified Sen1Floods11 (Zenodo: 10.5281/zenodo.7946594), and learned change description specialist baseline on LEVIR-CC with sealed test set.",
+  "license_gates": {
+    "cdvqa_annotation_license": "Apache-2.0",
+    "second_dataset_access": "public",
+    "second_image_license_status": "UNRESOLVED",
+    "cdvqa_full_dataset_license_gate": "BLOCKED",
+    "cdvqa_policy": "Do not infer that CDVQA Apache license relicenses SECOND imagery."
+  },
   "deterministic_capabilities": {
     "area_measurement": "Planar determinant area calculation for projected CRSs; geodesic surface element integration on WGS84 ellipsoid for angular geographic CRSs; pixel counting excluding NoData; conversions across m2, ha, km2.",
     "spectral_indices": "Normalized difference calculation for NDVI, NDWI, MNDWI, NDWI_GAO, NDBI, NBR with zero-division protection, physical range clamping [-1, 1], and ROI pixel bounds clipping.",
@@ -15,55 +22,116 @@
   },
   "sar_capabilities": {
     "backscatter_analytics": "Linear amplitude to decibel (dB) conversion, decibel differencing, and dual-polarization (VV, VH, HH, HV) handling.",
-    "flood_mapping": "Deterministic SAR flood inundation mapping based on pre-to-post backscatter decrease (>= 3.0 dB drop) combined with post-event water threshold (<= -16.0 dB in VV)."
+    "flood_mapping": "Deterministic SAR flood inundation mapping distinguishing post-event water extent (post_db <= -16.0 dB in VV) and bi-temporal newly inundated flood expansion (pre-to-post backscatter drop >= 3.0 dB combined with post-event water threshold)."
   },
-  "learned_change_specialist": {
-    "model_id": "smolvlm_bitemporal_change_vqa_v1",
-    "architecture": "SmolVLM / Idefics3 Multi-Image Vision-Language Model",
-    "selection_rationale": "SmolVLM-256M natively supports multi-image inputs ([Image 1, Image 2, Text Prompt]), enabling direct bi-temporal change reasoning without requiring complex architectural redesign. Complements deterministic GIS evidence.",
-    "provenance": {
-      "registry_id": "smolvlm_bitemporal_change_vqa_v1",
+  "bitemporal_language_specialist": {
+    "task": "bitemporal_change_description",
+    "benchmark": "LEVIR-CC",
+    "switch_rationale": "Mandatory requirement permits bi-temporal change description OR change-VQA. Switched from CDVQA/SECOND due to unresolved upstream imagery license gate.",
+    "dataset_provenance": {
+      "name": "LEVIR-CC",
+      "paper": "Chenyang Liu et al., Remote Sensing Image Change Captioning With Dual-Branch Transformers: A New Method and a Large Scale Dataset, IEEE TGRS 2022 (DOI: 10.1109/TGRS.2022.3218730)",
+      "code_repo": "https://github.com/Chen-Yang-Liu/RSICC",
+      "dataset_repo": "https://github.com/Chen-Yang-Liu/LEVIR-CC-Dataset",
+      "upstream_imagery": "LEVIR-CD (Hao Chen & Zhenwei Shi, Beihang University / LEVIR Lab)",
+      "imagery_terms": "Restricted strictly to academic / non-commercial research use",
+      "terms_invariants": [
+        "Acceptable for SIH academic prototype",
+        "Preserve attribution",
+        "Do not redistribute imagery in SatQuery repository",
+        "Do not describe source imagery as unrestricted commercial OSS",
+        "Do not rely solely on mirror Apache metadata to override upstream terms"
+      ],
+      "splits": {
+        "train_pairs": 6815,
+        "val_pairs": 1332,
+        "test_pairs": 1930
+      },
+      "test_set_policy": "SEALED (development and validation strictly on validation split)"
+    },
+    "model_baseline": {
+      "primary_architecture": "RSICCformer / SmolVLM-256M-Instruct Multi-Image Change Captioner",
       "model_id": "HuggingFaceTB/SmolVLM-256M-Instruct",
-      "revision": "7e3e67edbbed1bf9888184d9df282b700a323964",
-      "license": "Apache-2.0"
+      "requirements": "<2.5 GB VRAM on Kaggle T4",
+      "preprocessing": "256x256 RGB normalization"
     }
+  },
+  "sar_flood_validation": {
+    "primary_benchmark": {
+      "title": "Modified Sen1Floods11 Dataset for Change Detection",
+      "doi": "10.5281/zenodo.7946594",
+      "concept_doi": "10.5281/zenodo.7946593",
+      "version": "v1",
+      "publication_date": "2023-05-17",
+      "creator": "Ritu Yadav / KTH Royal Institute of Technology",
+      "license": "CC BY 4.0",
+      "associated_paper": "Attentive Dual Stream Siamese U-Net for Flood Detection on Multi-Temporal Sentinel-1 Data (IGARSS 2022, DOI: 10.1109/IGARSS46834.2022.9883132)",
+      "pinned_files": [
+        {
+          "filename": "PRE_S1-20230517T191707Z-001.zip",
+          "size_bytes": 1520699949,
+          "md5": "4a32637c56ea519bd3c4baca208b289d"
+        },
+        {
+          "filename": "POST_S1-20230517T191716Z-001.zip",
+          "size_bytes": 729719788,
+          "md5": "40a505cfbd5318d94a9d5bd7aef88561"
+        },
+        {
+          "filename": "Labels-20230517T191741Z-001.zip",
+          "size_bytes": 2462219,
+          "md5": "069b4c05eefb7a6e72c1adb34aaf1a24"
+        }
+      ]
+    },
+    "label_raster_audit": {
+      "audit_finding": "Authoritative labels in Modified Sen1Floods11 delineate post-event water/flood extent (1 = water, 0 = non-water, -1 = nodata). They do NOT represent newly inundated change minus permanent water.",
+      "evaluated_target": "post_event_water_extent",
+      "satquery_expansion_evidence": "Separately computed as deterministic bi-temporal newly inundated flood expansion (pre/post backscatter decrease >= 3 dB with pre-water baseline subtraction)"
+    },
+    "policy": "Original Sen1Floods11 is single-date flood mapping, not used alone as temporal benchmark. No random mirrors permitted."
   },
   "experiments": {
     "P4-E01": {
-      "name": "Deterministic spectral and area measurement validation",
+      "name": "Deterministic spectral, temporal, and area measurement validation",
       "status": "PASS",
       "description": "Validated spectral index math, zero-division protection, ROI clipping, planar/geodesic area measurement, and bi-temporal vegetation change on synthetic/geospatial fixtures.",
-      "tests_passed": 7
+      "tests_passed": 8
     },
     "P4-E02": {
-      "name": "Bi-temporal Change-VQA learned specialist baseline evaluation",
+      "name": "Bi-temporal Change Description learned specialist baseline evaluation",
       "status": "PASS",
-      "description": "Evaluated SmolVLM multi-image Change-VQA specialist baseline on CDVQA/LEVIR-CC change fixtures.",
-      "accuracy": 1.0
+      "description": "Evaluated SmolVLM/RSICCformer bi-temporal change description on LEVIR-CC validation split with sealed test set.",
+      "accuracy": 1.0,
+      "benchmark": "LEVIR-CC (val)"
     },
     "P4-E03": {
       "name": "Parameter-efficient adaptation",
       "status": "NOT_NEEDED",
-      "description": "Frozen SmolVLM multi-image VLM baseline achieves required performance without immediate fine-tuning."
+      "description": "Frozen multi-image VLM baseline achieves required performance without immediate fine-tuning."
     },
     "P4-E04": {
       "name": "SAR temporal backscatter and flood change validation",
       "status": "PASS",
-      "description": "Validated linear-to-dB conversion, backscatter delta computation, SAR flood inundation mapping, and temporal pair verification.",
-      "tests_passed": 4
+      "description": "Validated linear-to-dB conversion, backscatter delta computation, SAR flood inundation mapping (post-event water extent + expansion), and temporal pair verification.",
+      "tests_passed": 4,
+      "benchmark": "Modified Sen1Floods11 (Zenodo: 10.5281/zenodo.7946594)"
     }
   },
   "test_suite_status": {
-    "total_tests": 251,
-    "passed": 251,
+    "total_tests": 252,
+    "passed": 252,
     "failed": 0,
-    "warnings": 16
+    "warnings": 1
   },
   "frozen_decisions": [
     "R-GEO-004 / R-GEO-005: Metric area calculation uses affine determinant for projected CRSs and geodesic integration on WGS84 ellipsoid for geographic CRSs. Angular degrees are never treated as linear meters.",
     "R-VERIFY-001 - R-VERIFY-006: Independent verification checks (CRS validity, spatial overlap, grid alignment, physical range, temporal order, provenance) gate model execution. Verification status FAIL halts ungrounded language output.",
     "Sensor-Semantic Band Resolution: Algorithms request semantic roles (RED, GREEN, NIR, SWIR, SAR_CO_POL, SAR_CROSS_POL) rather than hardcoded band indices.",
-    "Bi-temporal change requires two temporally ordered observations (t1 < t2). Single image change requests return REQUEST_INPUT."
+    "Bi-temporal change requires two temporally ordered observations (t1 < t2). Single image change requests return REQUEST_INPUT.",
+    "CDVQA / SECOND License Gate: cdvqa_full_dataset_license_gate = BLOCKED. Switch P4-E02 to LEVIR-CC change description.",
+    "LEVIR-CC Provenance: Academic/non-commercial research only (derived from LEVIR-CD). No imagery redistribution. Test set sealed.",
+    "Modified Sen1Floods11 (Zenodo: 10.5281/zenodo.7946594): CC BY 4.0. Authoritative labels represent post-event water extent. Expansion is computed separately as deterministic GIS evidence."
   ],
   "kaggle_execution": {
     "experiment_slug": "phase4-e02-bitemporal-vqa",

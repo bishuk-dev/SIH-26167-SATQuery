@@ -153,16 +153,20 @@ class SarTemporalAnalytics:
 
         delta_db, stats = cls.compute_backscatter_delta(pre_db, post_db)
 
-        # Flood condition:
-        # 1. Significant decrease in backscatter (delta_db <= -decrease_threshold)
-        # 2. Post-event backscatter is characteristic of water (post_db <= water_max_threshold)
+        # Label Audit Distinction (Modified Sen1Floods11 vs Bi-temporal Expansion):
+        # 1. Post-event water/flood extent: post_db <= water_max_threshold
+        #    (Matches authoritative Sen1Floods11 / Modified Sen1Floods11 ground truth annotation)
+        # 2. Bi-temporal flood expansion / newly inundated change: delta_db <= -decrease_threshold AND post_db <= water_max_threshold
+        #    (SatQuery deterministic evidence of newly inundated land subtracting permanent water baseline)
         valid = np.isfinite(delta_db) & np.isfinite(post_db)
-        flood_mask = valid & (delta_db <= -abs(dec_thresh)) & (post_db <= water_thresh)
+        post_water_mask = valid & (post_db <= water_thresh)
+        flood_expansion_mask = valid & (delta_db <= -abs(dec_thresh)) & (post_db <= water_thresh)
 
-        # Measure flood area
-        area_res = calculate_area(flood_mask, transform, crs, target_unit=MeasurementUnit.M2)
+        # Measure areas for both
+        post_water_area_res = calculate_area(post_water_mask, transform, crs, target_unit=MeasurementUnit.M2)
+        expansion_area_res = calculate_area(flood_expansion_mask, transform, crs, target_unit=MeasurementUnit.M2)
 
-        flood_detected = area_res.pixel_count > 0
+        flood_detected = expansion_area_res.pixel_count > 0
         mean_delta = stats["mean_delta_db"]
 
         evidence_mask_id = f"sar_mask_{uuid.uuid4().hex[:16]}"
@@ -171,15 +175,17 @@ class SarTemporalAnalytics:
             change_type="sar_flood_inundation",
             pre_observation_id=pre_observation_id,
             post_observation_id=post_observation_id,
-            changed_pixels=area_res.pixel_count,
+            changed_pixels=expansion_area_res.pixel_count,
             total_pixels=pre_db.size,
-            change_fraction=float(area_res.pixel_count / pre_db.size),
+            change_fraction=float(expansion_area_res.pixel_count / pre_db.size),
             threshold=float(-abs(dec_thresh)),
             provenance={
                 "method": "sar_backscatter_differencing",
                 "polarization": pol_name_pre,
                 "decrease_threshold_db": dec_thresh,
                 "water_max_threshold_db": water_thresh,
+                "post_event_water_pixels": post_water_area_res.pixel_count,
+                "flood_expansion_pixels": expansion_area_res.pixel_count,
             },
         )
 
@@ -189,19 +195,28 @@ class SarTemporalAnalytics:
             post_observation_id=post_observation_id,
             polarization=pol_name_pre,
             flood_detected=flood_detected,
-            flood_area_m2=area_res.area,
-            flood_pixel_count=area_res.pixel_count,
+            flood_area_m2=expansion_area_res.area,
+            flood_pixel_count=expansion_area_res.pixel_count,
             backscatter_decrease_db_threshold=dec_thresh,
             mean_backscatter_delta_db=mean_delta,
+            post_event_water_area_m2=post_water_area_res.area,
+            post_event_water_pixel_count=post_water_area_res.pixel_count,
+            flood_expansion_area_m2=expansion_area_res.area,
+            flood_expansion_pixel_count=expansion_area_res.pixel_count,
             provenance={
                 "tool": "satquery.analytics.sar.SarTemporalAnalytics.detect_flood",
                 "polarization": pol_name_pre,
                 "water_max_threshold_db": water_thresh,
                 "backscatter_stats": stats,
+                "target_audit": {
+                    "primary_benchmark": "Modified Sen1Floods11 (Zenodo: 10.5281/zenodo.7946594)",
+                    "label_semantic": "post_event_water_extent",
+                    "expansion_semantic": "newly_inundated_change",
+                },
             },
         )
 
-        return flood_mask, sar_result, mask_evidence
+        return flood_expansion_mask, sar_result, mask_evidence
 
 
 def detect_sar_flood(

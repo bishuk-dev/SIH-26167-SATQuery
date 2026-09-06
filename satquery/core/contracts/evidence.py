@@ -110,4 +110,9 @@ class SarChangeResult(ContractModel):
     flood_pixel_count: int = Field(ge=0)
     backscatter_decrease_db_threshold: float
     mean_backscatter_delta_db: float
+    post_event_water_area_m2: float | None = None
+    post_event_water_pixel_count: int | None = None
+    flood_expansion_area_m2: float | None = None
+    flood_expansion_pixel_count: int | None = None
     provenance: dict[str, Any] = Field(default_factory=dict)
+

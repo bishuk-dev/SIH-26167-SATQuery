@@ -94,3 +94,18 @@ class ChangeVQAResult(ContractModel):
     supporting_evidence_ids: tuple[str, ...] = ()
     model_provenance: EvidenceModelProvenance | None = None
     limitations: tuple[str, ...] = ()
+
+
+class ChangeDescriptionResult(ContractModel):
+    """Structured result and evidence lineage for bi-temporal change captioning/description."""
+
+    pair_id: str = Field(min_length=1)
+    description: str = Field(min_length=1)
+    captions: tuple[str, ...] = Field(default_factory=tuple)
+    dataset_source: str = "LEVIR-CC"
+    evaluation_split: Literal["train", "val", "test"] = "val"
+    confidence: float | None = None
+    supporting_evidence_ids: tuple[str, ...] = ()
+    model_provenance: EvidenceModelProvenance | None = None
+    limitations: tuple[str, ...] = ()
+

@@ -2,15 +2,51 @@
 
 This plan outlines the end-to-end execution strategy for Phase 4, focusing on temporal analysis, deterministic spectral tools, and evidence generation. 
 
-## User Review Required
+## Dataset Blocker Resolutions (RESOLVED)
 
-> [!WARNING]
-> **Dataset for Change-VQA:** The plan proposes using CDVQA (based on SECOND) for P4-E02. We need to verify the exact OSS dataset license and provenance before proceeding. Is CDVQA fully authorized for this use case, or should we use another dataset?
+### P4-E02 — Learned Bi-Temporal Language Specialist (CDVQA Blocked / LEVIR-CC Adopted)
+- **CDVQA / SECOND License Audit & Gate Status**:
+  - `cdvqa_annotation_license`: Apache-2.0
+  - `second_dataset_access`: public
+  - `second_image_license_status`: UNRESOLVED
+  - `cdvqa_full_dataset_license_gate`: BLOCKED
+  - *Policy*: Do not infer that CDVQA's Apache-2.0 license relicenses upstream SECOND imagery.
+- **Adopted SIH MVP Solution**: Switched P4-E02 to **CHANGE DESCRIPTION** using **LEVIR-CC**.
+  - Permitted by mandatory requirement (allows bi-temporal change description OR change-VQA).
+  - Upstream imagery: Derived mainly from LEVIR-CD (Hao Chen & Zhenwei Shi, Beihang University / LEVIR Lab).
+  - Image license/terms: Restricted strictly to academic / non-commercial research use.
+  - Repositories & Provenance:
+    - Dataset: `https://github.com/Chen-Yang-Liu/LEVIR-CC-Dataset` / `lcybuaa/LEVIR-CC`
+    - Paper: Chenyang Liu et al., "Remote Sensing Image Change Captioning With Dual-Branch Transformers: A New Method and a Large Scale Dataset", IEEE TGRS 2022.
+    - Code: `https://github.com/Chen-Yang-Liu/RSICC`
+  - Invariants:
+    - Acceptable for SIH academic prototype.
+    - Attribution preserved.
+    - No redistribution of imagery in SatQuery repository.
+    - Do not describe source imagery as unrestricted commercial OSS.
+    - HuggingFace mirror Apache-2.0 metadata does NOT override upstream terms.
+  - Baseline: RSICCformer / SmolVLM multi-image change captioner (<2.5 GB VRAM on T4).
+  - Split: 6,815 train, 1,332 val, 1,930 test (test set strictly sealed; validation split only for evaluation).
 
-> [!IMPORTANT]
-> **SAR Dataset for P4-E04:** We need an authoritative OSS dataset with real SAR flood/change labels or before/after scenes. Are there specific datasets (e.g., Sen1Floods11, although we must ensure it's temporal if possible) that are preferred for the SAR flood validation?
+### P4-E04 — SAR Temporal Flood Inundation Validation (Modified Sen1Floods11 Pinned)
+- **Primary Benchmark**: Modified Sen1Floods11 Dataset for Change Detection
+  - DOI: [10.5281/zenodo.7946594](https://doi.org/10.5281/zenodo.7946594) (Concept DOI: 10.5281/zenodo.7946593)
+  - Version: v1 (Publication Date: 2023-05-17)
+  - Creator: Ritu Yadav / KTH Royal Institute of Technology
+  - License: CC BY 4.0
+  - Associated Paper: "Attentive Dual Stream Siamese U-Net for Flood Detection on Multi-Temporal Sentinel-1 Data", IGARSS 2022 (DOI: [10.1109/IGARSS46834.2022.9883132](https://doi.org/10.1109/IGARSS46834.2022.9883132))
+  - Authoritative Pinned Files & Published Hashes:
+    1. `PRE_S1-20230517T191707Z-001.zip` (1,520,699,949 bytes, MD5: `4a32637c56ea519bd3c4baca208b289d`)
+    2. `POST_S1-20230517T191716Z-001.zip` (729,719,788 bytes, MD5: `40a505cfbd5318d94a9d5bd7aef88561`)
+    3. `Labels-20230517T191741Z-001.zip` (2,462,219 bytes, MD5: `069b4c05eefb7a6e72c1adb34aaf1a24`)
+- **Label Raster Semantic Audit & Target**:
+  - *Audit Finding*: Ground truth labels in Modified Sen1Floods11 delineate **post-event water/flood extent** (1 = water/inundated, 0 = non-water, -1 = NoData). They do NOT represent newly inundated change minus permanent baseline water.
+  - *Evaluation Target*: Evaluates post-event water extent against authoritative labels.
+  - *SatQuery Evidence*: Bi-temporal flood expansion (post-water minus pre-water, backscatter drop >= 3 dB) is computed as a separate deterministic GIS evidence computation (`flood_expansion_m2`).
+  - *Policy*: Single-date Sen1Floods11 is NOT used alone as proof of temporal change. No random mirrors are permitted.
 
 ## Proposed Changes
+
 
 ---
 
