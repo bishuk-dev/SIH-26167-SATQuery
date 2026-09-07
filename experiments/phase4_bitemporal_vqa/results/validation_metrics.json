@@ -1,0 +1,8 @@
+{
+  "experiment": "P4-E02",
+  "task": "bitemporal_change_description",
+  "device": "cuda",
+  "status": "DATASET_UNAVAILABLE",
+  "failure_reason": "LEVIR-CC val/B directory missing",
+  "timestamp": "2026-09-07T05:43:15Z"
+}

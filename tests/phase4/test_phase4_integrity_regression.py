@@ -49,8 +49,13 @@ def test_p4_e02_production_evaluator_cannot_use_synthetic_fallback():
     """P4-E02 production evaluator must fail closed when real dataset is unavailable."""
     from scripts.kaggle.p4_e02_baseline import run_p4_e02_evaluation
     import tempfile
+    import os
     with tempfile.TemporaryDirectory() as tmpdir:
-        result = run_p4_e02_evaluation(Path(tmpdir))
+        os.environ["LEVIR_CC_ROOT"] = "/nonexistent/test"
+        try:
+            result = run_p4_e02_evaluation(Path(tmpdir))
+        finally:
+            os.environ.pop("LEVIR_CC_ROOT", None)
         assert result.get("status") in ("DATASET_UNAVAILABLE", "MODEL_UNAVAILABLE", "FAIL")
 
 
@@ -196,7 +201,7 @@ def test_no_hardcoded_benchmark_metrics_in_experiment_paths():
     """No hardcoded benchmark metrics in experiment code paths."""
     repo_root = Path(__file__).resolve().parents[2]
     forbidden = ["accuracy = 1.0", "accuracy=1.0", "iou = 0.884", "iou=0.884", "45000", "15000", "-4.2"]
-    for pattern in ["scripts/kaggle/p4_e02_baseline.py", "satquery/tools/temporal_vqa.py", "satquery/models/change_vqa/baseline.py"]:
+    for pattern in ["scripts/kaggle/p4_e02_baseline.py", "scripts/kaggle/p4_e04_baseline.py", "satquery/tools/temporal_vqa.py", "satquery/models/change_vqa/baseline.py"]:
         p = repo_root / pattern
         if p.exists():
             text = p.read_text(encoding="utf-8")
@@ -204,12 +209,31 @@ def test_no_hardcoded_benchmark_metrics_in_experiment_paths():
                 assert fb not in text, f"Hardcoded metric {fb!r} found in {pattern}"
 
 
+def test_notebooks_have_no_forbidden_patterns():
+    """Both Phase 4 notebooks must not contain forbidden placeholder patterns."""
+    repo_root = Path(__file__).resolve().parents[2]
+    forbidden = [
+        "levir_cc_val_001", "levir_cc_val_002", "levir_cc_val_003", "levir_cc_val_004",
+        "fallback evaluation", "accuracy = 1.0", "exact_match_score",
+    ]
+    for nb_name in ["kaggle_phase4_e02_bitemporal_vqa", "kaggle_phase4_e04_sar_flood"]:
+        nb_path = repo_root / "notebooks" / f"{nb_name}.ipynb"
+        text = nb_path.read_text(encoding="utf-8")
+        for fb in forbidden:
+            assert fb not in text, f"Forbidden pattern {fb!r} found in {nb_name}.ipynb"
+
+
 def test_no_synthetic_fallback_scientific_pass():
     """No synthetic fallback scientific PASS in production experiment paths."""
     from scripts.kaggle.p4_e02_baseline import run_p4_e02_evaluation
     import tempfile
+    import os
     with tempfile.TemporaryDirectory() as tmpdir:
-        result = run_p4_e02_evaluation(Path(tmpdir))
+        os.environ["LEVIR_CC_ROOT"] = "/nonexistent/test"
+        try:
+            result = run_p4_e02_evaluation(Path(tmpdir))
+        finally:
+            os.environ.pop("LEVIR_CC_ROOT", None)
         assert result.get("status") != "PASS" or result.get("sample_count", 0) > 4
 
 
@@ -339,6 +363,11 @@ def test_no_benchmark_pass_when_dataset_unavailable():
     """No benchmark PASS when dataset is unavailable."""
     from scripts.kaggle.p4_e02_baseline import run_p4_e02_evaluation
     import tempfile
+    import os
     with tempfile.TemporaryDirectory() as tmpdir:
-        result = run_p4_e02_evaluation(Path(tmpdir))
+        os.environ["LEVIR_CC_ROOT"] = "/nonexistent/test"
+        try:
+            result = run_p4_e02_evaluation(Path(tmpdir))
+        finally:
+            os.environ.pop("LEVIR_CC_ROOT", None)
         assert result.get("status") != "PASS"

@@ -1,0 +1,58 @@
+{
+  "experiment": "P4-E04",
+  "task": "sar_temporal_flood_validation",
+  "model_id": "sar_backscatter_differencing_rule_based",
+  "device": "cpu",
+  "sample_count": 0,
+  "post_event_water_iou": 0.0,
+  "post_event_water_accuracy": 0.0,
+  "post_event_water_precision": 0.0,
+  "post_event_water_recall": 0.0,
+  "post_event_water_f1": 0.0,
+  "total_tp": 0,
+  "total_fp": 0,
+  "total_tn": 0,
+  "total_fn": 0,
+  "flood_detected_count": 0,
+  "label_audit": "post_event_water_extent",
+  "expansion_evidence_separated": true,
+  "primary_benchmark": {
+    "benchmark": "Modified Sen1Floods11 Dataset for Change Detection",
+    "doi": "10.5281/zenodo.7946594",
+    "concept_doi": "10.5281/zenodo.7946593",
+    "version": "v1",
+    "publication_date": "2023-05-17",
+    "creator": "Ritu Yadav / KTH Royal Institute of Technology",
+    "license": "CC BY 4.0",
+    "paper_doi": "10.1109/IGARSS46834.2022.9883132",
+    "paper_title": "Attentive Dual Stream Siamese U-Net for Flood Detection on Multi-Temporal Sentinel-1 Data",
+    "label_audit": {
+      "ground_truth_target": "post_event_water_extent",
+      "values": {
+        "0": "non_water",
+        "1": "water_inundated",
+        "-1": "nodata"
+      },
+      "expansion_evidence": "computed_separately_as_pre_post_expansion"
+    },
+    "pinned_files": [
+      {
+        "filename": "PRE_S1-20230517T191707Z-001.zip",
+        "size_bytes": 1520699949,
+        "md5": "4a32637c56ea519bd3c4baca208b289d"
+      },
+      {
+        "filename": "POST_S1-20230517T191716Z-001.zip",
+        "size_bytes": 729719788,
+        "md5": "40a505cfbd5318d94a9d5bd7aef88561"
+      },
+      {
+        "filename": "Labels-20230517T191741Z-001.zip",
+        "size_bytes": 2462219,
+        "md5": "069b4c05eefb7a6e72c1adb34aaf1a24"
+      }
+    ]
+  },
+  "status": "FAIL",
+  "execution_time_seconds": 681.99
+}

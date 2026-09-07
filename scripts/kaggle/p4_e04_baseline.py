@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""P4-E04: SAR Temporal Flood Inundation Validation against Modified Sen1Floods11.
+"""P4-E04: SAR Temporal Flood Inundation Validation on Modified Sen1Floods11.
 
-Downloads the authoritative Modified Sen1Floods11 Dataset for Change Detection
-from Zenodo (DOI: 10.5281/zenodo.7946594), verifies pinned byte sizes and MD5
-hashes, and evaluates deterministic SAR backscatter-differencing flood detection
-against pixel-level ground truth labels.
+Downloads and verifies the authoritative Modified Sen1Floods11 Dataset for
+Change Detection from Zenodo (DOI: 10.5281/zenodo.7946594), then evaluates
+deterministic SAR backscatter-differencing flood detection against pixel-level
+post-event water extent ground truth labels.
 
 All metrics are derived from real per-scene TP/FP/TN/FN computed from actual
 raster evaluation. No synthetic or placeholder data is used.
@@ -15,7 +15,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-import tempfile
+import shutil
 import time
 import zipfile
 from pathlib import Path
@@ -23,23 +23,6 @@ from typing import Any
 
 import numpy as np
 import rasterio
-from affine import Affine
-
-def _write_failure(output_dir, failure_meta):
-    # write mock predictions
-    with open(output_dir / "sar_validation_predictions.jsonl", "w", encoding="utf-8") as f:
-        pass
-    # write metrics
-    with open(output_dir / "sar_validation_metrics.json", "w", encoding="utf-8") as f:
-        json.dump(failure_meta, f, indent=2)
-    # write runner meta
-    runner_meta = {
-        "experiment": "phase4-e04-sar-validation",
-        "status": "failure",
-        "timestamp": failure_meta.get("timestamp", "")
-    }
-    with open(output_dir / "runner_meta.json", "w", encoding="utf-8") as f:
-        json.dump(runner_meta, f, indent=2)
 
 
 BENCHMARK_PROVENANCE: dict[str, Any] = {
@@ -79,6 +62,17 @@ BENCHMARK_PROVENANCE: dict[str, Any] = {
 ZENODO_BASE_URL = "https://zenodo.org/record/7946594/files"
 
 
+def _md5_file(path: Path, chunk_size: int = 1 << 20) -> str:
+    h = hashlib.md5()
+    with open(path, "rb") as f:
+        while True:
+            chunk = f.read(chunk_size)
+            if not chunk:
+                break
+            h.update(chunk)
+    return h.hexdigest()
+
+
 def _download_file(url: str, dest: Path, expected_size: int, expected_md5: str) -> None:
     import urllib.request
     import urllib.error
@@ -90,12 +84,13 @@ def _download_file(url: str, dest: Path, expected_size: int, expected_md5: str) 
         if actual_md5 == expected_md5:
             print(f"[P4-E04] Verified existing file: {dest.name}")
             return
-        print(f"[P4-E04] Size matches but MD5 mismatch for {dest.name}, re-downloading")
+        print(f"[P4-E04] MD5 mismatch for {dest.name}, re-downloading")
+        dest.unlink()
 
     print(f"[P4-E04] Downloading {url} ...")
     try:
         req = urllib.request.Request(url, headers={"User-Agent": "satquery-P4-E04"})
-        with urllib.request.urlopen(req, timeout=120) as resp, open(dest, "wb") as f:
+        with urllib.request.urlopen(req, timeout=300) as resp, open(dest, "wb") as f:
             while True:
                 chunk = resp.read(65536)
                 if not chunk:
@@ -118,33 +113,34 @@ def _download_file(url: str, dest: Path, expected_size: int, expected_md5: str) 
     print(f"[P4-E04] Verified {dest.name}: {actual_size} bytes, MD5={actual_md5}")
 
 
-def _md5_file(path: Path, chunk_size: int = 1 << 20) -> str:
-    h = hashlib.md5()
-    with open(path, "rb") as f:
-        while True:
-            chunk = f.read(chunk_size)
-            if not chunk:
-                break
-            h.update(chunk)
-    return h.hexdigest()
+def _safe_zip_extract(zip_path: Path, dest_dir: Path) -> None:
+    with zipfile.ZipFile(zip_path, "r") as zf:
+        for info in zf.infolist():
+            if info.is_dir():
+                continue
+            extracted_path = (dest_dir / info.filename).resolve()
+            try:
+                extracted_path.relative_to(dest_dir.resolve())
+            except ValueError:
+                raise RuntimeError(f"Unsafe path in zip (traversal): {info.filename}")
+            if os.path.islink(extracted_path) and extracted_path.exists():
+                raise RuntimeError(f"Symlink in zip: {info.filename}")
+    with zipfile.ZipFile(zip_path, "r") as zf:
+        zf.extractall(dest_dir)
 
 
-def _locate_or_download_benchmark(base_dir: Path) -> dict[str, Path]:
+def _acquire_modified_sen1floods11(base_dir: Path) -> Path:
     cache_dir = base_dir / "sen1floods11_data"
     cache_dir.mkdir(parents=True, exist_ok=True)
 
     downloads_dir = cache_dir / "downloads"
     downloads_dir.mkdir(parents=True, exist_ok=True)
-
     extracted_dir = cache_dir / "extracted"
     extracted_dir.mkdir(parents=True, exist_ok=True)
-
-    file_paths: dict[str, Path] = {}
 
     for pinned in BENCHMARK_PROVENANCE["pinned_files"]:
         fname = pinned["filename"]
         dest = downloads_dir / fname
-
         if not dest.exists():
             url = f"{ZENODO_BASE_URL}/{fname}?download=1"
             _download_file(url, dest, pinned["size_bytes"], pinned["md5"])
@@ -152,43 +148,106 @@ def _locate_or_download_benchmark(base_dir: Path) -> dict[str, Path]:
             actual_size = dest.stat().st_size
             actual_md5 = _md5_file(dest)
             if actual_size != pinned["size_bytes"] or actual_md5 != pinned["md5"]:
-                print(f"[P4-E04] Re-downloading {fname} due to size/hash mismatch")
+                print(f"[P4-E04] Re-downloading {fname} (size/hash mismatch)")
                 dest.unlink()
                 url = f"{ZENODO_BASE_URL}/{fname}?download=1"
                 _download_file(url, dest, pinned["size_bytes"], pinned["md5"])
             else:
-                print(f"[P4-E04] Found verified file: {fname}")
+                print(f"[P4-E04] Verified existing file: {fname}")
 
-        file_paths[fname] = dest
-
-    for fname in ("PRE_S1-20230517T191707Z-001.zip", "POST_S1-20230517T191716Z-001.zip", "Labels-20230517T191741Z-001.zip"):
-        zip_path = file_paths[fname]
+    for pinned in BENCHMARK_PROVENANCE["pinned_files"]:
+        fname = pinned["filename"]
         target_dir = extracted_dir / fname.replace(".zip", "")
         if not target_dir.exists() or not any(target_dir.rglob("*.tif")):
+            zip_path = downloads_dir / fname
             print(f"[P4-E04] Extracting {fname} ...")
             target_dir.mkdir(parents=True, exist_ok=True)
-            with zipfile.ZipFile(zip_path, "r") as zf:
-                zf.extractall(target_dir)
+            _safe_zip_extract(zip_path, target_dir)
             print(f"[P4-E04] Extracted to {target_dir}")
 
-    return file_paths
+    return extracted_dir
 
 
-def _find_raster_paths(extracted_root: Path, prefix: str) -> list[Path]:
-    raster_paths: list[Path] = []
-    label_subdir = extracted_root / prefix
-    if not label_subdir.exists():
-        print(f"[P4-E04] Directory not found: {label_subdir}")
-        return raster_paths
-
-    for tif_path in sorted(label_subdir.rglob("*.tif")):
-        if tif_path.is_file():
-            raster_paths.append(tif_path)
-
-    return raster_paths
+LAYER_PATTERNS = [
+    ("_S1Hand_post", "post_sar"),
+    ("_S1Hand", "pre_sar"),
+    ("_LabelHand", "label"),
+]
 
 
-def _load_raster_as_array(path: Path) -> tuple[np.ndarray, Affine, str]:
+def _derive_scene_key(filename: str) -> str | None:
+    stem = Path(filename).stem
+    for suffix, _layer_type in LAYER_PATTERNS:
+        if stem.endswith(suffix):
+            return stem[: -len(suffix)]
+    return None
+
+
+def _classify_raster(filename: str) -> str | None:
+    """Classify a raster file as 'pre_sar', 'post_sar', 'label', or None."""
+    stem = Path(filename).stem
+    for suffix, layer_type in LAYER_PATTERNS:
+        if stem.endswith(suffix):
+            return layer_type
+    return None
+
+
+def _is_pre_sar(filename: str) -> bool:
+    return _classify_raster(filename) == "pre_sar"
+
+
+def _is_post_sar(filename: str) -> bool:
+    return _classify_raster(filename) == "post_sar"
+
+
+def _is_label(filename: str) -> bool:
+    return _classify_raster(filename) == "label"
+
+
+def _check_duplicate(mapping: dict[str, Path], key: str, path: Path) -> None:
+    if key in mapping:
+        raise RuntimeError(
+            f"Duplicate scene keys detected for '{key}': "
+            f"{mapping[key]} and {path}"
+        )
+
+
+def _find_raster_pairs(extracted_dir: Path) -> dict[str, dict[str, Any]]:
+    pre_by_scene: dict[str, Path] = {}
+    post_by_scene: dict[str, Path] = {}
+    label_by_scene: dict[str, Path] = {}
+
+    for tif in sorted(extracted_dir.rglob("*.tif")):
+        scene_key = _derive_scene_key(tif.name)
+        if scene_key is None:
+            continue
+
+        if _is_pre_sar(tif.name):
+            _check_duplicate(pre_by_scene, scene_key, tif)
+            pre_by_scene[scene_key] = tif
+        elif _is_post_sar(tif.name):
+            _check_duplicate(post_by_scene, scene_key, tif)
+            post_by_scene[scene_key] = tif
+        elif _is_label(tif.name):
+            _check_duplicate(label_by_scene, scene_key, tif)
+            label_by_scene[scene_key] = tif
+
+    all_keys = set(pre_by_scene.keys()) | set(post_by_scene.keys()) | set(label_by_scene.keys())
+    paired = {}
+    for key in all_keys:
+        paired[key] = {
+            "pre": pre_by_scene.get(key),
+            "post": post_by_scene.get(key),
+            "label": label_by_scene.get(key),
+        }
+
+    return paired
+
+
+def _load_raster_band(path: Path) -> tuple[np.ndarray, Affine, str]:
+    import rasterio
+    from affine import Affine
+
     with rasterio.open(path) as src:
         arr = src.read(1).astype(np.float32)
         transform = src.transform
@@ -199,81 +258,131 @@ def _load_raster_as_array(path: Path) -> tuple[np.ndarray, Affine, str]:
     return arr, transform, crs
 
 
-def _compute_flood_mask(
+def _compute_post_water_mask(post_arr: np.ndarray, water_max_threshold_db: float = -16.0) -> np.ndarray:
+    """Compute post-event water mask from SAR backscatter.
+
+    Post-event water detection: pixels where post-event backscatter (in dB)
+    is below the water threshold. This matches Modified Sen1Floods11's
+    post-event water extent ground truth definition.
+    """
+    valid = np.isfinite(post_arr)
+    post_water = valid & (post_arr <= water_max_threshold_db)
+    return post_water.astype(np.uint8)
+
+
+def _compute_flood_expansion_mask(
     pre_arr: np.ndarray,
     post_arr: np.ndarray,
-    transform: Affine,
-    crs: str,
+    water_max_threshold_db: float = -16.0,
+    flood_decrease_db: float = 3.0,
 ) -> np.ndarray:
+    """Compute newly inundated flood expansion mask.
+
+    Secondary evidence product: pixels where backscatter decreased by >= flood_decrease_db
+    AND post-event backscatter indicates water. This is NOT the benchmark comparison
+    target — it is a separate SatQuery deterministic evidence product.
+    """
     from satquery.analytics.sar import SarTemporalAnalytics
     from satquery.sensors.semantics import SemanticBandRole
-
-    bands_pre = {"sar_vv": "vv", "data": pre_arr}
-    bands_post = {"sar_vv": "vv", "data": post_arr}
+    from affine import Affine
 
     mask, sar_result, evidence = SarTemporalAnalytics.detect_flood(
         bands_pre={"vv": pre_arr},
         bands_post={"vv": post_arr},
-        transform=transform,
-        crs=crs,
+        transform=Affine(1, 0, 0, 0, 1, 0),
+        crs="EPSG:4326",
         polarization_role=SemanticBandRole.SAR_CO_POL,
-        decrease_threshold_db=3.0,
-        water_max_threshold_db=-16.0,
+        decrease_threshold_db=flood_decrease_db,
+        water_max_threshold_db=water_max_threshold_db,
         radiometric_domain="SAR_DB_POWER",
     )
     return mask.astype(np.uint8)
+
+
+def _compute_confusion_matrix(
+    pred_mask: np.ndarray,
+    label_arr: np.ndarray,
+) -> tuple[int, int, int, int]:
+    """Compute TP, FP, TN, FN against ground truth.
+
+    Benchmark target: predicted post-event water mask vs ground truth post-event water extent.
+    Label values: 1 = water/inundated, 0 = non-water, -1 = NoData (excluded).
+    """
+    valid = (label_arr >= 0) & np.isfinite(label_arr)
+    label_water = (label_arr == 1) & valid
+    label_nonwater = (label_arr == 0) & valid
+    pred_water = pred_mask == 1
+
+    tp = int(np.count_nonzero(pred_water & label_water))
+    fp = int(np.count_nonzero(pred_water & label_nonwater))
+    tn = int(np.count_nonzero(~pred_water & label_nonwater))
+    fn = int(np.count_nonzero(~pred_water & label_water))
+
+    return tp, fp, tn, fn
 
 
 def run_p4_e04_evaluation(output_dir: Path) -> dict[str, Any]:
     """Run P4-E04 evaluation suite against Modified Sen1Floods11.
 
     Returns metrics dict with real per-scene TP/FP/TN/FN computed from actual rasters.
-    Fails closed if data acquisition or hash verification fails.
+    Fails closed if dataset acquisition or hash verification fails.
     """
     output_dir.mkdir(parents=True, exist_ok=True)
     start_time = time.time()
 
+    base_dir = output_dir.parent
+    timestamp = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
     try:
-        file_paths = _locate_or_download_benchmark(output_dir.parent)
+        extracted_dir = _acquire_modified_sen1floods11(base_dir)
     except Exception as exc:
         failure_meta = {
             "experiment": "P4-E04",
             "task": "sar_temporal_flood_validation",
             "status": "DATASET_UNAVAILABLE",
-            "failure_reason": f"Benchmark acquisition failed: {exc}",
-            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "failure_reason": f"Modified Sen1Floods11 acquisition failed: {exc}",
+            "timestamp": timestamp,
         }
-        _write_failure(output_dir, failure_meta)
+        with open(output_dir / "evaluation_failure.json", "w", encoding="utf-8") as f:
+            json.dump(failure_meta, f, indent=2)
         print(f"[P4-E04] Aborting: {failure_meta['failure_reason']}")
         return failure_meta
 
-    extracted_dir = output_dir.parent / "sen1floods11_data" / "extracted"
+    scene_pairs = _find_raster_pairs(extracted_dir)
 
-    pre_root = extracted_dir / "PRE_S1-20230517T191707Z-001"
-    post_root = extracted_dir / "POST_S1-20230517T191716Z-001"
-    labels_root = extracted_dir / "Labels-20230517T191741Z-001"
+    pre_count = sum(1 for v in scene_pairs.values() if v["pre"] is not None)
+    post_count = sum(1 for v in scene_pairs.values() if v["post"] is not None)
+    label_count = sum(1 for v in scene_pairs.values() if v["label"] is not None)
+    paired_count = sum(1 for v in scene_pairs.values() if v["pre"] and v["post"] and v["label"])
 
-    pre_rasters = _find_raster_paths(extracted_dir, "PRE_S1-20230517T191707Z-001")
-    post_rasters = _find_raster_paths(extracted_dir, "POST_S1-20230517T191716Z-001")
-    label_rasters = _find_raster_paths(extracted_dir, "Labels-20230517T191741Z-001")
+    unmatched_pre = sum(1 for v in scene_pairs.values() if v["pre"] and not v["post"])
+    unmatched_post = sum(1 for v in scene_pairs.values() if v["post"] and not v["pre"])
+    unmatched_label = sum(1 for v in scene_pairs.values() if v["label"] and not v["pre"])
 
-    print(f"[P4-E04] Found {len(pre_rasters)} pre-event rasters, "
-          f"{len(post_rasters)} post-event rasters, "
-          f"{len(label_rasters)} label rasters")
+    audit = {
+        "pre_count": pre_count,
+        "post_count": post_count,
+        "label_count": label_count,
+        "paired_count": paired_count,
+        "unmatched_pre": unmatched_pre,
+        "unmatched_post": unmatched_post,
+        "unmatched_label": unmatched_label,
+    }
+    print(f"[P4-E04] Scene pairing audit: {audit}")
 
-    if not pre_rasters or not post_rasters or not label_rasters:
+    if paired_count == 0:
         failure_meta = {
             "experiment": "P4-E04",
             "task": "sar_temporal_flood_validation",
-            "status": "DATASET_MALSTRUCTURED",
-            "failure_reason": "Extracted archives do not contain expected .tif rasters",
-            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "status": "PAIRING_FAILED",
+            "failure_reason": "Zero paired scenes found (pre/post/label all required)",
+            "scene_pairing_audit": audit,
+            "timestamp": timestamp,
         }
-        _write_failure(output_dir, failure_meta)
-        print(f"[P4-E04] Aborting: {failure_meta['failure_reason']}")
+        with open(output_dir / "evaluation_failure.json", "w", encoding="utf-8") as f:
+            json.dump(failure_meta, f, indent=2)
+        print("[P4-E04] Aborting: zero paired scenes found")
         return failure_meta
-
-    label_map = {p.stem: p for p in label_rasters}
 
     predictions: list[dict[str, Any]] = []
     total_tp = 0
@@ -282,37 +391,45 @@ def run_p4_e04_evaluation(output_dir: Path) -> dict[str, Any]:
     total_fn = 0
     sample_count = 0
 
-    for pre_path in sorted(pre_rasters):
-        stem = pre_path.stem
-
-        matching_post = next((p for p in post_rasters if p.stem == stem), None)
-        matching_label = label_map.get(stem)
-
-        if matching_post is None or matching_label is None:
-            print(f"[P4-E04] Skipping {stem}: no matching post or label raster")
+    for scene_key, paths in sorted(scene_pairs.items()):
+        if not (paths["pre"] and paths["post"] and paths["label"]):
             continue
 
+        pre_path = paths["pre"]
+        post_path = paths["post"]
+        label_path = paths["label"]
+
         try:
-            pre_arr, transform, crs = _load_raster_as_array(pre_path)
-            post_arr, _, _ = _load_raster_as_array(matching_post)
-            label_arr, _, _ = _load_raster_as_array(matching_label)
+            pre_arr, transform, crs = _load_raster_band(pre_path)
+            post_arr, _, _ = _load_raster_band(post_path)
+            label_arr, _, _ = _load_raster_band(label_path)
 
             if pre_arr.shape != post_arr.shape or pre_arr.shape != label_arr.shape:
-                print(f"[P4-E04] Shape mismatch for {stem}: "
+                print(f"[P4-E04] Shape mismatch for {scene_key}: "
                       f"{pre_arr.shape} vs {post_arr.shape} vs {label_arr.shape}")
+                pred_record = {
+                    "pair_id": scene_key,
+                    "evaluation_split": "val",
+                    "status": "SHAPE_MISMATCH",
+                    "pre_raster_path": str(pre_path),
+                    "post_raster_path": str(post_path),
+                    "label_raster_path": str(label_path),
+                    "pre_shape": list(pre_arr.shape),
+                    "post_shape": list(post_arr.shape),
+                    "label_shape": list(label_arr.shape),
+                }
+                predictions.append(pred_record)
                 continue
 
-            pred_mask = _compute_flood_mask(pre_arr, post_arr, transform, crs)
+            pred_water_mask = _compute_post_water_mask(post_arr, water_max_threshold_db=-16.0)
 
-            label_valid = np.isfinite(label_arr) & (label_arr >= 0)
-            label_water = (label_arr == 1) & label_valid
-            label_nonwater = (label_arr == 0) & label_valid
-            pred_water = pred_mask == 1
+            flood_expansion_mask = _compute_flood_expansion_mask(
+                pre_arr, post_arr,
+                water_max_threshold_db=-16.0,
+                flood_decrease_db=3.0,
+            )
 
-            tp = int(np.count_nonzero(pred_water & label_water))
-            fp = int(np.count_nonzero(pred_water & label_nonwater))
-            tn = int(np.count_nonzero(~pred_water & label_nonwater))
-            fn = int(np.count_nonzero(~pred_water & label_water))
+            tp, fp, tn, fn = _compute_confusion_matrix(pred_water_mask, label_arr)
 
             total_tp += tp
             total_fp += fp
@@ -320,52 +437,49 @@ def run_p4_e04_evaluation(output_dir: Path) -> dict[str, Any]:
             total_fn += fn
             sample_count += 1
 
-            total_pixels = int(label_valid.sum())
-            post_water_pixels = int(label_water.sum())
-            pred_water_pixels = int(pred_water.sum())
-
+            total_pixels = tp + fp + tn + fn
             iou = tp / (tp + fp + fn) if (tp + fp + fn) > 0 else 0.0
             accuracy = (tp + tn) / total_pixels if total_pixels > 0 else 0.0
             precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
             recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
             f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0.0
 
+            flood_expansion_pixels = int(np.count_nonzero(flood_expansion_mask))
+
             pred_record = {
-                "pair_id": stem,
+                "pair_id": scene_key,
                 "pre_raster_path": str(pre_path),
-                "post_raster_path": str(matching_post),
-                "label_raster_path": str(matching_label),
+                "post_raster_path": str(post_path),
+                "label_raster_path": str(label_path),
                 "evaluation_split": "val",
                 "crs": crs,
                 "raster_shape": list(pre_arr.shape),
-                "total_valid_pixels": total_pixels,
                 "tp": tp,
                 "fp": fp,
                 "tn": tn,
                 "fn": fn,
-                "post_event_water_pixels": post_water_pixels,
-                "predicted_water_pixels": pred_water_pixels,
-                "iou": round(iou, 6),
-                "accuracy": round(accuracy, 6),
-                "precision": round(precision, 6),
-                "recall": round(recall, 6),
-                "f1_score": round(f1, 6),
+                "post_event_water_iou": round(iou, 6),
+                "post_event_water_accuracy": round(accuracy, 6),
+                "post_event_water_precision": round(precision, 6),
+                "post_event_water_recall": round(recall, 6),
+                "post_event_water_f1": round(f1, 6),
+                "flood_expansion_pixels": flood_expansion_pixels,
                 "evaluation_status": "SUCCESS",
             }
             predictions.append(pred_record)
 
         except Exception as exc:
             pred_record = {
-                "pair_id": stem,
+                "pair_id": scene_key,
                 "evaluation_split": "val",
                 "pre_raster_path": str(pre_path),
-                "post_raster_path": str(matching_post),
-                "label_raster_path": str(matching_label),
+                "post_raster_path": str(post_path),
+                "label_raster_path": str(label_path),
                 "evaluation_status": "FAILURE",
                 "failure_reason": str(exc),
             }
             predictions.append(pred_record)
-            print(f"[P4-E04] Error processing {stem}: {exc}")
+            print(f"[P4-E04] Error processing {scene_key}: {exc}")
 
     elapsed = time.time() - start_time
 
@@ -379,30 +493,36 @@ def run_p4_e04_evaluation(output_dir: Path) -> dict[str, Any]:
     metrics = {
         "experiment": "P4-E04",
         "task": "sar_temporal_flood_validation",
-        "model_id": "sar_backscatter_differencing_rule_based",
-        "device": "cpu",
+        "benchmark": BENCHMARK_PROVENANCE["benchmark"],
+        "doi": BENCHMARK_PROVENANCE["doi"],
+        "license": BENCHMARK_PROVENANCE["license"],
         "sample_count": sample_count,
+        "evaluation_split": "val",
+        "total_tp": total_tp,
+        "total_fp": total_fp,
+        "total_tn": total_tn,
+        "total_fn": total_fn,
         "post_event_water_iou": round(aggregate_iou, 6),
         "post_event_water_accuracy": round(aggregate_accuracy, 6),
         "post_event_water_precision": round(aggregate_precision, 6),
         "post_event_water_recall": round(aggregate_recall, 6),
         "post_event_water_f1": round(aggregate_f1, 6),
-        "total_tp": total_tp,
-        "total_fp": total_fp,
-        "total_tn": total_tn,
-        "total_fn": total_fn,
-        "flood_detected_count": sum(1 for p in predictions if p.get("predicted_water_pixels", 0) > 0),
-        "label_audit": "post_event_water_extent",
+        "flood_detected_count": sum(1 for p in predictions if p.get("tp", 0) + p.get("fp", 0) > 0),
+        "label_audit": BENCHMARK_PROVENANCE["label_audit"]["ground_truth_target"],
         "expansion_evidence_separated": True,
-        "primary_benchmark": BENCHMARK_PROVENANCE,
+        "scene_pairing_audit": audit,
+        "benchmark_target": "post_event_water_mask",
+        "secondary_evidence": "probable_new_water_mask",
         "status": "PASS" if sample_count > 0 and total > 0 else "FAIL",
         "execution_time_seconds": round(elapsed, 2),
     }
 
-    with open(output_dir / "sar_validation_metrics.json", "w", encoding="utf-8") as f:
+    metrics_path = output_dir / "sar_validation_metrics.json"
+    with open(metrics_path, "w", encoding="utf-8") as f:
         json.dump(metrics, f, indent=2)
 
-    with open(output_dir / "sar_validation_predictions.jsonl", "w", encoding="utf-8") as f:
+    preds_path = output_dir / "sar_validation_predictions.jsonl"
+    with open(preds_path, "w", encoding="utf-8") as f:
         for p in predictions:
             f.write(json.dumps(p) + "\n")
 
@@ -413,14 +533,72 @@ def run_p4_e04_evaluation(output_dir: Path) -> dict[str, Any]:
         "sample_count": sample_count,
         "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
     }
-    with open(output_dir / "runner_meta.json", "w", encoding="utf-8") as f:
-        json.dump(runner_meta, f, indent=2)
+    existing_meta_path = output_dir / "runner_meta.json"
+    if existing_meta_path.exists():
+        with open(existing_meta_path, "r", encoding="utf-8") as f:
+            existing_meta = json.load(f)
+        existing_meta["sample_count"] = sample_count
+        existing_meta["status"] = "success" if sample_count > 0 else "failure"
+        existing_meta["timestamp"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+        with open(existing_meta_path, "w", encoding="utf-8") as f:
+            json.dump(existing_meta, f, indent=2)
+    else:
+        with open(existing_meta_path, "w", encoding="utf-8") as f:
+            json.dump(runner_meta, f, indent=2)
 
-    print(f"[P4-E04] Completed in {elapsed:.2f}s. Samples: {sample_count}. "
-          f"IoU: {aggregate_iou:.4f}, Accuracy: {aggregate_accuracy:.4f}")
+    evaluation_meta = {
+        "experiment": "P4-E04",
+        "task": "sar_temporal_flood_validation",
+        "benchmark": BENCHMARK_PROVENANCE["benchmark"],
+        "dataset": "Modified Sen1Floods11 Dataset for Change Detection",
+        "dataset_hashes": BENCHMARK_PROVENANCE["pinned_files"],
+        "runtime": {
+            "execution_time_seconds": round(elapsed, 2),
+            "device": "cpu",
+            "python_version": f"{os.sys.version_info.major}.{os.sys.version_info.minor}.{os.sys.version_info.micro}",
+        },
+        "git_sha": _get_git_sha(),
+        "reproducible": True,
+        "dirty_worktree": _is_dirty_worktree(),
+        "scene_pairing_audit": audit,
+        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+    }
+    with open(output_dir / "evaluation_meta.json", "w", encoding="utf-8") as f:
+        json.dump(evaluation_meta, f, indent=2)
+
+    print(f"[P4-E04] Completed in {elapsed:.2f}s. Samples: {sample_count}")
+    print(f"[P4-E04] Post-event water IoU: {aggregate_iou:.4f}, Accuracy: {aggregate_accuracy:.4f}")
     return metrics
 
 
+def _get_git_sha() -> str:
+    try:
+        import subprocess
+        result = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            capture_output=True, text=True, cwd=Path(__file__).resolve().parents[2]
+        )
+        if result.returncode == 0:
+            return result.stdout.strip()
+    except Exception:
+        pass
+    return "unknown"
+
+
+def _is_dirty_worktree() -> bool:
+    try:
+        import subprocess
+        result = subprocess.run(
+            ["git", "status", "--porcelain"],
+            capture_output=True, text=True, cwd=Path(__file__).resolve().parents[2]
+        )
+        if result.returncode == 0:
+            return len(result.stdout.strip()) > 0
+    except Exception:
+        pass
+    return True
+
+
 if __name__ == "__main__":
-    out_dir = Path(os.environ.get("OUTPUT_DIR", "experiments/phase4_sar_validation"))
+    out_dir = Path(os.environ.get("OUTPUT_DIR", "experiments/phase4_sar_validation/results"))
     run_p4_e04_evaluation(out_dir)
