@@ -25,6 +25,22 @@ import numpy as np
 import rasterio
 from affine import Affine
 
+def _write_failure(output_dir, failure_meta):
+    # write mock predictions
+    with open(output_dir / "sar_validation_predictions.jsonl", "w", encoding="utf-8") as f:
+        pass
+    # write metrics
+    with open(output_dir / "sar_validation_metrics.json", "w", encoding="utf-8") as f:
+        json.dump(failure_meta, f, indent=2)
+    # write runner meta
+    runner_meta = {
+        "experiment": "phase4-e04-sar-validation",
+        "status": "failure",
+        "timestamp": failure_meta.get("timestamp", "")
+    }
+    with open(output_dir / "runner_meta.json", "w", encoding="utf-8") as f:
+        json.dump(runner_meta, f, indent=2)
+
 
 BENCHMARK_PROVENANCE: dict[str, Any] = {
     "benchmark": "Modified Sen1Floods11 Dataset for Change Detection",
@@ -227,8 +243,7 @@ def run_p4_e04_evaluation(output_dir: Path) -> dict[str, Any]:
             "failure_reason": f"Benchmark acquisition failed: {exc}",
             "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         }
-        with open(output_dir / "evaluation_failure.json", "w") as f:
-            json.dump(failure_meta, f, indent=2)
+        _write_failure(output_dir, failure_meta)
         print(f"[P4-E04] Aborting: {failure_meta['failure_reason']}")
         return failure_meta
 
@@ -254,8 +269,7 @@ def run_p4_e04_evaluation(output_dir: Path) -> dict[str, Any]:
             "failure_reason": "Extracted archives do not contain expected .tif rasters",
             "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         }
-        with open(output_dir / "evaluation_failure.json", "w") as f:
-            json.dump(failure_meta, f, indent=2)
+        _write_failure(output_dir, failure_meta)
         print(f"[P4-E04] Aborting: {failure_meta['failure_reason']}")
         return failure_meta
 
@@ -380,7 +394,7 @@ def run_p4_e04_evaluation(output_dir: Path) -> dict[str, Any]:
         "flood_detected_count": sum(1 for p in predictions if p.get("predicted_water_pixels", 0) > 0),
         "label_audit": "post_event_water_extent",
         "expansion_evidence_separated": True,
-        "primary_benchmark": benchmark_provenance,
+        "primary_benchmark": BENCHMARK_PROVENANCE,
         "status": "PASS" if sample_count > 0 and total > 0 else "FAIL",
         "execution_time_seconds": round(elapsed, 2),
     }

@@ -182,7 +182,7 @@ phase4-e02-levircc-change-description:
 
 phase4-e04-modified-sen1floods11-validation:
   notebook: notebooks/kaggle_phase4_e04_sar_flood.ipynb
-  kernel_slug: satquery-phase4-e04-modified-sen1floods11-validation
+  kernel_slug: satquery-p4e04-sen1floods11-val
   experiment_dir: experiments/phase4_sar_validation
   remote_output_dir: phase4-e04-modified-sen1floods11-validation
   result_files:

@@ -662,6 +662,9 @@ def cmd_run(args: argparse.Namespace) -> None:
     exp_name     = exp["_name"]
     nb_path      = REPO_ROOT / exp["notebook"]
     slug         = exp["kernel_slug"]
+    if len(slug) > 50:
+        _die(f"Kernel slug '{slug}' exceeds Kaggle's 50-character limit (length: {len(slug)})")
+    
     exp_dir      = REPO_ROOT / exp["experiment_dir"]
     remote_out   = exp["remote_output_dir"]
     gpu          = exp.get("gpu", True)
