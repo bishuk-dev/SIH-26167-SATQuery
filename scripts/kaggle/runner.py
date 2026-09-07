@@ -267,14 +267,20 @@ def _patch_notebook(
             or ('"git"' in src and ('"clone"' in src or '"pull"' in src))
         )
         if _is_clone_cell:
-            # Append a checkout step after clone/pull
+            src = "".join(cell.get("source", []))
+            if "REPO_DIR" in src:
+                repo_var = "REPO_DIR"
+            elif "repo_root" in src:
+                repo_var = "repo_root"
+            else:
+                repo_var = "REPO_DIR"
             cell["source"] = list(cell.get("source", [])) + [
                 "\n",
                 "# Pin to the exact git ref recorded by runner.py\n",
                 "_ref = os.environ.get('SATQUERY_GIT_REF', 'HEAD')\n",
                 "if _ref != 'HEAD':\n",
-                "    subprocess.run(['git', 'fetch', '--depth=1', 'origin', _ref], cwd=str(REPO_DIR), check=False)\n",
-                "    subprocess.run(['git', 'checkout', _ref], cwd=str(REPO_DIR), check=True)\n",
+                f"    subprocess.run(['git', 'fetch', '--depth=1', 'origin', _ref], cwd=str({repo_var}), check=False)\n",
+                f"    subprocess.run(['git', 'checkout', _ref], cwd=str({repo_var}), check=True)\n",
                 "    print(f'Checked out {_ref}')\n",
             ]
             break

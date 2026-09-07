@@ -3,6 +3,7 @@
 .env.*
 !.env.example
 scratch/
+SATQuery_Context_Export_2026-09-08/
 
 # Python
 __pycache__/

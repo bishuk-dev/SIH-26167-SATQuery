@@ -137,6 +137,64 @@ class TestPatchNotebook:
         )
         assert "SATQUERY_GIT_REF" in src
 
+    def test_clone_cell_uses_repo_root_variable(self, tmp_path: Path, dest_dir: Path) -> None:
+        notebook_with_repo_root = {
+            "cells": [
+                {
+                    "cell_type": "markdown",
+                    "metadata": {},
+                    "source": ["# Test notebook\n"],
+                },
+                {
+                    "cell_type": "code",
+                    "execution_count": None,
+                    "metadata": {},
+                    "outputs": [],
+                    "source": [
+                        "import os, subprocess, sys\n",
+                        "from pathlib import Path\n",
+                        "repo_url = os.environ.get('SATQUERY_REPO_URL', 'https://github.com/example/repo.git')\n",
+                        "repo_root = Path('/kaggle/working/repo')\n",
+                        "if not repo_root.exists():\n",
+                        "    subprocess.run(['git', 'clone', '--depth', '1', repo_url, str(repo_root)], check=True)\n",
+                    ],
+                },
+                {
+                    "cell_type": "code",
+                    "execution_count": None,
+                    "metadata": {},
+                    "outputs": [],
+                    "source": ["print('hello')\n"],
+                },
+            ],
+            "metadata": {
+                "kernelspec": {"display_name": "Python 3", "language": "python", "name": "python3"},
+                "language_info": {"name": "python", "version": "3.11"},
+            },
+            "nbformat": 4,
+            "nbformat_minor": 5,
+        }
+        nb_file = tmp_path / "kaggle_test_repo_root.ipynb"
+        nb_file.write_text(json.dumps(notebook_with_repo_root, indent=1))
+        patched = runner._patch_notebook(
+            source_nb=nb_file,
+            dest_dir=dest_dir,
+            git_sha="deadbeef",
+            repo_url="https://github.com/example/repo.git",
+            allow_dirty=False,
+            experiment_name="test-exp",
+            remote_output_dir="test-output",
+        )
+        nb = json.loads(patched.read_text())
+        clone_cell = nb["cells"][2]
+        src = "".join(clone_cell["source"])
+        assert "repo_root" in src, (
+            f"Expected repo_root variable in clone cell, got: {src!r}"
+        )
+        assert "REPO_DIR" not in src, (
+            f"Should not find REPO_DIR when notebook uses repo_root, got: {src!r}"
+        )
+
     def test_dirty_worktree_flag_in_meta(self, source_nb: Path, dest_dir: Path) -> None:
         patched = runner._patch_notebook(
             source_nb=source_nb,
