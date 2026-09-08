@@ -692,11 +692,12 @@ class TestDownloadArtifacts:
         assert "--file-pattern" in cmd
         pattern_idx = cmd.index("--file-pattern") + 1
         pattern = cmd[pattern_idx]
-        # Pattern must match the configured basenames
-        assert re.match(pattern, "satquery-output/phase3b/calibration.json")
-        assert re.match(pattern, "satquery-output/phase3b/validation_candidates.jsonl")
+        # Pattern must match the configured basenames under remote_output_dir
+        assert re.match(pattern, f"satquery-output/{remote_out}/calibration.json")
+        assert re.match(pattern, f"satquery-output/{remote_out}/validation_candidates.jsonl")
         # Must not match unrelated files
-        assert not re.match(pattern, "satquery-output/phase3b/README.md")
+        assert not re.match(pattern, f"satquery-output/{remote_out}/README.md")
+        assert not re.match(pattern, "satquery-output/phase3b/calibration.json")
         assert not re.match(pattern, "SIH-26167-SATQuery/satquery/main.py")
 
     def test_missing_result_file_raises_system_exit(self, tmp_path: Path) -> None:

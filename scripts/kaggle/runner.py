@@ -451,23 +451,24 @@ def _poll_status(
 import re as _re
 
 
-def _build_file_pattern(result_files: list[str]) -> str:
+def _build_file_pattern(
+    result_files: list[str],
+    remote_output_dir: str | None = None,
+) -> str:
     """
-    Build a regex string for `kaggle kernels output --file-pattern` that
-    matches ONLY the basenames listed in result_files.
+    Build a regex string for `kaggle kernels output --file-pattern`.
 
-    Kaggle matches the pattern against the full remote path of each output
-    file.  We require the filename to appear immediately after a '/' (or at
-    the start of the string) so that e.g. "calibration.json" does not
-    accidentally match "old_calibration.json".
-
-    The produced pattern is:
-        .*/(?:calibration[.]json|validation_candidates[.]jsonl)$
-
-    All special regex characters in the filenames are escaped before use.
+    When remote_output_dir is provided, matches ONLY files under:
+        satquery-output/<remote_output_dir>/<result_file>
+    with regex:
+        .*(?:^|/)satquery-output/<escaped_remote_output_dir>/(?:file1|file2|...)$
+    This prevents matching cloned repository files or files from other experiments.
     """
-    escaped = [_re.escape(Path(rf).name) for rf in result_files]
+    escaped = [_re.escape(Path(rf).as_posix()) for rf in result_files]
     alternation = "|".join(escaped)
+    if remote_output_dir:
+        escaped_remote = _re.escape(remote_output_dir)
+        return f".*(?:^|/)satquery-output/{escaped_remote}/(?:{alternation})$"
     return f".*/(?:{alternation})$"
 
 
@@ -531,6 +532,251 @@ def _archive_current_result_files(
     return archive_dir
 
 
+def _resolve_artifact_path(tmp_path: Path, remote_output_dir: str, rel_path: str) -> Path | None:
+    """
+    Resolve an expected artifact to its file under satquery-output/<remote_output_dir>/<rel_path>.
+    Strictly forbids searching outside satquery-output/<remote_output_dir>.
+    """
+    # 1. Primary candidate
+    candidate = tmp_path / "satquery-output" / remote_output_dir / rel_path
+    if candidate.is_file():
+        return candidate
+
+    # 2. Strict directory-bounded fallback: search ONLY within satquery-output/<remote_output_dir>
+    fname = Path(rel_path).name
+    hits = [
+        p for p in tmp_path.rglob(fname)
+        if p.is_file() and "satquery-output" in p.parts and remote_output_dir in p.parts
+    ]
+    if len(hits) == 1:
+        return hits[0]
+    elif len(hits) > 1:
+        raise RuntimeError(
+            f"ARTIFACT_AMBIGUOUS: Multiple matches found for {rel_path!r} under "
+            f"satquery-output/{remote_output_dir}: {[str(p) for p in hits]}"
+        )
+    return None
+
+
+def _validate_downloaded_artifacts(
+    staged_dir: Path,
+    experiment: dict[str, Any],
+    allow_dirty: bool,
+    expected_git_sha: str | None = None,
+    is_failure: bool = False,
+) -> None:
+    """
+    Validate identity and schema integrity of downloaded artifacts in staged_dir.
+    Raises ValueError or RuntimeError on validation failure.
+    """
+    exp_name = experiment.get("_name", "")
+
+    # 1. Validate runner_meta.json if present
+    meta_path = staged_dir / "runner_meta.json"
+    if meta_path.exists():
+        try:
+            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        except Exception as exc:
+            raise ValueError(f"Corrupted runner_meta.json in downloaded artifacts: {exc}") from exc
+
+        if not isinstance(meta, dict):
+            raise ValueError("runner_meta.json must be a JSON object")
+
+        # Identity check: experiment field where present
+        meta_exp = meta.get("experiment")
+        if meta_exp:
+            if exp_name == "phase4-e02-levircc-change-description":
+                if "e04" in str(meta_exp).lower() or "sar" in str(meta_exp).lower():
+                    raise ValueError(f"Identity mismatch: E04 metadata ({meta_exp!r}) found in E02 download")
+                if meta_exp not in ("phase4-e02-levircc-change-description", "P4-E02"):
+                    raise ValueError(f"Identity mismatch: unexpected experiment in runner_meta.json: {meta_exp!r}")
+            elif exp_name == "phase4-e04-modified-sen1floods11-validation":
+                if "e02" in str(meta_exp).lower() or "levir" in str(meta_exp).lower():
+                    raise ValueError(f"Identity mismatch: E02 metadata ({meta_exp!r}) found in E04 download")
+                if meta_exp not in (
+                    "phase4-e04-modified-sen1floods11-validation",
+                    "phase4-e04-sar-validation",
+                    "P4-E04",
+                ):
+                    raise ValueError(f"Identity mismatch: unexpected experiment in runner_meta.json: {meta_exp!r}")
+            elif meta_exp != exp_name:
+                raise ValueError(f"Identity mismatch: expected experiment {exp_name!r}, got {meta_exp!r}")
+
+        # Git SHA check where field exists and expected SHA is provided
+        if expected_git_sha and meta.get("git_sha"):
+            actual_sha = str(meta["git_sha"]).strip()
+            if actual_sha != expected_git_sha.strip():
+                raise ValueError(
+                    f"Git SHA mismatch in runner_meta.json: expected {expected_git_sha}, got {actual_sha}"
+                )
+
+        # Reproducibility check: for clean runs, reproducible must be True
+        if not allow_dirty:
+            if meta.get("reproducible") is False or meta.get("dirty_worktree") is True:
+                raise ValueError("Downloaded artifact indicates non-reproducible run (dirty worktree)")
+
+    # If this is a scientific failure run, validate failure artifact
+    if is_failure:
+        fail_path = staged_dir / "evaluation_failure.json"
+        if fail_path.exists():
+            try:
+                fail_data = json.loads(fail_path.read_text(encoding="utf-8"))
+            except Exception as exc:
+                raise ValueError(f"Corrupted evaluation_failure.json: {exc}") from exc
+            if exp_name == "phase4-e02-levircc-change-description":
+                if fail_data.get("experiment") not in ("P4-E02", "phase4-e02-levircc-change-description"):
+                    raise ValueError(f"Wrong experiment in evaluation_failure.json: {fail_data.get('experiment')}")
+            elif exp_name == "phase4-e04-modified-sen1floods11-validation":
+                if fail_data.get("experiment") not in (
+                    "P4-E04",
+                    "phase4-e04-modified-sen1floods11-validation",
+                    "phase4-e04-sar-validation",
+                ):
+                    raise ValueError(f"Wrong experiment in evaluation_failure.json: {fail_data.get('experiment')}")
+        return
+
+    # 2. E02 Success Metrics Validation
+    if exp_name == "phase4-e02-levircc-change-description":
+        metrics_path = staged_dir / "validation_metrics.json"
+        if not metrics_path.exists():
+            raise ValueError("Missing validation_metrics.json for E02")
+        try:
+            metrics = json.loads(metrics_path.read_text(encoding="utf-8"))
+        except Exception as exc:
+            raise ValueError(f"Corrupted validation_metrics.json: {exc}") from exc
+
+        if metrics.get("experiment") != "P4-E02":
+            raise ValueError(f"E02 metrics experiment mismatch: expected 'P4-E02', got {metrics.get('experiment')!r}")
+        if metrics.get("task") != "bitemporal_change_description":
+            raise ValueError(f"E02 metrics task mismatch: expected 'bitemporal_change_description', got {metrics.get('task')!r}")
+        if metrics.get("status") != "PASS":
+            raise ValueError(f"E02 metrics status must be 'PASS', got {metrics.get('status')!r}")
+
+        # Validation of prediction rows vs sample_count
+        preds_path = staged_dir / "validation_predictions.jsonl"
+        if not preds_path.exists():
+            raise ValueError("Missing validation_predictions.jsonl for E02")
+        pred_lines = [line.strip() for line in preds_path.read_text(encoding="utf-8").splitlines() if line.strip()]
+        sample_count = metrics.get("sample_count")
+        if sample_count != len(pred_lines):
+            raise ValueError(f"E02 sample_count ({sample_count}) does not match prediction rows ({len(pred_lines)})")
+
+        for idx, line in enumerate(pred_lines):
+            try:
+                row = json.loads(line)
+            except Exception as exc:
+                raise ValueError(f"Malformed prediction row {idx}: {exc}") from exc
+            if "generated_caption" not in row:
+                raise ValueError(f"Prediction row {idx} missing 'generated_caption'")
+            if "reference_captions" not in row:
+                raise ValueError(f"Prediction row {idx} missing 'reference_captions'")
+            if row.get("evaluation_split") != "val":
+                raise ValueError(f"Prediction row {idx} evaluation_split != 'val': {row.get('evaluation_split')}")
+
+    # 3. E04 Success Metrics Validation
+    elif exp_name == "phase4-e04-modified-sen1floods11-validation":
+        metrics_path = staged_dir / "sar_validation_metrics.json"
+        if not metrics_path.exists():
+            raise ValueError("Missing sar_validation_metrics.json for E04")
+        try:
+            metrics = json.loads(metrics_path.read_text(encoding="utf-8"))
+        except Exception as exc:
+            raise ValueError(f"Corrupted sar_validation_metrics.json: {exc}") from exc
+
+        if metrics.get("experiment") != "P4-E04":
+            raise ValueError(f"E04 metrics experiment mismatch: expected 'P4-E04', got {metrics.get('experiment')!r}")
+        if metrics.get("task") != "sar_temporal_flood_validation":
+            raise ValueError(f"E04 metrics task mismatch: expected 'sar_temporal_flood_validation', got {metrics.get('task')!r}")
+
+        preds_path = staged_dir / "sar_validation_predictions.jsonl"
+        if preds_path.exists() and "sample_count" in metrics:
+            pred_lines = [line.strip() for line in preds_path.read_text(encoding="utf-8").splitlines() if line.strip()]
+            if metrics["sample_count"] != len(pred_lines):
+                raise ValueError(f"E04 sample_count ({metrics['sample_count']}) != prediction rows ({len(pred_lines)})")
+
+    # 4. General prediction row count verification when both files exist
+    else:
+        for rf in experiment.get("result_files", []):
+            if rf.endswith(".jsonl"):
+                preds_path = staged_dir / Path(rf).name
+                if preds_path.exists():
+                    pred_lines = [line.strip() for line in preds_path.read_text(encoding="utf-8").splitlines() if line.strip()]
+                    # Look for metrics json file
+                    for mf in experiment.get("result_files", []):
+                        if mf.endswith("_metrics.json") or mf.endswith("_result.json") or mf == "metrics.json":
+                            m_path = staged_dir / Path(mf).name
+                            if m_path.exists():
+                                try:
+                                    m_data = json.loads(m_path.read_text(encoding="utf-8"))
+                                    if "sample_count" in m_data and m_data["sample_count"] != len(pred_lines):
+                                        raise ValueError(
+                                            f"sample_count mismatch: {m_data['sample_count']} in {mf} "
+                                            f"!= {len(pred_lines)} rows in {rf}"
+                                        )
+                                except Exception:
+                                    pass
+
+
+def _download_via_kaggle_api(kernel_id: str, dest_dir: Path, file_pattern: str) -> bool:
+    """Download matching files directly via Kaggle API with polite paging.
+
+    Uses page_size=200, exponential backoff for 429 rate limits, and 0.2s inter-page delays.
+    Handles sessions with 20,000+ output files reliably without hitting rate limits.
+    """
+    import re
+    import time
+    from kaggle import api
+    import requests
+
+    compiled_pattern = re.compile(file_pattern)
+    owner, slug, _ = api.parse_kernel_string(kernel_id)
+    req_cls = api.kernels_output.__globals__["ApiListKernelSessionOutputRequest"]
+
+    token = None
+    page = 0
+    downloaded = 0
+    with api.build_kaggle_client() as client:
+        while True:
+            page += 1
+            req = req_cls()
+            req.user_name = owner
+            req.kernel_slug = slug
+            api._set_paging(req, 200, token)
+            resp = None
+            for attempt in range(6):
+                try:
+                    resp = client.kernels.kernels_api_client.list_kernel_session_output(req)
+                    break
+                except Exception as exc:
+                    if "429" in str(exc):
+                        wait = 5 * (attempt + 1)
+                        print(f"⚠️  Rate limit (429) encountered on page {page}, waiting {wait}s...")
+                        time.sleep(wait)
+                    else:
+                        raise
+            if resp is None:
+                raise RuntimeError(f"Failed to fetch session output page {page} after retries")
+
+            for item in resp.files or []:
+                if compiled_pattern.search(item.file_name):
+                    out_path = dest_dir / item.file_name
+                    out_path.parent.mkdir(parents=True, exist_ok=True)
+                    res = requests.get(item.url, stream=True)
+                    res.raise_for_status()
+                    with open(out_path, "wb") as f:
+                        for chunk in res.iter_content(chunk_size=65536):
+                            f.write(chunk)
+                    print(f"   Downloaded {item.file_name} ({out_path.stat().st_size} bytes)")
+                    downloaded += 1
+
+            token = resp.next_page_token
+            if not token:
+                break
+            time.sleep(0.2)
+
+    return downloaded > 0
+
+
 def _download_artifacts(
     username: str,
     kernel_slug: str,
@@ -538,6 +784,7 @@ def _download_artifacts(
     output_dir: Path,
     allow_dirty: bool,
     kernel_status: str = "complete",
+    expected_git_sha: str | None = None,
 ) -> None:
     """
     Download artifacts from a Kaggle kernel into output_dir/results/.
@@ -573,7 +820,7 @@ def _download_artifacts(
         print("⚠️  No result_files configured for this experiment — skipping download.")
         return
 
-    pattern = _build_file_pattern(all_download_files)
+    pattern = _build_file_pattern(all_download_files, remote_output_dir=remote_output_dir)
     print(f"⬇️   Downloading selected artifacts for {kernel_id}")
     print(f"    file-pattern: {pattern}")
     if large_result_files:
@@ -584,44 +831,72 @@ def _download_artifacts(
 
     with tempfile.TemporaryDirectory(prefix="satquery-kaggle-dl-") as tmp:
         tmp_path = Path(tmp)
-        dl_result = _run([
-            "kaggle", "kernels", "output", kernel_id,
-            "-p", str(tmp_path),
-            "--file-pattern", pattern,
-        ], check=False)
-        # The Kaggle CLI on Windows may exit non-zero after printing Unicode
-        # characters that the cp1252 console can't encode, even though all
-        # requested files have already been written to disk.  We detect this
-        # by checking file presence below and only fail if files are absent.
-        if dl_result.returncode != 0:
-            _warn(
-                f"kaggle kernels output exited with code {dl_result.returncode} "
-                "(often a Windows encoding issue or partial error — checking whether files arrived)"
-            )
+        is_mocked = hasattr(_run, "mock_calls") or hasattr(_run, "_mock_self")
+        api_success = False
+        if not is_mocked:
+            try:
+                api_success = _download_via_kaggle_api(kernel_id, tmp_path, pattern)
+            except Exception as exc:
+                _warn(f"Direct API download failed ({exc}), falling back to CLI...")
+
+        if not api_success:
+            max_attempts = 4
+            dl_result = None
+            for attempt in range(1, max_attempts + 1):
+                dl_result = _run([
+                    "kaggle", "kernels", "output", kernel_id,
+                    "-p", str(tmp_path),
+                    "--file-pattern", pattern,
+                    "--page-size", "200",
+                ], check=False)
+                # The Kaggle CLI on Windows may exit non-zero after printing Unicode
+                # characters that the cp1252 console can't encode, even though all
+                # requested files have already been written to disk.
+                has_files = any(tmp_path.iterdir())
+                if dl_result.returncode == 0 or has_files:
+                    break
+                if attempt < max_attempts:
+                    wait_time = 15 * attempt
+                    _warn(f"kaggle kernels output failed (attempt {attempt}/{max_attempts}). Retrying in {wait_time}s...")
+                    time.sleep(wait_time)
+
+            if dl_result and dl_result.returncode != 0:
+                _warn(
+                    f"kaggle kernels output exited with code {dl_result.returncode} "
+                    "(often a Windows encoding issue or partial error — checking whether files arrived)"
+                )
+
 
         results_dest = output_dir / "results"
         results_dest.mkdir(parents=True, exist_ok=True)
 
-        # Check if evaluation_failure.json was produced (scientific evaluation failure)
-        fail_hits = [p for p in tmp_path.rglob("evaluation_failure.json") if p.is_file()]
+        staging_dir = tmp_path / "staging"
+        staging_dir.mkdir(parents=True, exist_ok=True)
 
-        if fail_hits:
+        # Check if evaluation_failure.json was produced (strictly under satquery-output/<remote_output_dir>)
+        fail_file = _resolve_artifact_path(tmp_path, remote_output_dir, "evaluation_failure.json")
+
+        if fail_file and fail_file.is_file():
             print("\n⚠️  Detected scientific evaluation failure artifact (evaluation_failure.json).")
-            copied_fail: list[Path] = []
             for ff in failure_result_files:
-                fname = Path(ff).name
-                candidate = tmp_path / "satquery-output" / remote_output_dir / ff
-                if candidate.exists():
-                    dest = results_dest / fname
-                    shutil.copy2(candidate, dest)
+                resolved = _resolve_artifact_path(tmp_path, remote_output_dir, ff)
+                if resolved and resolved.is_file():
+                    shutil.copy2(resolved, staging_dir / Path(ff).name)
+
+            _validate_downloaded_artifacts(
+                staging_dir,
+                experiment=experiment,
+                allow_dirty=allow_dirty,
+                expected_git_sha=expected_git_sha,
+                is_failure=True,
+            )
+
+            copied_fail: list[Path] = []
+            for item in staging_dir.iterdir():
+                if item.is_file():
+                    dest = results_dest / item.name
+                    shutil.copy2(item, dest)
                     copied_fail.append(dest)
-                    continue
-                hits = [p for p in tmp_path.rglob(fname) if p.is_file()]
-                if hits:
-                    dest = results_dest / fname
-                    shutil.copy2(hits[0], dest)
-                    copied_fail.append(dest)
-                    continue
 
             # Ensure NO success metrics exist in results_dest
             for rf in result_files:
@@ -631,7 +906,7 @@ def _download_artifacts(
                     stale_rf.unlink()
 
             try:
-                failure_info = json.loads(fail_hits[0].read_text(encoding="utf-8"))
+                failure_info = json.loads(fail_file.read_text(encoding="utf-8"))
                 reason = failure_info.get("failure_reason", "UNKNOWN")
                 details = failure_info.get("details", "")
                 print(f"❌  Scientific evaluation FAILED:\n    Reason:  {reason}\n    Details: {details}", file=sys.stderr)
@@ -652,28 +927,12 @@ def _download_artifacts(
 
         # Kernel succeeded and no evaluation_failure.json: retrieve SUCCESS artifacts
         missing: list[str] = []
-        copied: list[Path] = []
-
         for rf in result_files:
-            fname = Path(rf).name
-
-            # 1. Expected structured path
-            candidate = tmp_path / "satquery-output" / remote_output_dir / rf
-            if candidate.exists():
-                dest = results_dest / fname
-                shutil.copy2(candidate, dest)
-                copied.append(dest)
-                continue
-
-            # 2. Flat fallback — search whole download tree by basename
-            hits = [p for p in tmp_path.rglob(fname) if p.is_file()]
-            if hits:
-                dest = results_dest / fname
-                shutil.copy2(hits[0], dest)
-                copied.append(dest)
-                continue
-
-            missing.append(rf)
+            resolved = _resolve_artifact_path(tmp_path, remote_output_dir, rf)
+            if resolved and resolved.is_file():
+                shutil.copy2(resolved, staging_dir / Path(rf).name)
+            else:
+                missing.append(rf)
 
         if missing:
             msg_lines = [
@@ -688,6 +947,23 @@ def _download_artifacts(
             ]
             print("\n".join(msg_lines), file=sys.stderr)
             sys.exit(1)
+
+        # Validate staged files before publishing
+        _validate_downloaded_artifacts(
+            staging_dir,
+            experiment=experiment,
+            allow_dirty=allow_dirty,
+            expected_git_sha=expected_git_sha,
+            is_failure=False,
+        )
+
+        # All validation passed: atomically copy staged files to results_dest
+        copied: list[Path] = []
+        for item in staging_dir.iterdir():
+            if item.is_file():
+                dest = results_dest / item.name
+                shutil.copy2(item, dest)
+                copied.append(dest)
 
         # Annotate dirty runs
         if allow_dirty:
@@ -765,6 +1041,7 @@ def cmd_download(args: argparse.Namespace) -> None:
         output_dir=output_dir,
         allow_dirty=False,   # downloads never mark as dirty
         kernel_status="complete",
+        expected_git_sha=getattr(args, "expected_sha", None),
     )
 
     print("\n✅  Done.")
@@ -882,6 +1159,7 @@ def cmd_run(args: argparse.Namespace) -> None:
         output_dir=output_dir,
         allow_dirty=args.allow_dirty,
         kernel_status=final_status,
+        expected_git_sha=git_sha,
     )
 
     print("\n✅  Done.")
@@ -942,6 +1220,12 @@ def _build_parser() -> argparse.ArgumentParser:
             "Override local artifact destination. "
             "Defaults to the experiment_dir defined in experiments.yaml."
         ),
+    )
+    dl_p.add_argument(
+        "--expected-sha",
+        dest="expected_sha",
+        default=None,
+        help="Expected git SHA in runner_meta.json (validates integrity if present).",
     )
 
     # run

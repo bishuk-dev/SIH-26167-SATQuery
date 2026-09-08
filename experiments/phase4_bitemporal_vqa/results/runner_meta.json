@@ -1,0 +1,12 @@
+{
+  "experiment": "phase4-e02-levircc-change-description",
+  "task": "bitemporal_change_description",
+  "primary_benchmark": "LEVIR-CC",
+  "model_id": "HuggingFaceTB/SmolVLM-256M-Instruct",
+  "device": "cuda",
+  "cuda_available": true,
+  "gpu_name": "Tesla T4",
+  "sample_count": 100,
+  "status": "PASS",
+  "timestamp": "2026-09-08T02:45:55Z"
+}
