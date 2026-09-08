@@ -167,3 +167,60 @@ phase5a-bifold-joint-validation:
     - technobishu/satquery-phase4-materialize-s2
   gpu: true
   internet: true
+
+p4-e01-oscd:
+  notebook: notebooks/kaggle_p4_e01_oscd.ipynb
+  kernel_slug: satquery-p4-e01-oscd
+  experiment_dir: experiments/phase4_temporal_analytics/p4_e01
+  remote_output_dir: p4-e01-oscd-validation
+  result_files:
+    - manifest.json
+    - validation_result.json
+    - validation_predictions.jsonl
+    - runner_meta.json
+  large_result_files: []
+  download_policy: metadata_only
+  gpu: false
+  internet: true
+
+p4-e02-changer:
+  notebook: notebooks/kaggle_p4_e02_changer.ipynb
+  kernel_slug: satquery-p4-e02-changer
+  experiment_dir: experiments/phase4_temporal_analytics/p4_e02
+  remote_output_dir: p4-e02-changer-validation
+  result_files:
+    - validation_result.json
+    - validation_predictions.jsonl
+    - runner_meta.json
+  large_result_files: []
+  download_policy: metadata_only
+  gpu: true
+  internet: true
+
+p4-e03-chg2cap:
+  notebook: notebooks/kaggle_p4_e03_chg2cap.ipynb
+  kernel_slug: satquery-p4-e03-chg2cap
+  experiment_dir: experiments/phase4_temporal_analytics/p4_e03
+  remote_output_dir: p4-e03-chg2cap-validation
+  result_files:
+    - validation_result.json
+    - validation_predictions.jsonl
+    - runner_meta.json
+  large_result_files: []
+  download_policy: metadata_only
+  gpu: true
+  internet: true
+
+p4-e04-sturm:
+  notebook: notebooks/kaggle_p4_e04_sturm.ipynb
+  kernel_slug: satquery-p4-e04-sturm
+  experiment_dir: experiments/phase4_temporal_analytics/p4_e04
+  remote_output_dir: p4-e04-sturm-validation
+  result_files:
+    - validation_result.json
+    - validation_predictions.jsonl
+    - runner_meta.json
+  large_result_files: []
+  download_policy: metadata_only
+  gpu: true
+  internet: true

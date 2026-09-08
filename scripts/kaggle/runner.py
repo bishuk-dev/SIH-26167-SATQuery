@@ -175,6 +175,11 @@ def _get_experiment(name: str) -> dict[str, Any]:
     return entry
 
 
+def get_experiment(name: str) -> dict[str, Any]:
+    """Return a registered experiment for validation and dry-run callers."""
+    return _get_experiment(name)
+
+
 # ---------------------------------------------------------------------------
 # Kaggle CLI capability detection
 # ---------------------------------------------------------------------------
@@ -531,17 +536,10 @@ def _download_artifacts(
 
             # 1. Expected structured path
             candidate = tmp_path / "satquery-output" / remote_output_dir / rf
-            if candidate.exists():
-                dest = results_dest / fname
+            if candidate.is_file():
+                dest = results_dest / rf
+                dest.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(candidate, dest)
-                copied.append(dest)
-                continue
-
-            # 2. Flat fallback — search whole download tree by basename
-            hits = [p for p in tmp_path.rglob(fname) if p.is_file()]
-            if hits:
-                dest = results_dest / fname
-                shutil.copy2(hits[0], dest)
                 copied.append(dest)
                 continue
 

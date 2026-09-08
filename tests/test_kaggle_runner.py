@@ -384,6 +384,33 @@ class TestExperimentRegistry:
         with pytest.raises(SystemExit):
             runner._get_experiment("this-experiment-does-not-exist-xyz")
 
+    @pytest.mark.parametrize("name", ["p4-e01-oscd", "p4-e02-changer", "p4-e03-chg2cap", "p4-e04-sturm"])
+    def test_phase4_experiment_has_unique_identity_and_output(self, name: str) -> None:
+        experiment = runner.get_experiment(name)
+        assert experiment["remote_output_dir"].startswith(name)
+        assert experiment["download_policy"] == "metadata_only"
+        assert Path(experiment["notebook"]).is_file()
+
+    def test_phase4_download_rejects_same_named_file_outside_exact_path(self, tmp_path: Path) -> None:
+        remote_out = "p4-e02-changer-validation"
+        out_dir = tmp_path / "out"
+        out_dir.mkdir()
+        experiment = {
+            "remote_output_dir": remote_out,
+            "result_files": ["validation_result.json"],
+        }
+
+        def fake_run(cmd, **_kwargs):
+            destination = Path(cmd[cmd.index("-p") + 1])
+            decoy = destination / "unrelated" / "validation_result.json"
+            decoy.parent.mkdir(parents=True)
+            decoy.write_text("decoy")
+            return mock.MagicMock(returncode=0)
+
+        with mock.patch.object(runner, "_run", side_effect=fake_run):
+            with pytest.raises(SystemExit):
+                runner._download_artifacts("u", "s", experiment, out_dir, allow_dirty=False)
+
     def test_get_known_experiment(self) -> None:
         registry = runner._load_registry()
         if not registry:

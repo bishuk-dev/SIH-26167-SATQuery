@@ -173,6 +173,21 @@ A `.dirty_worktree` sentinel file is also written next to the downloaded results
 
 ---
 
+## Phase 4 temporal runs
+
+The clean temporal analytics kernels use unique identities and metadata-only retrieval:
+
+```bash
+python scripts/kaggle/runner.py run p4-e01-oscd
+python scripts/kaggle/runner.py run p4-e02-changer
+python scripts/kaggle/runner.py run p4-e03-chg2cap
+python scripts/kaggle/runner.py run p4-e04-sturm
+```
+
+Each notebook must write only the declared small artifacts under its exact
+`remote_output_dir`. The runner copies configured relative paths only; a
+same-named file elsewhere is not accepted.
+
 ## Adding a new experiment
 
 1. Add a notebook under `notebooks/kaggle_<experiment>.ipynb`.  Structure it exactly like `kaggle_phase3a.ipynb`: env-vars are injected by the runner, no hardcoded git refs.
