@@ -1,0 +1,69 @@
+{
+  "experiment": "P4-E02",
+  "task": "bitemporal_change_description",
+  "model_id": "HuggingFaceTB/SmolVLM-256M-Instruct",
+  "model_revision": "7e3e67edbbed1bf9888184d9df282b700a323964",
+  "device": "cuda",
+  "cuda_available": true,
+  "sample_count": 100,
+  "validation_subset_size": 100,
+  "validation_subset_label": "VALIDATION_SUBSET",
+  "selection_rule": "deterministic_first_100_sorted_by_filename",
+  "evaluation_split": "val",
+  "test_set_policy": "SEALED (evaluated on validation split only; test set never accessed)",
+  "test_accessed": false,
+  "status": "PASS",
+  "caption_metrics": {
+    "bleu_1": 0.174749,
+    "bleu_2": 0.071975,
+    "bleu_3": 0.023837,
+    "bleu_4": 2e-06,
+    "rouge_l": 0.162742,
+    "cider": 0.007735,
+    "provenance": {
+      "source_repository": "https://github.com/Chen-Yang-Liu/RSICC",
+      "commit": "d1505e514c450c3728782ca723e82761e70bafd3",
+      "upstream_project": "MS-COCO Caption Evaluation (Chen et al., 2015)",
+      "license": "BSD-3-Clause / MIT permissive",
+      "aggregation": "corpus_level"
+    }
+  },
+  "validation_membership_audit": {
+    "annotation_val_count": 1333,
+    "unique_annotation_filename_count": 1333,
+    "val_A_file_count": 1438,
+    "val_B_file_count": 1438,
+    "matched_annotated_pairs": 1333,
+    "missing_A": 0,
+    "missing_B": 0,
+    "duplicate_annotation_filenames": 0,
+    "duplicate_A_filenames": 0,
+    "duplicate_B_filenames": 0,
+    "entries_without_references": 0,
+    "historical_documented_count": 1332,
+    "pinned_artifact_observed_count": 1333,
+    "discrepancy_resolution": "LevirCCcaptions.json defines 1333 items with split=='val' (6815 train + 1333 val + 1929 test = 10077 total). Historical documentation colloquially cited 1332/1930, but the pinned authoritative annotation file assigns 1333 items to val and 1929 to test."
+  },
+  "license_gates": {
+    "cdvqa_annotation_license": "Apache-2.0",
+    "second_dataset_access": "public",
+    "second_image_license_status": "UNRESOLVED",
+    "cdvqa_full_dataset_license_gate": "BLOCKED"
+  },
+  "primary_benchmark": {
+    "name": "LEVIR-CC",
+    "task": "change_description",
+    "provenance": "Chenyang Liu et al. (IEEE TGRS 2022) / LEVIR Lab (Beihang University)",
+    "upstream_imagery": "LEVIR-CD (Academic / non-commercial research use only)",
+    "test_set_policy": "SEALED (evaluated on validation split)",
+    "huggingface_repo": "lcybuaa/LEVIR-CC",
+    "huggingface_revision": "881887bfc8a0f856f9059bcedf74c388e0d92ad7",
+    "zip_sha256": "e05d38c0fdfda8c9b2048d314e5f95974d8b81e1b9f83f107acc39d55015e130",
+    "split_pairs": {
+      "train": 6815,
+      "val": 1333,
+      "test": 1929
+    }
+  },
+  "execution_time_seconds": 391.4
+}

@@ -18,9 +18,11 @@ import os
 import shutil
 import time
 import zipfile
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from affine import Affine
 import numpy as np
 import rasterio
 
@@ -227,107 +229,174 @@ def _acquire_modified_sen1floods11(base_dir: Path) -> Path:
             url = f"{ZENODO_BASE_URL}/{fname}?download=1"
             _download_file_robust(url, dest, pinned["size_bytes"], pinned["md5"])
 
+    role_dirs: dict[str, Path] = {}
     for pinned in BENCHMARK_PROVENANCE["pinned_files"]:
         fname = pinned["filename"]
         target_dir = extracted_dir / fname.replace(".zip", "")
-        if not target_dir.exists() or not any(target_dir.rglob("*.tif")):
+        has_tifs = target_dir.exists() and any(
+            p.is_file() and p.suffix.lower() in {".tif", ".tiff"}
+            for p in target_dir.rglob("*")
+        )
+        if not has_tifs:
             zip_path = downloads_dir / fname
             print(f"[P4-E04] Extracting {fname} safely...")
             target_dir.mkdir(parents=True, exist_ok=True)
             _safe_zip_extract(zip_path, target_dir)
             print(f"[P4-E04] Extracted to {target_dir}")
 
-    return extracted_dir
+        fn_upper = fname.upper()
+        if "PRE" in fn_upper:
+            role_dirs["pre"] = target_dir
+        elif "POST" in fn_upper:
+            role_dirs["post"] = target_dir
+        elif "LABEL" in fn_upper:
+            role_dirs["label"] = target_dir
+
+    return DatasetRoles(
+        pre_dir=role_dirs.get("pre", extracted_dir / "PRE_S1-20230517T191707Z-001"),
+        post_dir=role_dirs.get("post", extracted_dir / "POST_S1-20230517T191716Z-001"),
+        label_dir=role_dirs.get("label", extracted_dir / "Labels-20230517T191741Z-001"),
+        extracted_dir=extracted_dir,
+    )
 
 
-LAYER_PATTERNS = [
-    ("_S1Hand_post", "post_sar"),
-    ("_S1Hand", "pre_sar"),
-    ("_LabelHand", "label"),
-]
+@dataclass
+class DatasetRoles:
+    pre_dir: Path
+    post_dir: Path
+    label_dir: Path
+    extracted_dir: Path | None = None
+
+    def exists(self) -> bool:
+        return self.pre_dir.exists() and self.post_dir.exists() and self.label_dir.exists()
+
+
+@dataclass
+class RasterMetadata:
+    shape: tuple[int, ...]
+    crs: str
+    transform: Affine
+    resolution: tuple[float, float]
+    bounds: tuple[float, float, float, float]
+    nodata: float | None
+    array: np.ndarray
+
+
+def _enumerate_rasters(dir_path: Path) -> list[Path]:
+    """Enumerate raster files robustly accepting case-insensitive .tif and .tiff."""
+    if not dir_path.exists():
+        return []
+    return sorted(
+        p for p in dir_path.rglob("*")
+        if p.is_file() and p.suffix.lower() in {".tif", ".tiff"}
+    )
+
+
+KNOWN_SUFFIXES: tuple[str, ...] = (
+    "_S1Hand_post",
+    "_S1Hand_pre",
+    "_S1Hand",
+    "_LabelHand",
+    "_Label",
+)
 
 
 def _derive_scene_key(filename: str) -> str | None:
+    """Derive scene key from raster filename.
+
+    Strips known SAR/Label naming suffixes to obtain the base scene key
+    (e.g., 'Bolivia_103757').
+    Fails closed: returns None if the filename does not match a known pattern.
+    """
     stem = Path(filename).stem
-    for suffix, _layer_type in LAYER_PATTERNS:
+    for suffix in KNOWN_SUFFIXES:
         if stem.endswith(suffix):
-            return stem[: -len(suffix)]
+            key = stem[:-len(suffix)]
+            if key:
+                return key
     return None
 
 
-def _classify_raster(filename: str) -> str | None:
-    """Classify a raster file as 'pre_sar', 'post_sar', 'label', or None."""
-    stem = Path(filename).stem
-    for suffix, layer_type in LAYER_PATTERNS:
-        if stem.endswith(suffix):
-            return layer_type
-    return None
+def _build_role_map(
+    files: list[Path],
+) -> tuple[dict[str, Path], list[str], list[str]]:
+    """Build a mapping of scene_key -> Path for a specific role directory.
 
+    Rejects duplicate scene keys from the mapping and tracks them.
+    Tracks unrecognized files that could not be normalized.
+    """
+    mapping: dict[str, Path] = {}
+    duplicate_keys: list[str] = []
+    unrecognized_files: list[str] = []
+    seen_keys: set[str] = set()
 
-def _is_pre_sar(filename: str) -> bool:
-    return _classify_raster(filename) == "pre_sar"
+    for f in files:
+        key = _derive_scene_key(f.name)
+        if key is None:
+            unrecognized_files.append(f.name)
+            continue
+        if key in seen_keys:
+            if key not in duplicate_keys:
+                duplicate_keys.append(key)
+            mapping.pop(key, None)  # Reject duplicate: ambiguous scene key must not be used
+        else:
+            seen_keys.add(key)
+            mapping[key] = f
 
-
-def _is_post_sar(filename: str) -> bool:
-    return _classify_raster(filename) == "post_sar"
-
-
-def _is_label(filename: str) -> bool:
-    return _classify_raster(filename) == "label"
+    return mapping, duplicate_keys, unrecognized_files
 
 
 def _check_duplicate(mapping: dict[str, Path], key: str, path: Path) -> None:
+    """Check if key is already in mapping, raising RuntimeError if duplicate."""
     if key in mapping:
-        raise RuntimeError(
-            f"Duplicate scene keys detected for '{key}': "
-            f"{mapping[key]} and {path}"
-        )
+        raise RuntimeError(f"Duplicate scene keys detected for '{key}': {mapping[key]} and {path}")
 
 
-def _find_raster_pairs(extracted_dir: Path) -> dict[str, dict[str, Any]]:
-    pre_by_scene: dict[str, Path] = {}
-    post_by_scene: dict[str, Path] = {}
-    label_by_scene: dict[str, Path] = {}
 
-    for tif in sorted(extracted_dir.rglob("*.tif")):
-        scene_key = _derive_scene_key(tif.name)
-        if scene_key is None:
-            continue
-
-        if _is_pre_sar(tif.name):
-            _check_duplicate(pre_by_scene, scene_key, tif)
-            pre_by_scene[scene_key] = tif
-        elif _is_post_sar(tif.name):
-            _check_duplicate(post_by_scene, scene_key, tif)
-            post_by_scene[scene_key] = tif
-        elif _is_label(tif.name):
-            _check_duplicate(label_by_scene, scene_key, tif)
-            label_by_scene[scene_key] = tif
-
-    all_keys = set(pre_by_scene.keys()) | set(post_by_scene.keys()) | set(label_by_scene.keys())
-    paired = {}
-    for key in all_keys:
-        paired[key] = {
-            "pre": pre_by_scene.get(key),
-            "post": post_by_scene.get(key),
-            "label": label_by_scene.get(key),
-        }
-
-    return paired
-
-
-def _load_raster_band(path: Path) -> tuple[np.ndarray, Affine, str]:
+def _load_raster_data(path: Path) -> RasterMetadata:
     import rasterio
-    from affine import Affine
-
     with rasterio.open(path) as src:
         arr = src.read(1).astype(np.float32)
         transform = src.transform
         crs = src.crs.to_string() if src.crs else "EPSG:4326"
+        res = src.res
+        b = src.bounds
+        bounds = (b.left, b.bottom, b.right, b.top)
         nodata = src.nodata
         if nodata is not None:
-            arr[nodata == arr] = np.nan
-    return arr, transform, crs
+            arr[arr == nodata] = np.nan
+        return RasterMetadata(
+            shape=arr.shape,
+            crs=crs,
+            transform=transform,
+            resolution=res,
+            bounds=bounds,
+            nodata=nodata,
+            array=arr,
+        )
+
+
+GRID_TOLERANCE: float = 1e-5
+
+
+def _check_grid_alignment(
+    m1: RasterMetadata,
+    m2: RasterMetadata,
+    label1: str,
+    label2: str,
+    tolerance: float = GRID_TOLERANCE,
+) -> tuple[bool, str]:
+    """Strictly verify spatial grid compatibility between two rasters."""
+    if m1.shape != m2.shape:
+        return False, f"{label1} vs {label2} shape mismatch: {m1.shape} != {m2.shape}"
+    crs1 = m1.crs.strip().upper()
+    crs2 = m2.crs.strip().upper()
+    if crs1 != crs2:
+        return False, f"{label1} vs {label2} CRS mismatch: {m1.crs} != {m2.crs}"
+    for idx, (v1, v2) in enumerate(zip(m1.transform, m2.transform)):
+        if abs(v1 - v2) > tolerance:
+            return False, f"{label1} vs {label2} affine transform coeff {idx} mismatch: {v1} vs {v2} (diff {abs(v1-v2):.6e} > {tolerance})"
+    return True, "OK"
 
 
 def _compute_post_water_mask(post_arr: np.ndarray, water_max_threshold_db: float = -16.0) -> np.ndarray:
@@ -356,7 +425,6 @@ def _compute_flood_expansion_mask(
     """
     from satquery.analytics.sar import SarTemporalAnalytics
     from satquery.sensors.semantics import SemanticBandRole
-    from affine import Affine
 
     mask, sar_result, evidence = SarTemporalAnalytics.detect_flood(
         bands_pre={"vv": pre_arr},
@@ -393,7 +461,10 @@ def _compute_confusion_matrix(
     return tp, fp, tn, fn
 
 
-def run_p4_e04_evaluation(output_dir: Path) -> dict[str, Any]:
+def run_p4_e04_evaluation(
+    output_dir: Path,
+    roles: DatasetRoles | None = None,
+) -> dict[str, Any]:
     """Run P4-E04 evaluation suite against Modified Sen1Floods11.
 
     Returns metrics dict with real per-scene TP/FP/TN/FN computed from actual rasters.
@@ -405,62 +476,81 @@ def run_p4_e04_evaluation(output_dir: Path) -> dict[str, Any]:
     base_dir = output_dir.parent
     timestamp = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
-    try:
-        extracted_dir = _acquire_modified_sen1floods11(base_dir)
-    except Exception as exc:
-        failure_meta = {
-            "experiment": "P4-E04",
-            "task": "sar_temporal_flood_validation",
-            "status": "DATASET_UNAVAILABLE",
-            "failure_reason": f"Modified Sen1Floods11 acquisition failed: {exc}",
-            "timestamp": timestamp,
-        }
-        with open(output_dir / "evaluation_failure.json", "w", encoding="utf-8") as f:
-            json.dump(failure_meta, f, indent=2)
-        runner_meta = {
-            "experiment": "phase4-e04-modified-sen1floods11-validation",
-            "task": "sar_temporal_flood_validation",
-            "status": "FAIL",
-            "failure_reason": failure_meta["failure_reason"],
-            "timestamp": timestamp,
-        }
-        with open(output_dir / "runner_meta.json", "w", encoding="utf-8") as f:
-            json.dump(runner_meta, f, indent=2)
-        print(f"[P4-E04] Aborting: {failure_meta['failure_reason']}")
-        return failure_meta
+    if roles is None:
+        try:
+            roles = _acquire_modified_sen1floods11(base_dir)
+        except Exception as exc:
+            failure_meta = {
+                "experiment": "P4-E04",
+                "task": "sar_temporal_flood_validation",
+                "status": "DATASET_UNAVAILABLE",
+                "failure_reason": f"Modified Sen1Floods11 acquisition failed: {exc}",
+                "timestamp": timestamp,
+            }
+            with open(output_dir / "evaluation_failure.json", "w", encoding="utf-8") as f:
+                json.dump(failure_meta, f, indent=2)
+            runner_meta = {
+                "experiment": "phase4-e04-modified-sen1floods11-validation",
+                "task": "sar_temporal_flood_validation",
+                "status": "FAIL",
+                "failure_reason": failure_meta["failure_reason"],
+                "timestamp": timestamp,
+            }
+            with open(output_dir / "runner_meta.json", "w", encoding="utf-8") as f:
+                json.dump(runner_meta, f, indent=2)
+            print(f"[P4-E04] Aborting: {failure_meta['failure_reason']}")
+            return failure_meta
 
-    all_tifs = sorted(extracted_dir.rglob("*.tif"))
-    pre_sample = [p.name for p in all_tifs if _is_pre_sar(p.name)][:5]
-    post_sample = [p.name for p in all_tifs if _is_post_sar(p.name)][:5]
-    label_sample = [p.name for p in all_tifs if _is_label(p.name)][:5]
-    print(f"[P4-E04] Representative PRE files ({len(pre_sample)}): {pre_sample}")
-    print(f"[P4-E04] Representative POST files ({len(post_sample)}): {post_sample}")
-    print(f"[P4-E04] Representative LABEL files ({len(label_sample)}): {label_sample}")
+    # Robust raster enumeration per source directory
+    raw_pre_files = _enumerate_rasters(roles.pre_dir)
+    raw_post_files = _enumerate_rasters(roles.post_dir)
+    raw_label_files = _enumerate_rasters(roles.label_dir)
 
-    scene_pairs = _find_raster_pairs(extracted_dir)
+    print(f"[P4-E04] RAW PRE ({len(raw_pre_files)}): {[p.name for p in raw_pre_files[:5]]}")
+    print(f"[P4-E04] RAW POST ({len(raw_post_files)}): {[p.name for p in raw_post_files[:5]]}")
+    print(f"[P4-E04] RAW LABEL ({len(raw_label_files)}): {[p.name for p in raw_label_files[:5]]}")
 
-    pre_count = sum(1 for v in scene_pairs.values() if v["pre"] is not None)
-    post_count = sum(1 for v in scene_pairs.values() if v["post"] is not None)
-    label_count = sum(1 for v in scene_pairs.values() if v["label"] is not None)
-    paired_count = sum(1 for v in scene_pairs.values() if v["pre"] and v["post"] and v["label"])
+    # Build three independent maps
+    pre_by_scene_key, dup_pre, unrec_pre = _build_role_map(raw_pre_files)
+    post_by_scene_key, dup_post, unrec_post = _build_role_map(raw_post_files)
+    label_by_scene_key, dup_label, unrec_label = _build_role_map(raw_label_files)
 
-    unmatched_pre = sum(1 for v in scene_pairs.values() if v["pre"] and not v["post"])
-    unmatched_post = sum(1 for v in scene_pairs.values() if v["post"] and not v["pre"])
-    unmatched_label = sum(1 for v in scene_pairs.values() if v["label"] and not v["pre"])
+    paired_keys = sorted(
+        set(pre_by_scene_key.keys())
+        & set(post_by_scene_key.keys())
+        & set(label_by_scene_key.keys())
+    )
+
+    pre_count = len(pre_by_scene_key)
+    post_count = len(post_by_scene_key)
+    label_count = len(label_by_scene_key)
+    paired_count = len(paired_keys)
+
+    unmatched_pre = sorted(set(pre_by_scene_key.keys()) - set(paired_keys))
+    unmatched_post = sorted(set(post_by_scene_key.keys()) - set(paired_keys))
+    unmatched_label = sorted(set(label_by_scene_key.keys()) - set(paired_keys))
 
     audit = {
         "pre_count": pre_count,
         "post_count": post_count,
         "label_count": label_count,
         "paired_count": paired_count,
-        "unmatched_pre": unmatched_pre,
-        "unmatched_post": unmatched_post,
-        "unmatched_label": unmatched_label,
-        "duplicate_keys": 0,
+        "unmatched_pre": len(unmatched_pre),
+        "unmatched_post": len(unmatched_post),
+        "unmatched_label": len(unmatched_label),
+        "unmatched_pre_samples": unmatched_pre[:5],
+        "unmatched_post_samples": unmatched_post[:5],
+        "unmatched_label_samples": unmatched_label[:5],
+        "duplicate_pre_keys": dup_pre,
+        "duplicate_post_keys": dup_post,
+        "duplicate_label_keys": dup_label,
+        "unrecognized_pre_files": unrec_pre,
+        "unrecognized_post_files": unrec_post,
+        "unrecognized_label_files": unrec_label,
         "representative_samples": {
-            "pre": pre_sample,
-            "post": post_sample,
-            "label": label_sample,
+            "pre": [p.name for p in raw_pre_files[:5]],
+            "post": [p.name for p in raw_post_files[:5]],
+            "label": [p.name for p in raw_label_files[:5]],
         },
     }
     print(f"[P4-E04] Scene pairing audit: {audit}")
@@ -494,46 +584,55 @@ def run_p4_e04_evaluation(output_dir: Path) -> dict[str, Any]:
     total_tn = 0
     total_fn = 0
     sample_count = 0
+    grid_valid_count = 0
+    grid_mismatch_count = 0
 
-    for scene_key, paths in sorted(scene_pairs.items()):
-        if not (paths["pre"] and paths["post"] and paths["label"]):
-            continue
-
-        pre_path = paths["pre"]
-        post_path = paths["post"]
-        label_path = paths["label"]
+    for scene_key in paired_keys:
+        pre_path = pre_by_scene_key[scene_key]
+        post_path = post_by_scene_key[scene_key]
+        label_path = label_by_scene_key[scene_key]
 
         try:
-            pre_arr, transform, crs = _load_raster_band(pre_path)
-            post_arr, _, _ = _load_raster_band(post_path)
-            label_arr, _, _ = _load_raster_band(label_path)
+            pre_meta = _load_raster_data(pre_path)
+            post_meta = _load_raster_data(post_path)
+            label_meta = _load_raster_data(label_path)
 
-            if pre_arr.shape != post_arr.shape or pre_arr.shape != label_arr.shape:
-                print(f"[P4-E04] Shape mismatch for {scene_key}: "
-                      f"{pre_arr.shape} vs {post_arr.shape} vs {label_arr.shape}")
+            ok_pre_post, msg_pre_post = _check_grid_alignment(pre_meta, post_meta, "PRE", "POST")
+            ok_post_label, msg_post_label = _check_grid_alignment(post_meta, label_meta, "POST", "LABEL")
+
+            if not ok_pre_post or not ok_post_label:
+                mismatch_msg = msg_pre_post if not ok_pre_post else msg_post_label
+                grid_mismatch_count += 1
                 pred_record = {
                     "pair_id": scene_key,
                     "evaluation_split": "val",
-                    "status": "SHAPE_MISMATCH",
+                    "status": "GRID_MISMATCH",
+                    "evaluation_status": "GRID_MISMATCH",
+                    "failure_reason": mismatch_msg,
                     "pre_raster_path": str(pre_path),
                     "post_raster_path": str(post_path),
                     "label_raster_path": str(label_path),
-                    "pre_shape": list(pre_arr.shape),
-                    "post_shape": list(post_arr.shape),
-                    "label_shape": list(label_arr.shape),
+                    "pre_shape": list(pre_meta.shape),
+                    "post_shape": list(post_meta.shape),
+                    "label_shape": list(label_meta.shape),
+                    "pre_crs": pre_meta.crs,
+                    "post_crs": post_meta.crs,
+                    "label_crs": label_meta.crs,
                 }
                 predictions.append(pred_record)
                 continue
 
-            pred_water_mask = _compute_post_water_mask(post_arr, water_max_threshold_db=-16.0)
+            grid_valid_count += 1
+
+            pred_water_mask = _compute_post_water_mask(post_meta.array, water_max_threshold_db=-16.0)
 
             flood_expansion_mask = _compute_flood_expansion_mask(
-                pre_arr, post_arr,
+                pre_meta.array, post_meta.array,
                 water_max_threshold_db=-16.0,
                 flood_decrease_db=3.0,
             )
 
-            tp, fp, tn, fn = _compute_confusion_matrix(pred_water_mask, label_arr)
+            tp, fp, tn, fn = _compute_confusion_matrix(pred_water_mask, label_meta.array)
 
             total_tp += tp
             total_fp += fp
@@ -556,8 +655,8 @@ def run_p4_e04_evaluation(output_dir: Path) -> dict[str, Any]:
                 "post_raster_path": str(post_path),
                 "label_raster_path": str(label_path),
                 "evaluation_split": "val",
-                "crs": crs,
-                "raster_shape": list(pre_arr.shape),
+                "crs": post_meta.crs,
+                "raster_shape": list(post_meta.shape),
                 "tp": tp,
                 "fp": fp,
                 "tn": tn,
@@ -587,6 +686,9 @@ def run_p4_e04_evaluation(output_dir: Path) -> dict[str, Any]:
 
     elapsed = time.time() - start_time
 
+    audit["grid_valid_count"] = grid_valid_count
+    audit["grid_mismatch_count"] = grid_mismatch_count
+
     total = total_tp + total_fp + total_tn + total_fn
     aggregate_iou = total_tp / (total_tp + total_fp + total_fn) if (total_tp + total_fp + total_fn) > 0 else 0.0
     aggregate_accuracy = (total_tp + total_tn) / total if total > 0 else 0.0
@@ -602,6 +704,8 @@ def run_p4_e04_evaluation(output_dir: Path) -> dict[str, Any]:
         "license": BENCHMARK_PROVENANCE["license"],
         "sample_count": sample_count,
         "evaluation_split": "val",
+        "grid_valid_count": grid_valid_count,
+        "grid_mismatch_count": grid_mismatch_count,
         "total_tp": total_tp,
         "total_fp": total_fp,
         "total_tn": total_tn,
