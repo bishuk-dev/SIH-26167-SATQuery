@@ -19,3 +19,7 @@ class ModelExecutionError(ModelInferenceError):
 
 class EvidenceGeometryError(ModelInferenceError):
     code = "INVALID_EVIDENCE_GEOMETRY"
+
+
+class TemporalOrderUnknownError(ModelInputUnsupportedError):
+    code = "TEMPORAL_ORDER_UNKNOWN"
