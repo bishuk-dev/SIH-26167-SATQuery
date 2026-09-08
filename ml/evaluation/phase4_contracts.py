@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 AUDIT_FILES = (
     "dataset_contracts.yaml",
@@ -29,6 +29,31 @@ class AuditEntry(BaseModel):
         return self.status == "PASS" and not self.blockers
 
 
+class DatasetSemantics(BaseModel):
+    model_config = ConfigDict(extra="allow", frozen=True)
+
+    modalities: tuple[str, ...]
+    sensors: tuple[str, ...]
+    bands_or_polarizations: tuple[str, ...]
+    radiometric_domain: str
+    pair_order: str
+    labels: str
+
+    @field_validator("modalities", "sensors", "bands_or_polarizations", mode="before")
+    @classmethod
+    def normalize_sequences(cls, value: object) -> object:
+        return tuple(value) if isinstance(value, list) else value
+
+
+class DatasetContract(AuditEntry):
+    authority: dict[str, Any] | None = None
+    license: dict[str, Any] | None = None
+    transport: dict[str, Any] | None = None
+    contract: DatasetSemantics | None = None
+    splits: dict[str, Any] | None = None
+    references: tuple[dict[str, Any], ...] = ()
+
+
 class AuditFile(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -41,7 +66,7 @@ class AuditFile(BaseModel):
 class Phase4ContractSet(BaseModel):
     model_config = ConfigDict(frozen=True)
 
-    datasets: dict[str, AuditEntry]
+    datasets: dict[str, DatasetContract]
     models: dict[str, AuditEntry]
     experiment_plan: dict[str, Any]
 
@@ -54,7 +79,9 @@ def load_phase4_contracts(root: str | Path) -> Phase4ContractSet:
         name: _read_yaml(root_path / name)
         for name in AUDIT_FILES
     }
-    dataset_file = _parse_audit_file(payloads["dataset_contracts.yaml"], "datasets")
+    dataset_file = _parse_audit_file(
+        payloads["dataset_contracts.yaml"], "datasets", DatasetContract
+    )
     model_file = _parse_audit_file(payloads["model_contracts.yaml"], "models")
     experiment_plan = _parse_experiment_plan(payloads["experiment_plan.yaml"])
 
@@ -80,7 +107,11 @@ def _read_yaml(path: Path) -> dict[str, Any]:
     return payload
 
 
-def _parse_audit_file(payload: dict[str, Any], field: str) -> AuditFile:
+def _parse_audit_file(
+    payload: dict[str, Any],
+    field: str,
+    entry_type: type[AuditEntry] = AuditEntry,
+) -> AuditFile:
     if field not in payload:
         raise ValueError(f"Phase 4 audit file missing {field}")
     entries = payload[field]
@@ -89,7 +120,11 @@ def _parse_audit_file(payload: dict[str, Any], field: str) -> AuditFile:
     try:
         normalized = {key: value for key, value in payload.items() if key != field}
         normalized["entries"] = entries
-        return AuditFile.model_validate(normalized)
+        parsed = AuditFile.model_validate(normalized)
+        typed_entries = {
+            key: entry_type.model_validate(value) for key, value in entries.items()
+        }
+        return parsed.model_copy(update={"entries": typed_entries})
     except ValidationError as exc:
         raise ValueError(f"Invalid Phase 4 {field} audit: {exc}") from exc
 
