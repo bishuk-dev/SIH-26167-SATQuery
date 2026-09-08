@@ -81,6 +81,41 @@ def test_caption_service_rejects_wrong_modality_and_empty_output(tmp_path: Path)
         _service(tmp_path, EmptyCaptionBackend()).describe(t1, t2)
 
 
+def test_caption_service_rejects_sar_before_requesting_temporal_order(tmp_path: Path) -> None:
+    """F-MODEL-003: an input the model can never consume is REJECT, not REQUEST_INPUT."""
+    image = tmp_path / "image.tif"
+    _write_image(image)
+    t1 = _observation(image, "t1").model_copy(update={"temporal": TemporalMetadata()})
+    t2 = _observation(image, "t2").model_copy(
+        update={
+            "temporal": TemporalMetadata(),
+            "sensor": _observation(image, "t2").sensor.model_copy(update={"modality": Modality.SAR}),
+        }
+    )
+
+    with pytest.raises(ModelInputUnsupportedError):
+        _service(tmp_path).describe(t1, t2)
+
+
+def test_caption_service_rejects_misaligned_pair_before_temporal_order(tmp_path: Path) -> None:
+    """Structurally incomparable pairs reject even when temporal order is unknown."""
+    image = tmp_path / "image.tif"
+    _write_image(image)
+    base = _observation(image, "t1")
+    t1 = base.model_copy(update={"temporal": TemporalMetadata()})
+    t2 = _observation(image, "t2").model_copy(
+        update={
+            "temporal": TemporalMetadata(),
+            "geo": base.geo.model_copy(
+                update={"transform": base.geo.transform.model_copy(update={"c": 10.0})}
+            ),
+        }
+    )
+
+    with pytest.raises(ModelInputUnsupportedError, match="aligned temporal pair"):
+        _service(tmp_path).describe(t1, t2)
+
+
 def test_chg2cap_backend_checkpoint_verification(tmp_path: Path) -> None:
     missing = tmp_path / "missing.pth"
     t1_rgb = np.ones((3, 2, 2), dtype=np.float32)

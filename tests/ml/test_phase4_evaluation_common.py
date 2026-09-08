@@ -60,6 +60,16 @@ def test_binary_confusion_with_valid_mask() -> None:
     assert counts == {"tp": 1, "fp": 1, "fn": 0, "tn": 1}
 
 
+def test_binary_confusion_excludes_invalid_pixels_from_every_bucket() -> None:
+    """Pixels outside the valid mask are never counted, not even as true negatives."""
+    pred = np.array([1, 0, 1, 0], dtype=bool)
+    truth = np.array([1, 1, 0, 0], dtype=bool)
+    valid = np.array([False, False, False, True], dtype=bool)
+
+    counts = binary_confusion(pred, truth, valid=valid)
+    assert counts == {"tp": 0, "fp": 0, "fn": 0, "tn": 1}
+
+
 def test_binary_metrics_zeros() -> None:
     counts = {"tp": 0, "fp": 0, "fn": 0, "tn": 5}
     metrics = binary_metrics(counts)
