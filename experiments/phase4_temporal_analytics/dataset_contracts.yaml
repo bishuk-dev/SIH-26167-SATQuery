@@ -1,7 +1,7 @@
 schema_version: 1
 
-audited_at: "2026-09-08"
-status: BLOCKED_PENDING_SOURCE_AND_CHECKPOINT_AUDIT
+audited_at: "2026-09-09"
+status: BLOCKED_PENDING_LOCAL_BYTES_AND_REMAINING_LICENSE_AUDIT
 
 datasets:
   oscd:
@@ -11,11 +11,11 @@ datasets:
       title: Onera Satellite Change Detection Dataset
       landing_url: https://rcdaudt.github.io/oscd/
       repository_url: null
-      doi: null
-      version: website_current_2026-06-15
+      doi: 10.1109/IGARSS.2018.8518015
+      version: website_current_2026-09-09
     license:
       dataset_license: CC BY 4.0
-      imagery_terms: IEEE DataPort metadata declares CC BY 4.0; confirm downloadable archive terms before redistribution
+      imagery_terms: IEEE DataPort metadata declares CC BY 4.0 (verified in page metadata 2026-09-09); downloadable-archive terms require logged-in access
       redistribution_allowed: null
     transport:
       url: https://ieee-dataport.org/open-access/oscd-onera-satellite-change-detection
@@ -28,28 +28,43 @@ datasets:
       modalities: [multispectral_optical]
       sensors: [Sentinel-2]
       bands_or_polarizations: [B01, B02, B03, B04, B05, B06, B07, B08, B8A, B09, B10, B11, B12]
-      radiometric_domain: not stated on project page; verify archive/code
+      radiometric_domain: not stated on project page; verify from archive README.txt and file bytes
       spatial_resolution_m: [10, 20, 60]
       pair_order: T1_then_T2
       registration_claim: registered pairs according to project page; verify transforms in files
       labels: pixel_level_binary_change; urban changes such as buildings and roads
-      label_limitations: [not a water-expansion ground truth, not a vegetation-loss ground truth]
+      label_limitations: [not a water-expansion ground truth, not a vegetation-loss ground truth, not a label for any specific spectral-index change]
+    layout:
+      note: >-
+        The publisher archive is login-gated on IEEE DataPort and ships a README.txt;
+        the actual archive member layout has NOT been observed and must not be assumed.
+        In particular, do NOT assume one 13-band T1.tif/T2.tif per pair: the dataset
+        ships per-resolution native grids and the observed on-disk tiling must be frozen
+        from the first authorized download.
+      materialization_rule: >-
+        Bands at 10 m stay on their native grid; 20 m and 60 m bands are resampled to the
+        10 m grid with explicitly recorded resampling kernels (bilinear for continuous
+        reflectance) into derived analysis grids; every derived tile records parent hash,
+        source/destination grids, CRS, resampling, and transform. Native-resolution index
+        computation uses only native-grid bands.
     splits:
       authority_defined: true
       grouping_unit: registered_temporal_pair
       train: 14 pairs
       validation: null
-      test: 10 pairs; labels now reported open by project page
-      test_sealed: false
+      test: 10 pairs; labels openly published since project-site update (verified 2026-09-09)
+      test_sealed: true
     references:
       - url: https://rcdaudt.github.io/oscd/
-        supports: dataset size, bands, resolutions, registration, label scope
+        supports: dataset size, bands, resolutions, registration, label scope, open test labels
       - url: https://ieee-dataport.org/open-access/oscd-onera-satellite-change-detection
-        supports: publisher page and CC BY 4.0 dataset metadata
+        supports: publisher page, CC BY 4.0 metadata, login-gated archive transport
+      - url: https://doi.org/10.1109/IGARSS.2018.8518015
+        supports: original dataset paper (Daudt et al., IGARSS 2018)
     blockers:
-      - archive file list, size, checksum, and on-disk transforms not frozen
-      - official page has no immutable dataset release identifier
-      - test must remain excluded from tuning despite public labels
+      - "archive file list, member layout, size, and checksum not frozen: IEEE DataPort downloads require a free account login"
+      - on-disk band/tiling layout and per-tile geotransforms not observed locally
+      - official page exposes no immutable dataset release identifier; first authorized download must record archive size and SHA-256
 
   sentinel2_l2a_demo:
     status: BLOCKED
@@ -104,7 +119,7 @@ datasets:
       landing_url: https://justchenhao.github.io/LEVIR/
       repository_url: https://github.com/justchenhao/LEVIR
       doi: 10.3390/rs12101662
-      version: repository_head_fb19600da4dad999b6dd07c635a5c79fdf7bc935
+      version: repository_master_fb19600da4dad999b6dd07c635a5c79fdf7bc935
     license:
       dataset_license: academic_only
       imagery_terms: Google Earth terms apply; official page prohibits commercial use
@@ -118,13 +133,19 @@ datasets:
       locally_verified_sha256: null
     contract:
       modalities: [optical_rgb]
-      sensors: [Google Earth imagery]
+      sensors: [Google_Earth_VHR]
       bands_or_polarizations: [R, G, B]
-      radiometric_domain: 8_bit_RGB_files; verify archive
+      radiometric_domain: 8_bit_RGB_patch_files; no GeoTIFF/CRS assumption; file format verified at acquisition
       spatial_resolution_m: 0.5
-      pair_order: A_pre_then_B_post
-      registration_claim: bitemporal image pairs; verify transforms/geographic supplement
-      labels: binary building-related change
+      patch_size_px: [1024, 1024]
+      pair_count: 637
+      pair_order: A_is_T1_pre_then_B_is_T2_post
+      labels: binary building-related change (1=change, 0=unchanged)
+      label_values: [0_unchanged, 1_change]
+      label_instance_count: 31333
+      label_semantics: building-related change only
+      geospatial_supplement: latitude/longitude per sample published under justchenhao/STANet LEVIR_CD_spatial_info (2023-03-11 update)
+      registration_claim: bitemporal patch pairs; per-sample coordinates available; no per-pixel geotransform inside benchmark imagery
       label_limitations: [not generic land-cover change, not SAR, not multispectral index ground truth]
     splits:
       authority_defined: true
@@ -137,22 +158,24 @@ datasets:
       - url: https://justchenhao.github.io/LEVIR/
         supports: size, resolution, geography, label scope, imagery terms
       - url: https://github.com/justchenhao/LEVIR
-        supports: repository revision and data layout
+        supports: repository revision, 637 pairs, 1024x1024, label values, instance count
+      - url: https://github.com/justchenhao/STANet/tree/master/LEVIR_CD_spatial_info
+        supports: per-sample geospatial supplement
     blockers:
-      - archive bytes and hashes not frozen
-      - exact split manifest and geographic grouping not checked locally
+      - "archive bytes and hashes not frozen: transport is Google Drive links from the official repository without publisher hashes"
+      - exact split manifest, image file format, and geographic grouping not checked locally
 
   s2looking:
     status: BLOCKED
-    role: robustness_gate
+    role: robustness_source_optional
     authority:
       title: S2Looking Change Detection Dataset
       landing_url: https://github.com/S2Looking/Dataset
       repository_url: https://github.com/S2Looking/Dataset
       doi: null
-      version: repository_head_6a0e4b0e9cc0057a913132fa2963a192755259d6
+      version: repository_main_6a0e4b0e9cc0057a913132fa2963a192755259d6
     license:
-      dataset_license: not stated in official README
+      dataset_license: not stated in official README (re-verified 2026-09-09)
       imagery_terms: unresolved
       redistribution_allowed: null
     transport:
@@ -164,12 +187,12 @@ datasets:
       locally_verified_sha256: null
     contract:
       modalities: [optical_rgb]
-      sensors: [Gaofen, SuperView, Beijing-2 reported by proposal; verify authoritative dataset documentation]
+      sensors: [unresolved_off_nadir_vhr]
       bands_or_polarizations: [R, G, B]
       radiometric_domain: unresolved
       spatial_resolution_m: unresolved
       pair_order: unresolved
-      registration_claim: off_nadir and registration difficulty reported by cited research; verify dataset documentation
+      registration_claim: off-nadir registration difficulty reported by cited research; verify dataset documentation
       labels: binary change expected; verify annotation semantics
       label_limitations: [robustness only, no tuning, no promotion without license/contract audit]
     splits:
@@ -181,102 +204,137 @@ datasets:
       test_sealed: true
     references:
       - url: https://github.com/S2Looking/Dataset
-        supports: official transport links and repository revision
+        supports: official transport links (Google Drive, Baidu) and repository revision; README states no license or split counts
+    decoupling_rule: >-
+      S2Looking is an optional robustness source only. Its blocked status must not
+      gate or delay the primary LEVIR-CD ChangerEx reproduction (see experiment_plan
+      P4-E02 primary/robustness split and promotion rules).
     blockers:
       - official README does not provide license, versioned archive, split counts, or complete input contract
       - source archive and annotation hashes not frozen
+      - "alternative: drop S2Looking robustness lane entirely if license stays unresolved; this does not affect primary reproduction"
 
   levir_cc:
     status: BLOCKED
     role: primary_benchmark
     authority:
       title: LEVIR-CC remote sensing change captioning dataset
-      landing_url: https://github.com/Chen-Yang-Liu/RSICC
-      repository_url: https://github.com/Chen-Yang-Liu/RSICC
-      doi: null
-      version: repository_head_d1505e514c450c3728782ca723e82761e70bafd3
+      landing_url: https://github.com/Chen-Yang-Liu/LEVIR-CC-Dataset
+      repository_url: https://github.com/Chen-Yang-Liu/LEVIR-CC-Dataset
+      doi: 10.1109/TGRS.2022.3218297
+      version: repository_main_ef442261a9bb8bde11cec02d665f41c0baa1539e
     license:
-      dataset_license: unresolved
-      imagery_terms: source repository points to dataset distribution; verify upstream terms
-      redistribution_allowed: null
+      dataset_or_annotation_license: apache-2.0 (declared in the official Hugging Face dataset record lcybuaa/LEVIR-CC linked from the official dataset repository; applies to the dataset organization/annotations, NOT to the underlying imagery rights)
+      imagery_terms: >-
+        upstream imagery is Google Earth-derived; the Google Earth academic/non-commercial
+        restriction that governs LEVIR-CD imagery is the operative constraint for the
+        imagery itself. The apache-2.0 dataset declaration does NOT override imagery terms.
+      redistribution_allowed: false
     transport:
-      url: https://github.com/Chen-Yang-Liu/RSICC
-      mirror_role: official_related_repository_with_external_data
-      expected_files: [LevirCCcaptions.json, images/train/A, images/train/B, images/val/A, images/val/B, images/test/A, images/test/B]
-      expected_size_bytes: null
-      publisher_hashes: {}
+      url: https://huggingface.co/datasets/lcybuaa/LEVIR-CC/tree/main
+      mirror_role: publisher_linked_transport (Hugging Face dataset linked as official download source by the official dataset repository README)
+      expected_files:
+        - Levir-CC-dataset.zip
+      expected_size_bytes: 2683666867
+      publisher_hashes:
+        sha256: e05d38c0fdfda8c9b2048d314e5f95974d8b81e1b9f83f107acc39d55015e130
       locally_verified_sha256: null
     contract:
       modalities: [optical_rgb]
-      sensors: [high_resolution_remote_sensing; verify source]
+      sensors: [Google_Earth_VHR]
       bands_or_polarizations: [R, G, B]
-      radiometric_domain: unresolved
-      spatial_resolution_m: unresolved
-      pair_order: A_pre_then_B_post
-      registration_claim: paired images; verify files and source documentation
+      radiometric_domain: 8_bit_RGB
+      spatial_resolution_m: 0.5_to_0.8_per_official_paper; verify per archive
+      pair_order: A_is_pre_phase_then_B_is_post_phase
+      pair_count: 10077
+      sentence_count: 50385
+      caption_schema: all change descriptions live inside LevirCCcaptions.json (images[].images = [A_filename, B_filename], images[].sentences[]); there are NO per-pair reference files in the official layout
+      image_normalization_reference:
+        A_mean_rgb: [0.44152, 0.43863, 0.37418]
+        A_var_rgb: [0.17623, 0.16578, 0.15337]
+        B_mean_rgb: [0.33992, 0.33383, 0.28561]
+        B_var_rgb: [0.13035, 0.12678, 0.11959]
       labels: multiple natural-language change descriptions per pair
       label_limitations: [caption references are not segmentation masks, captions cannot support area measurement]
     splits:
       authority_defined: true
       grouping_unit: temporal_pair
-      train: repository-defined
-      validation: repository-defined
-      test: repository-defined
+      train: images/train (A/B)
+      validation: images/val (A/B)
+      test: images/test (A/B)
       test_sealed: true
     references:
+      - url: https://github.com/Chen-Yang-Liu/LEVIR-CC-Dataset
+        supports: official dataset repository, layout, pair/sentence counts, per-folder mean/variance, download sources
+      - url: https://huggingface.co/datasets/lcybuaa/LEVIR-CC
+        supports: publisher-linked transport archive, size 2683666867 bytes, sha256 e05d38c0fdfda8c9b2048d314e5f95974d8b81e1b9f83f107acc39d55015e130, apache-2.0 license declaration
       - url: https://github.com/ShizhenChang/Chg2Cap
         supports: official Chg2Cap data layout and A/B temporal semantics
-      - url: https://github.com/Chen-Yang-Liu/RSICC
-        supports: related dataset repository revision
     blockers:
-      - dataset license and authoritative release terms unresolved
-      - exact caption counts, archive hashes, and split manifest not frozen
+      - archive bytes not locally verified (download once, record size + SHA-256, compare against publisher sha256)
+      - LevirCCcaptions.json field-level schema and exact validation membership not yet inspected from bytes
+      - imagery-rights confirmation pending: apache-2.0 covers the dataset package only; Google Earth upstream terms must be confirmed as compatible with the planned use before any execution
 
   sturm_flood:
     status: BLOCKED
     role: primary_benchmark
     authority:
       title: STURM-Flood
-      landing_url: https://doi.org/10.5281/zenodo.12748982
+      landing_url: https://doi.org/10.5281/zenodo.12748983
       repository_url: https://github.com/STURM-WEO/STURM-Flood
-      doi: 10.5281/zenodo.12748982
-      version: repository_head_c39d9bf8ba76302663c097ec4e905c918e1e131d
+      doi: 10.5281/zenodo.12748983
+      concept_doi: 10.5281/zenodo.12748982
+      doi_relationship: >-
+        verified from Zenodo API 2026-09-09: record 12748983 is the version record,
+        12748982 is the concept DOI; the official repository README links the concept
+        DOI and the official inference notebook downloads from the version record.
+      version: 1.0.0
     license:
-      dataset_license: unresolved at dataset-record level
-      imagery_terms: repository lists source terms; verify Zenodo record and source imagery terms
-      redistribution_allowed: null
+      dataset_license: CC-BY-4.0 (verified from Zenodo record 12748983 license field 2026-09-09)
+      imagery_terms: Sentinel-1/2 usage under Copernicus Sentinel Data Legal Notice; Copernicus EMS source products referenced by the repository
+      redistribution_allowed: true_per_CC_BY_4.0_with_attribution
     transport:
-      url: https://doi.org/10.5281/zenodo.12748982
-      mirror_role: official_zenodo
-      expected_files: []
-      expected_size_bytes: null
-      publisher_hashes: {}
+      url: https://zenodo.org/records/12748983/files/Dataset.zip
+      mirror_role: official_zenodo_version_record
+      expected_files: [Dataset.zip]
+      expected_size_bytes: 3985215183
+      publisher_hashes:
+        md5: 0e4172e74a4cf2e4c608c14d1588d1d9
       locally_verified_sha256: null
     contract:
       modalities: [sar, multispectral_optical]
       sensors: [Sentinel-1, Sentinel-2]
-      bands_or_polarizations: [VV, VH, S2_multispectral]
-      radiometric_domain: unresolved; official README does not define S1 units
+      bands_or_polarizations: [VV_VH_S1_composite, S2_multispectral]
+      radiometric_domain: encoded in the composite files themselves; the official inference code applies NO conversion and NO normalization (normalize_inputs=False), so units must be verified from file bytes and the dataset paper
       spatial_resolution_m: 10
-      pair_order: acquisition_metadata_required
-      registration_claim: corresponding water masks; verify files and metadata
-      labels: water/flood extent masks
+      tile_size_px: [128, 128]
+      tile_counts: {sentinel1: 21602, sentinel2: 2675, flood_events: 60}
+      pair_order: single_flood_observation_per_tile
+      layout:
+        dataset_root: STURM-Flood/Dataset/
+        sentinel1_composites: Dataset/Sentinel1/S1/
+        sentinel1_masks: Dataset/Sentinel1/Floodmaps/
+        sentinel1_metadata: Dataset/Sentinel1_metadata.csv (tile_id column drives iteration)
+        sentinel2_metadata: Dataset/Sentinel2_metadata.csv
+      labels: water/flood extent mask paired per tile_id in Floodmaps
+      label_semantics: water/flood extent mask paired per tile_id in Floodmaps
       label_limitations: [flood labels are not generic SAR change labels]
     splits:
-      authority_defined: unresolved
+      authority_defined: false
       grouping_unit: flood_event_and_tile
-      train: unresolved
-      validation: unresolved
-      test: unresolved
+      train: not declared by publisher; metadata CSV only
+      validation: not declared by publisher
+      test: not declared by publisher
       test_sealed: true
     references:
+      - url: https://zenodo.org/records/12748983
+        supports: version record, CC-BY-4.0, Dataset.zip size 3985215183 bytes, md5 0e4172e74a4cf2e4c608c14d1588d1d9 (API-verified 2026-09-09)
       - url: https://github.com/STURM-WEO/STURM-Flood
-        supports: tile counts, dimensions, resolution, event count, resource DOIs, repository license
-      - url: https://doi.org/10.5281/zenodo.12748982
-        supports: official dataset record
+        supports: tile counts, dimensions, resolution, event count, resource DOIs, CC BY-SA 4.0 code license, paper DOI 10.1080/20964471.2025.2458714
     blockers:
-      - Zenodo record metadata/archive not retrieved
-      - exact archive files, hashes, split policy, S1 radiometric units, and labels not frozen
+      - Dataset.zip (3.98 GB) not downloaded; local SHA-256 and archive member inspection pending
+      - S1 composite band order (VV then VH) and radiometric scaling not verified from file bytes or the dataset paper
+      - "no publisher-declared split: any train/validation split must be derived and frozen from event grouping with recorded rule"
 
   sen1floods11:
     status: BLOCKED
@@ -286,41 +344,69 @@ datasets:
       landing_url: https://github.com/cloudtostreet/Sen1Floods11
       repository_url: https://github.com/cloudtostreet/Sen1Floods11
       doi: null
-      version: repository_head_b9e460dabe70230111a3c3d36cd0c5ce03606ee9
+      version: v1.1 (bucket restructure documented in README; repository_master_b9e460dabe70230111a3c3d36cd0c5ce03606ee9)
     license:
-      dataset_license: unresolved in official README
+      dataset_license: not stated in official repository README or as a LICENSE file (re-checked 2026-09-09)
       imagery_terms: Sentinel-1 source terms require confirmation
       redistribution_allowed: null
     transport:
-      url: gs://sen1floods11/
+      url: gs://sen1floods11 (v1.1 layout; bucket listing verified unauthenticated 2026-09-09)
       mirror_role: official_publisher_bucket
-      expected_files: [S1, QC, Sen1Floods11_Metadata.geojson]
+      expected_files:
+        - v1.1/Sen1Floods11_Metadata.geojson
+        - v1.1/catalog.zip
+        - v1.1/data/flood_events/HandLabeled/S1Hand/EVENT_CHIPID_S1Hand.tif
+        - v1.1/data/flood_events/HandLabeled/LabelHand/EVENT_CHIPID_LabelHand.tif
+        - v1.1/data/flood_events/HandLabeled/QCHand/EVENT_CHIPID_QCHand.tif
+        - v1.1/splits/flood_handlabeled/flood_train_data.csv
+        - v1.1/splits/flood_handlabeled/flood_valid_data.csv
+        - v1.1/splits/flood_handlabeled/flood_test_data.csv
+        - v1.1/splits/flood_handlabeled/flood_bolivia_data.csv
       expected_size_bytes: null
-      publisher_hashes: {}
+      publisher_hashes: per-object GCS md5Hash metadata is available from the bucket API (verified for sample objects); full manifest to be frozen at first sync
       locally_verified_sha256: null
     contract:
       modalities: [sar]
-      sensors: [Sentinel-1]
+      sensors: [Sentinel-1_GRD_IW]
       bands_or_polarizations: [VV, VH]
-      radiometric_domain: backscatter_db
+      band_order: [VV, VH]
+      radiometric_domain: backscatter_db (float32)
       spatial_resolution_m: 10
-      pair_order: event_metadata_required
-      registration_claim: WGS84 512x512 chips; verify per file
-      labels: QC values -1 NoData, 0 Not Water, 1 Water
+      chip_size_px: [512, 512]
+      crs: EPSG:4326
+      pair_order: single_observation_per_chip; event dates from Sen1Floods11_Metadata.geojson
+      file_naming: EVENT_CHIPID_LAYER.tif (e.g. Bolivia_103757_S1Hand.tif); chip IDs unique per event
+      labels: water/flood extent masks per QC/LabelHand layer (values -1 NoData/Not Valid, 0 Not Water, 1 Water; int16)
+      label_layer: QC / LabelHand
+      label_values: [-1_no_data_or_not_valid, 0_not_water, 1_water]
+      label_dtype: int16
+      splits:
+        source: v1.1/splits/flood_handlabeled CSVs (train/valid/test/bolivia) with sizes recorded from bucket listing
       label_limitations: [independent holdout only, no threshold tuning]
+    compatibility_gate:
+      rule: >-
+        STURM's audited inference contract reads composite bands in file order as
+        float32 with NO normalization (normalize_inputs=False) and threshold 0.5.
+        Sen1Floods11 S1Hand chips are float32 dB VV/VH. Transfer is authorized only
+        if STURM's composite radiometric scaling (verified from dataset bytes or the
+        STURM paper) is demonstrably the same dB scaling; otherwise the external
+        STURM evaluation is recorded BLOCKED_INPUT_CONTRACT. No conversion may be guessed.
     splits:
       authority_defined: true
       grouping_unit: flood_event_and_chip
-      train: bucket-defined
-      validation: bucket-defined
-      test: bucket-defined
+      train: v1.1/splits/flood_handlabeled/flood_train_data.csv
+      validation: v1.1/splits/flood_handlabeled/flood_valid_data.csv
+      test: v1.1/splits/flood_handlabeled/flood_test_data.csv
       test_sealed: true
     references:
       - url: https://github.com/cloudtostreet/Sen1Floods11
-        supports: bucket, dimensions, CRS, dB/VV/VH, labels, metadata fields
+        supports: bucket layout, EVENT_CHIPID_LAYER naming, S1 512x512 2-band dB VV/VH, QC label values, WGS84 10 m, event metadata fields
+      - url: https://storage.googleapis.com/storage/v1/b/sen1floods11/o
+        supports: v1.1 bucket structure, split CSV file names/sizes, per-object md5Hash metadata (API-verified 2026-09-09)
     blockers:
-      - bucket manifest, file hashes, license, and exact split files not frozen
-      - compatibility with STURM preprocessing not established
+      - dataset license unresolved (no LICENSE file or README statement)
+      - bucket manifest with per-file hashes and exact split membership not frozen locally
+      - STURM composite radiometric scaling not yet verified, so transfer compatibility is undecided (BLOCKED_INPUT_CONTRACT candidate)
 
   modified_sen1floods11:
     status: BLOCKED

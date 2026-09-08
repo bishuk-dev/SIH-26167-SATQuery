@@ -1,4 +1,5 @@
 schema_version: 1
+
 experiment_family: phase4_temporal_analytics
 status: BLOCKED_PENDING_SOURCE_AND_CHECKPOINT_AUDIT
 
@@ -12,13 +13,58 @@ shared_policy:
   metric_rule: every aggregate must reconstruct from saved prediction or confusion rows
   zero_sample_rule: report not_measured, never zero_score
   output_rule: no source imagery, checkpoints, caches, or third_party_repository_files
+  agreement_policy: >-
+    Mask agreement (learned vs deterministic) is a DIAGNOSTIC metric only in Phase 4.
+    No numeric agreement thresholds (e.g. IoU cutoffs driving ABSTAIN or warnings) are
+    predeclared or authorized: none currently has validation evidence. Agreement values
+    are recorded and reported; routing/verification policy that consumes them is a
+    Phase 5 decision requiring its own validation evidence. Any production code that
+    applies fixed agreement cutoffs is out of contract for Phase 4.
 
 experiments:
   P4-E01:
     status: BLOCKED
-    hypothesis: Deterministic band-aware temporal operations produce reproducible multispectral evidence and measurements.
+    hypothesis: >-
+      Deterministic band-aware temporal operations produce reproducible multispectral
+      evidence, and a frozen generic deterministic change baseline (Change Vector
+      Analysis) yields reconstructable segmentation metrics on OSCD.
+    validation_lanes:
+      A_spectral_formula_correctness:
+        purpose: verify NDVI/NDWI/MNDWI formulas against hand-calculated fixtures on native grids
+        metrics: [valid_pixel_index_error]
+        benchmark_use: none
+      B_temporal_grid_correctness:
+        purpose: verify common-grid preparation, identity-pair and misalignment behavior
+        metrics: []
+        sanities: [identity_pair_T1_T1, reversed_pair_T2_T1, deliberate_grid_misalignment]
+        benchmark_use: none
+      C_deterministic_area_correctness:
+        purpose: verify projected-affine and equal-area measurement paths
+        metrics: [area_MAE, area_relative_error]
+        sanities: [projected_area_fixture, geographic_CRS_fixture]
+        benchmark_use: none
+      D_generic_change_benchmark_optional:
+        purpose: >-
+          evaluate a frozen generic multispectral deterministic change method on OSCD
+          train-pair-derived validation; NDVI absolute difference is NOT authorized as a
+          generic change measure
+        method:
+          id: change_vector_analysis_v1
+          definition: >-
+            CVA magnitude over the materialized common analysis grid: the Euclidean
+            norm of per-pixel band-wise differences across the semantic band set,
+            computed per native-resolution group; change pixels are magnitude above a
+            threshold frozen on development pairs only
+          authority_basis: standard deterministic multispectral change baseline (Malila 1980; widely used in the change-detection literature); frozen here because OSCD labels are generic urban change, not index-change
+          threshold_rule: single scalar magnitude threshold selected on development pairs and frozen before any sealed or held-out evaluation
+        metrics: [precision, recall, F1, IoU]
+        benchmark_use: oscd_validation_only
+        removal_condition: >-
+          if the CVA contract cannot be frozen with an authoritative, reproducible
+          definition before implementation, lane D and its OSCD precision/F1/IoU are
+          REMOVED from P4-E01 rather than substituted with an ad-hoc method
     datasets: [oscd, sentinel2_l2a_demo]
-    model_or_tools: [compute_ndvi_v1, compute_ndwi_v1, compute_mndwi_v1, temporal_difference_v1, compute_mask_area_v1]
+    model_or_tools: [compute_ndvi_v1, compute_ndwi_v1, compute_mndwi_v1, temporal_difference_v1, compute_mask_area_v1, change_vector_analysis_v1]
     sample_selection:
       source: OSCD official train/test pair declaration
       development_split: train_or_declared_validation_only
@@ -27,16 +73,31 @@ experiments:
       demonstration_samples: sentinel2_l2a_demo
       seed: 0
     preprocessing_profile_ids: [oscd_native_band_contract, sentinel2_l2a_l2a_reflectance_contract]
-    metrics: [valid_pixel_index_error, precision, recall, F1, IoU, area_MAE, area_relative_error]
+    metrics: [valid_pixel_index_error, area_MAE, area_relative_error, precision, recall, F1, IoU]
+    metric_scope_note: >-
+      precision/recall/F1/IoU apply ONLY to lane D (CVA on OSCD validation); they are
+      never reported for NDVI/NDWI/MNDWI differences.
     sanities: [identity_pair_T1_T1, reversed_pair_T2_T1, deliberate_grid_misalignment, hand_calculated_index_fixture, projected_area_fixture, geographic_CRS_fixture]
     output_files: [manifest.json, validation_predictions.jsonl, validation_result.json, provenance.json]
-    pass_condition: All semantic bands, masks, grids, formulas, and measurement paths pass deterministic fixtures; any benchmark metric has nonzero samples and reconstructible rows.
-    blockers: [oscd_archive_contract, sentinel2_selected_pair_contract]
-    stop_conditions: [missing_band_semantics, unverified_grid, missing_CRS_for_area, test_access]
+    pass_condition: >-
+      Lanes A, B, C pass all deterministic fixtures with reconstructible rows; lane D,
+      if retained, reports nonzero-sample reconstructible segmentation metrics computed
+      only with the frozen CVA method and frozen threshold.
+    blockers: [oscd_archive_contract, sentinel2_selected_pair_contract, cva_freeze_pending]
+    stop_conditions: [missing_band_semantics, unverified_grid, missing_CRS_for_area, test_access, benchmark_metric_substitution_for_lanes_A_B_C]
 
   P4-E02:
     status: BLOCKED
-    hypothesis: ChangerEx-R18 supplies useful high-resolution structural-change masks on LEVIR-CD and exposes domain degradation on S2Looking.
+    hypothesis: ChangerEx-R18 supplies useful high-resolution structural-change masks on LEVIR-CD.
+    primary_gate:
+      dataset: levir_cd
+      purpose: official validation reproduction; solely determines promotion eligibility
+    robustness_lane:
+      dataset: s2looking
+      purpose: unchanged-model degradation report
+      status_reporting: recorded separately as robustness_status (pass | degraded | blocked)
+      gate_effect: none on primary promotion; a blocked or unresolved S2Looking contract must not delay or block the LEVIR-CD reproduction
+      tuning_rule: no S2Looking tuning under any outcome
     datasets: [levir_cd, s2looking]
     model_or_tools: [changerex_r18_levircd]
     sample_selection:
@@ -48,9 +109,18 @@ experiments:
     preprocessing_profile_ids: [changerex_r18_levircd_frozen]
     metrics: [precision, recall, F1, IoU, mIoU, Acc_at_IoU_0.5, absolute_domain_drop, relative_domain_drop, latency_ms, peak_vram_mb]
     sanities: [identity_pair_T1_T1, reversed_pair_T2_T1, deliberate_misalignment, source_coordinate_round_trip, checkpoint_hash_check]
-    output_files: [levir_manifest.json, s2looking_manifest.json, validation_predictions.jsonl, robustness_predictions.jsonl, validation_result.json, robustness_result.json, provenance.json]
-    pass_condition: Official LEVIR-CD validation reproduces within frozen tolerance; unchanged checkpoint/profile/threshold then runs on S2Looking and reports degradation.
-    blockers: [checkpoint_bytes_and_sha256, immutable_model_source_revision, dataset_archive_hashes, s2looking_license_and_contract]
+    output_files: [levir_manifest.json, validation_predictions.jsonl, validation_result.json, robustness_manifest.json, robustness_predictions.jsonl, robustness_result.json, provenance.json]
+    pass_condition_primary: >-
+      Official LEVIR-CD validation metric definitions (mmseg IoUMetric mFscore + mIoU)
+      reproduce within the tolerance frozen in this plan, with nonzero samples,
+      verified checkpoint hash, and reconstructible rows. This gate alone decides
+      structural_change promotion eligibility.
+    pass_condition_robustness: >-
+      S2Looking runs unchanged checkpoint/profile/threshold and reports degradation;
+      if the S2Looking contract remains BLOCKED, robustness_status is recorded as
+      blocked and the primary result stands.
+    blockers_primary: [checkpoint_bytes_and_sha256, dependency_lock, dataset_archive_hashes]
+    blockers_robustness: [s2looking_license_and_contract]
     stop_conditions: [checkpoint_mismatch, unsupported_loader, official_metric_mismatch, test_access, robustness_tuning]
 
   P4-E03:
@@ -59,17 +129,25 @@ experiments:
     datasets: [levir_cc]
     model_or_tools: [chg2cap_levircc]
     sample_selection:
-      source: official_related LEVIR-CC repository after local manifest verification
+      source: official LEVIR-CC dataset repository archive after local manifest verification
       development_split: levir_cc_validation
       robustness_split: null
       sealed_splits: [levir_cc_test]
       seed: 0
     preprocessing_profile_ids: [chg2cap_levircc_frozen]
     metrics: [BLEU_4, METEOR, ROUGE_L, CIDEr, caption_row_count, latency_ms, peak_vram_mb]
+    metric_implementation_rule: >-
+      Metrics must use the official standard implementations bundled in the Chg2Cap
+      repository (eval_func: Bleu(4), Meteor, Rouge, Cider, coco-caption style) at the
+      pinned revision; METEOR requires a Java runtime. Substituting different
+      implementations or approximate metrics under the official names is forbidden.
     sanities: [identity_pair_T1_T1, reversed_pair_T2_T1, pair_order_check, caption_count_check, checkpoint_hash_check]
     output_files: [manifest.json, validation_predictions.jsonl, validation_result.json, provenance.json]
-    pass_condition: Official/pretrained validation protocol and metric implementation are reproduced or discrepancy is explicitly documented; all references and predictions are preserved.
-    blockers: [checkpoint_hash_unavailable, levir_cc_license, exact_dataset_release, metric_protocol]
+    pass_condition: >-
+      Official/pretrained validation protocol with the pinned standard metric
+      implementations is reproduced or the discrepancy is explicitly documented; all
+      references from LevirCCcaptions.json and all predictions are preserved per pair.
+    blockers: [checkpoint_hash_unavailable_google_drive, levir_cc_local_byte_verification, captions_json_schema_audit]
     stop_conditions: [checkpoint_mismatch, missing_reference_rows, test_access, metric_substitution]
 
   P4-E04:
@@ -78,23 +156,31 @@ experiments:
     datasets: [sturm_flood, sen1floods11]
     model_or_tools: [sturm_sentinel1_unet, sar_temporal_change_v1, mask_agreement_v1]
     sample_selection:
-      source: official dataset split after event-level manifest verification
+      source: event-grouped split derived and frozen from publisher metadata because no publisher split is declared
       development_split: sturm_flood_validation
       robustness_split: sen1floods11_external_holdout
       sealed_splits: [sturm_flood_test]
       seed: 0
     preprocessing_profile_ids: [sturm_sentinel1_frozen, sen1floods11_native_db_v1]
-    metrics: [precision, recall, F1, IoU, event_level_metrics, absolute_domain_drop, relative_domain_drop, identity_pair_false_positive_rate, mask_agreement_IoU, latency_ms, peak_vram_mb]
+    metrics: [precision, recall, F1, IoU, event_level_metrics, absolute_domain_drop, relative_domain_drop, identity_pair_false_positive_rate, mask_agreement_IoU_diagnostic, latency_ms, peak_vram_mb]
     sanities: [identity_pair_T1_T1, known_db_difference_fixture, unknown_radiometric_domain_rejection, wrong_polarization_rejection, checkpoint_hash_check]
     output_files: [sturm_manifest.json, sen1floods11_manifest.json, validation_predictions.jsonl, external_predictions.jsonl, validation_result.json, external_result.json, agreement_result.json, provenance.json]
-    pass_condition: STURM validation has nonzero samples and reconstructible segmentation metrics; external evaluation runs unchanged only when input contracts are compatible, otherwise records blocked status.
-    blockers: [Zenodo_record_unavailable, model_archive_and_hash, official_preprocessing, tensorflow_dependency, sen1floods11_compatibility]
-    stop_conditions: [unknown_SAR_domain, wrong_polarization, checkpoint_mismatch, test_access, external_threshold_tuning]
+    pass_condition: >-
+      STURM validation has nonzero samples and reconstructible segmentation metrics.
+      Sen1Floods11 external evaluation runs unchanged only when STURM composite
+      radiometric scaling is verified identical to Sen1Floods11 dB; otherwise the
+      external lane is recorded BLOCKED_INPUT_CONTRACT with the exact unsatisfied
+      fact. Mask agreement is reported as a diagnostic only (see shared_policy).
+    external_holdout_condition: conditional_on_audited_input_compatibility
+    blockers: [model_archive_and_sha256, dataset_archive_sha256, s1_radiometric_scaling_unverified, tensorflow_version_pin, sen1floods11_license, split_derivation_freeze]
+    stop_conditions: [unknown_SAR_domain, wrong_polarization, checkpoint_mismatch, test_access, external_threshold_tuning, guessed_radiometric_conversion]
 
 promotion:
-  structural_change: requires P4-E02_pass
+  structural_change: requires P4-E02_primary_gate_pass (LEVIR-CD reproduction only; S2Looking robustness status recorded separately and does not gate)
   change_captioning: requires P4-E03_pass
-  flood_segmentation: requires P4-E04_pass
-  deterministic_tools: requires P4-E01_local_fixture_pass
+  flood_segmentation: requires P4-E04_primary_pass (external holdout status recorded separately)
+  deterministic_tools: requires P4-E01_lanes_A_B_C_pass
+  oscd_benchmark_metrics: requires P4-E01_lane_D_retained_with_frozen_CVA
   risat_claim: forbidden_without_dedicated_sensor_transfer_experiment
   cartosat_claim: forbidden_without_dedicated_sensor_transfer_experiment
+  agreement_routing_policy: forbidden_in_phase_4; phase 5 must validate any numeric cutoff before adoption
