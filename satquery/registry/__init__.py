@@ -2,6 +2,9 @@
 
 from satquery.registry.models import (
     BifoldPreprocessingProfile,
+    ChangeCaptionRegistration,
+    ChangeDetectionRegistration,
+    FloodSegmentationRegistration,
     ModelRegistration,
     MultisensorModelRegistration,
     NativeMultisensorPreprocessingProfile,
@@ -12,6 +15,9 @@ from satquery.registry.models import (
 
 __all__ = [
     "BifoldPreprocessingProfile",
+    "ChangeCaptionRegistration",
+    "ChangeDetectionRegistration",
+    "FloodSegmentationRegistration",
     "ModelRegistration",
     "MultisensorModelRegistration",
     "NativeMultisensorPreprocessingProfile",

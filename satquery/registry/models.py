@@ -61,6 +61,36 @@ class MultisensorModelRegistration(ContractModel):
     allow_remote_code: Literal[False]
 
 
+class _TemporalModelRegistration(ContractModel):
+    provider: Literal["huggingface", "github", "zenodo"]
+    model_id: str = Field(min_length=1)
+    revision: str = Field(min_length=1)
+    checkpoint_file: str = Field(min_length=1)
+    checkpoint_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    checkpoint_size_bytes: int = Field(gt=0)
+    architecture: str = Field(min_length=1)
+    license: str = Field(min_length=1)
+    preprocessing_profile: str = Field(min_length=1)
+    training_domain: str = Field(min_length=1)
+    supported_modalities: tuple[str, ...]
+    input_shape: tuple[int, ...]
+    output_semantics: str = Field(min_length=1)
+    frozen: Literal[True]
+    allow_remote_code: Literal[False]
+
+
+class ChangeDetectionRegistration(_TemporalModelRegistration):
+    task: Literal["structural_change_segmentation"]
+
+
+class ChangeCaptionRegistration(_TemporalModelRegistration):
+    task: Literal["change_captioning"]
+
+
+class FloodSegmentationRegistration(_TemporalModelRegistration):
+    task: Literal["flood_segmentation"]
+
+
 class ModelRegistry(ContractModel):
     schema_version: Literal[1]
     models: dict[
@@ -68,7 +98,10 @@ class ModelRegistry(ContractModel):
         Annotated[
             ModelRegistration
             | GroundingModelRegistration
-            | MultisensorModelRegistration,
+            | MultisensorModelRegistration
+            | ChangeDetectionRegistration
+            | ChangeCaptionRegistration
+            | FloodSegmentationRegistration,
             Field(discriminator="task"),
         ],
     ]
