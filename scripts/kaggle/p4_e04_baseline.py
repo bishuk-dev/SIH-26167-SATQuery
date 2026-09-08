@@ -80,7 +80,7 @@ def _download_file_robust(
     dest: Path,
     expected_size: int,
     expected_md5: str,
-    max_attempts: int = 6,
+    max_attempts: int = 8,
 ) -> None:
     """Download a file with HTTP Range resume, exponential backoff, and hash verification."""
     import urllib.request
@@ -89,9 +89,8 @@ def _download_file_robust(
     dest.parent.mkdir(parents=True, exist_ok=True)
 
     if dest.exists() and dest.stat().st_size == expected_size:
-        actual_md5 = _md5_file(dest)
-        if actual_md5 == expected_md5:
-            print(f"[P4-E04] Verified existing archive: {dest.name}")
+        if _md5_file(dest) == expected_md5:
+            print(f"[P4-E04] Verified existing {dest.name}")
             return
         print(f"[P4-E04] MD5 mismatch for existing {dest.name}, re-downloading")
         dest.unlink()
@@ -105,7 +104,10 @@ def _download_file_robust(
             part_path.unlink()
             existing_bytes = 0
 
-        headers = {"User-Agent": "satquery-P4-E04"}
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+            "Accept": "*/*",
+        }
         if existing_bytes > 0:
             headers["Range"] = f"bytes={existing_bytes}-"
             print(f"[P4-E04] Attempt {attempt}/{max_attempts}: Resuming {dest.name} from byte {existing_bytes}...")
