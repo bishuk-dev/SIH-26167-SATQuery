@@ -295,6 +295,8 @@ def _enumerate_rasters(dir_path: Path) -> list[Path]:
 
 
 KNOWN_SUFFIXES: tuple[str, ...] = (
+    "_S1_PREHand",
+    "_S1_PRE",
     "_S1Hand_post",
     "_S1Hand_pre",
     "_S1Hand",

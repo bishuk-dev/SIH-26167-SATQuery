@@ -105,6 +105,10 @@ class TestP4E04TemporalRolePairingAndGrid:
         key_tiff = _derive_scene_key("Bolivia_103757_S1Hand_post.tiff")
         assert key_tiff == "Bolivia_103757"
 
+        # Test real Modified Sen1Floods11 PRE naming convention
+        key_pre = _derive_scene_key("Ghana_103272_S1_PREHand.tif")
+        assert key_pre == "Ghana_103272"
+
     def test_3_uppercase_tif_and_tiff_enumerated_and_paired(self, tmp_path: Path) -> None:
         """Uppercase .TIF and .TIFF extensions are discovered and paired."""
         pre_dir = tmp_path / "PRE"
