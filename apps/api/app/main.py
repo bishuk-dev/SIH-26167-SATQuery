@@ -30,6 +30,7 @@ from satquery.ingestion import (
 from satquery.visualization.config import VisualizationSettings
 from satquery.visualization.derivatives import VisualizationDerivativeGenerator
 from satquery.visualization.tiles import RasterTileService
+from apps.api.app.routes.analyses import router as analyses_router
 
 
 def create_app(
@@ -45,8 +46,9 @@ def create_app(
     safety_limits = limits or RasterSafetyLimits.from_env()
     display_settings = visualization_settings or VisualizationSettings.from_env()
     storage_root = Path(data_root or os.environ.get("DATA_ROOT", "./data"))
-    store = FilesystemObservationStore(storage_root)
     application = FastAPI(title="SatQuery API", version="0.1.0")
+    store = FilesystemObservationStore(storage_root)
+    application.state.observation_store = store
     application.state.observation_ingestion_service = ObservationIngestionService(
         inspector=RasterInspector(safety_limits),
         store=store,
@@ -67,6 +69,7 @@ def create_app(
     application.include_router(tiles_router)
     application.include_router(vqa_router)
     application.include_router(grounding_router)
+    application.include_router(analyses_router)
 
     @application.exception_handler(RequestValidationError)
     async def request_validation_handler(
