@@ -10,6 +10,7 @@ from satquery.analytics.spectral import (
     compute_index,
     normalized_difference,
 )
+from satquery.analytics.reconciliation import ReconciliationResult, reconcile_masks
 from satquery.analytics.sar import (
     AgreementResult,
     SarChangeResult,
@@ -27,6 +28,7 @@ from satquery.analytics.temporal import (
 __all__ = [
     "AgreementResult",
     "AlignedPair",
+    "ReconciliationResult",
     "CrsRequiredForMeasurementError",
     "MeasurementResult",
     "MissingRequiredBandError",
@@ -36,6 +38,7 @@ __all__ = [
     "compute_index",
     "mask_agreement",
     "measure_mask_area",
+    "reconcile_masks",
     "normalized_difference",
     "prepare_common_grid",
     "sar_temporal_change",
