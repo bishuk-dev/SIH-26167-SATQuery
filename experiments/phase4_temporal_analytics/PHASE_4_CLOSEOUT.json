@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "status": "BLOCKED",
+  "artifacts": [
+    {
+      "path": "experiments/phase4_temporal_analytics/README.md",
+      "sha256": "5b1dfd93103411a4e33090a8e19ee621b1cef69d8f0d5e76862b48c6b76e86b7"
+    },
+    {
+      "path": "experiments/phase4_temporal_analytics/dataset_contracts.yaml",
+      "sha256": "e64603580ec0fb0d479645750298c353eca4a4a40fdb511667cba3044063e14f"
+    },
+    {
+      "path": "experiments/phase4_temporal_analytics/model_contracts.yaml",
+      "sha256": "a7b0bd1d763096808cadea8bd17e71701ff5d5e87744a88a1f19aaaffcd45977"
+    },
+    {
+      "path": "experiments/phase4_temporal_analytics/experiment_plan.yaml",
+      "sha256": "d0438ddc96f0655a4facaf2426674aac52fd5369824b21ca6a31da8478b91d54"
+    }
+  ],
+  "capabilities": [
+    {
+      "name": "P4-E01 deterministic multispectral",
+      "status": "BLOCKED",
+      "sample_count": 0,
+      "metrics": {},
+      "reason": "OSCD archive, transforms, and checksum audit unresolved."
+    },
+    {
+      "name": "P4-E02 ChangerEx structural change",
+      "status": "BLOCKED",
+      "sample_count": 0,
+      "metrics": {},
+      "reason": "LEVIR-CD archive and checkpoint byte verification unresolved."
+    },
+    {
+      "name": "P4-E03 Chg2Cap change captioning",
+      "status": "BLOCKED",
+      "sample_count": 0,
+      "metrics": {},
+      "reason": "Official checkpoint hash and validation inputs unresolved."
+    },
+    {
+      "name": "P4-E04 STURM Sentinel-1 flood segmentation",
+      "status": "BLOCKED",
+      "sample_count": 0,
+      "metrics": {},
+      "reason": "STURM checkpoint acquisition and Sen1Floods11 transfer contract unresolved."
+    }
+  ],
+  "external_evaluation": "NOT_RUN",
+  "notes": [
+    "No external dataset or checkpoint was downloaded.",
+    "Fixture tests verify contracts and deterministic code only; they are not benchmark evidence.",
+    "Historical Phase 4 BigEarthNet artifacts remain outside this clean rebuild."
+  ]
+}

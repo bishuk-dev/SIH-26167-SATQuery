@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 import re
 from pathlib import Path
 from typing import Any, Literal
@@ -15,6 +17,8 @@ AUDIT_FILES = (
     "experiment_plan.yaml",
 )
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+CLOSEOUT_PATH = PROJECT_ROOT / "experiments" / "phase4_temporal_analytics" / "PHASE_4_CLOSEOUT.json"
 
 
 class AuditEntry(BaseModel):
@@ -69,6 +73,48 @@ class Phase4ContractSet(BaseModel):
     datasets: dict[str, DatasetContract]
     models: dict[str, AuditEntry]
     experiment_plan: dict[str, Any]
+
+
+class CloseoutArtifact(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    path: Path
+    sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+
+class CloseoutCapability(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: str = Field(min_length=1)
+    status: Literal["SUPPORTED", "SUPPORTED_WITH_LIMITS", "BLOCKED", "NOT_EVALUATED"]
+    sample_count: int = Field(ge=0)
+    metrics: dict[str, float]
+    reason: str = Field(min_length=1)
+
+
+class Phase4Closeout(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    schema_version: Literal[1]
+    status: Literal["BLOCKED", "IN_PROGRESS", "COMPLETE"]
+    artifacts: tuple[CloseoutArtifact, ...]
+    capabilities: tuple[CloseoutCapability, ...]
+    external_evaluation: Literal["NOT_RUN", "PARTIAL", "COMPLETE"]
+    notes: tuple[str, ...]
+
+
+def load_closeout(path: str | Path) -> Phase4Closeout:
+    closeout_path = Path(path)
+    try:
+        payload = json.loads(closeout_path.read_text(encoding="utf-8"))
+        return Phase4Closeout.model_validate(payload)
+    except (OSError, json.JSONDecodeError, ValidationError) as exc:
+        raise ValueError(f"Invalid Phase 4 closeout: {closeout_path}") from exc
+
+
+def sha256_file(path: Path) -> str:
+    with path.open("rb") as file_handle:
+        return hashlib.file_digest(file_handle, "sha256").hexdigest()
 
 
 def load_phase4_contracts(root: str | Path) -> Phase4ContractSet:

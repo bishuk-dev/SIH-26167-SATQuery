@@ -6,7 +6,12 @@ import pytest
 import yaml
 from pydantic import ValidationError
 
-from ml.evaluation.phase4_contracts import load_phase4_contracts
+from ml.evaluation.phase4_contracts import (
+    CLOSEOUT_PATH,
+    load_closeout,
+    load_phase4_contracts,
+    sha256_file,
+)
 
 ROOT = Path("experiments/phase4_temporal_analytics")
 
@@ -49,6 +54,21 @@ def test_unknown_contract_file_key_is_rejected(tmp_path: Path) -> None:
 
     with pytest.raises((ValidationError, ValueError), match="unexpected"):
         load_phase4_contracts(root)
+
+
+def test_phase4_closeout_references_existing_hash_matching_artifacts() -> None:
+    closeout = load_closeout(CLOSEOUT_PATH)
+    for artifact in closeout.artifacts:
+        assert artifact.path.is_file()
+        assert sha256_file(artifact.path) == artifact.sha256
+
+
+def test_supported_capability_has_nonzero_measured_evidence() -> None:
+    closeout = load_closeout(CLOSEOUT_PATH)
+    for capability in closeout.capabilities:
+        if capability.status.startswith("SUPPORTED"):
+            assert capability.sample_count > 0
+            assert capability.metrics
 
 
 def test_temporal_registry_rejects_missing_domain_contract(tmp_path: Path) -> None:
