@@ -26,6 +26,7 @@ from satquery.inference.exceptions import (
     TemporalOrderUnknownError,
 )
 from satquery.ingestion.models import Modality, ObservationState
+from satquery.verification.domain import require_domain
 
 
 class ChangeCaptionBackend(Protocol):
@@ -90,6 +91,8 @@ class ChangeCaptionService:
 
 
 def _validate_pair(t1: ObservationState, t2: ObservationState) -> None:
+    require_domain(t1, supported_modalities=(Modality.OPTICAL, Modality.MULTISPECTRAL))
+    require_domain(t2, supported_modalities=(Modality.OPTICAL, Modality.MULTISPECTRAL))
     if t1.sensor.modality not in {Modality.OPTICAL, Modality.MULTISPECTRAL} or t2.sensor.modality not in {
         Modality.OPTICAL,
         Modality.MULTISPECTRAL,

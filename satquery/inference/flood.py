@@ -21,6 +21,7 @@ from satquery.evidence.models import (
 )
 from satquery.inference.exceptions import ModelExecutionError, ModelInputUnsupportedError, ModelUnavailableError
 from satquery.ingestion.models import Modality, ObservationState
+from satquery.verification.domain import require_domain
 
 
 class FloodBackend(Protocol):
@@ -105,6 +106,12 @@ class FloodSegmentationService:
 
 
 def _validate_observation(observation: ObservationState) -> None:
+    require_domain(
+        observation,
+        supported_modalities=(Modality.SAR,),
+        required_sensor_names=("Sentinel-1", "Sentinel-1 C-SAR"),
+        required_polarizations=("VV", "VH"),
+    )
     if observation.sensor.modality is not Modality.SAR:
         raise ModelInputUnsupportedError("STURM requires SAR")
     if observation.sensor.sensor_name not in {"Sentinel-1", "Sentinel-1 C-SAR"}:
