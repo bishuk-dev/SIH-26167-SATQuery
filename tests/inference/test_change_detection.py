@@ -8,8 +8,8 @@ import pytest
 import rasterio
 from affine import Affine
 
-from satquery.inference.change_detection import StructuralChangeService
-from satquery.inference.exceptions import ModelInputUnsupportedError
+from satquery.inference.change_detection import ChangerExBackend, StructuralChangeService
+from satquery.inference.exceptions import ModelInputUnsupportedError, ModelUnavailableError
 from satquery.ingestion.models import (
     BandMetadata,
     GeoBounds,
@@ -140,3 +140,16 @@ def test_structural_model_rejects_sar_and_unverified_alignment(tmp_path: Path) -
     )
     with pytest.raises(ModelInputUnsupportedError):
         service.detect(t1, shifted)
+
+
+def test_changerex_backend_checkpoint_verification(tmp_path: Path) -> None:
+    missing = tmp_path / "missing.pth"
+    t1_rgb = np.ones((3, 2, 2), dtype=np.float32)
+    t2_rgb = np.ones((3, 2, 2), dtype=np.float32)
+    with pytest.raises(ModelUnavailableError, match="ChangerEx checkpoint is unavailable"):
+        ChangerExBackend(missing, "0" * 64, predictor=lambda a, b: np.zeros((2, 2), dtype=np.float32)).predict(t1_rgb, t2_rgb)
+
+    dummy = tmp_path / "checkpoint.pth"
+    dummy.write_bytes(b"bad-checkpoint")
+    with pytest.raises(ModelUnavailableError, match="ChangerEx checkpoint hash is invalid"):
+        ChangerExBackend(dummy, "0" * 64, predictor=lambda a, b: np.zeros((2, 2), dtype=np.float32)).predict(t1_rgb, t2_rgb)

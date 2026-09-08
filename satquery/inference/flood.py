@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, Protocol
@@ -19,6 +18,7 @@ from satquery.evidence.models import (
     FloodMaskEvidence,
     MaskAsset,
 )
+from satquery.inference.checkpoints import require_checkpoint, sha256_file
 from satquery.inference.exceptions import ModelExecutionError, ModelInputUnsupportedError, ModelUnavailableError
 from satquery.ingestion.models import Modality, ObservationState
 from satquery.verification.domain import require_domain
@@ -37,7 +37,7 @@ class SturmS1Backend:
         self.segmenter = segmenter
 
     def segment(self, image: np.ndarray) -> np.ndarray:
-        _verify_checkpoint(self.checkpoint_path, self.checkpoint_sha256)
+        require_checkpoint(self.checkpoint_path, self.checkpoint_sha256, model_name="STURM")
         if self.segmenter is not None:
             return self.segmenter(image)
         raise ModelUnavailableError("Audited STURM runtime is not installed")
@@ -85,7 +85,7 @@ class FloodSegmentationService:
             mask=MaskAsset(
                 asset_id=asset_id,
                 path=str(mask_path),
-                sha256=_sha256(mask_path),
+                sha256=sha256_file(mask_path),
                 width=128,
                 height=128,
                 crs=observation.geo.crs,
@@ -126,15 +126,3 @@ def _validate_observation(observation: ObservationState) -> None:
         raise ModelInputUnsupportedError("STURM requires approximately 10 m GSD")
     if observation.geo.crs is None or observation.geo.transform is None:
         raise ModelInputUnsupportedError("STURM requires georeferencing")
-
-
-def _verify_checkpoint(path: Path, expected: str) -> None:
-    if not path.is_file():
-        raise ModelUnavailableError("STURM checkpoint is unavailable")
-    if _sha256(path) != expected:
-        raise ModelUnavailableError("STURM checkpoint hash is invalid")
-
-
-def _sha256(path: Path) -> str:
-    with path.open("rb") as file_handle:
-        return hashlib.file_digest(file_handle, "sha256").hexdigest()

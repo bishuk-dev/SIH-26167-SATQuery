@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, Protocol
@@ -19,6 +18,7 @@ from satquery.evidence.models import (
     EvidenceProvenance,
     TemporalPairEvidence,
 )
+from satquery.inference.checkpoints import require_checkpoint
 from satquery.inference.exceptions import (
     ModelExecutionError,
     ModelInputUnsupportedError,
@@ -48,7 +48,7 @@ class Chg2CapBackend:
         self.captioner = captioner
 
     def caption(self, t1_rgb: np.ndarray, t2_rgb: np.ndarray) -> str:
-        _verify_checkpoint(self.checkpoint_path, self.checkpoint_sha256)
+        require_checkpoint(self.checkpoint_path, self.checkpoint_sha256, model_name="Chg2Cap")
         if self.captioner is not None:
             return self.captioner(t1_rgb, t2_rgb)
         raise ModelUnavailableError("Audited Chg2Cap runtime is not installed")
@@ -119,12 +119,3 @@ def _validate_pair(t1: ObservationState, t2: ObservationState) -> None:
 def _read_rgb(observation: ObservationState) -> np.ndarray:
     with rasterio.open(observation.source_asset.path) as source:
         return source.read((1, 2, 3)).astype("float32") / 255.0
-
-
-def _verify_checkpoint(path: Path, expected: str) -> None:
-    if not path.is_file():
-        raise ModelUnavailableError("Chg2Cap checkpoint is unavailable")
-    with path.open("rb") as file_handle:
-        actual = hashlib.file_digest(file_handle, "sha256").hexdigest()
-    if actual != expected:
-        raise ModelUnavailableError("Chg2Cap checkpoint hash is invalid")

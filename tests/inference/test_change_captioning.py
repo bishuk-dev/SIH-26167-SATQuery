@@ -3,11 +3,17 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from pathlib import Path
 
+import numpy as np
 import pytest
 
 from satquery.evidence.models import EvidenceModelProvenance
-from satquery.inference.change_captioning import ChangeCaptionService
-from satquery.inference.exceptions import ModelExecutionError, ModelInputUnsupportedError, TemporalOrderUnknownError
+from satquery.inference.change_captioning import ChangeCaptionService, Chg2CapBackend
+from satquery.inference.exceptions import (
+    ModelExecutionError,
+    ModelInputUnsupportedError,
+    ModelUnavailableError,
+    TemporalOrderUnknownError,
+)
 from satquery.ingestion.models import Modality, TemporalMetadata
 
 from tests.inference.test_change_detection import _observation, _write_image
@@ -73,3 +79,16 @@ def test_caption_service_rejects_wrong_modality_and_empty_output(tmp_path: Path)
         _service(tmp_path).describe(sar, t2)
     with pytest.raises(ModelExecutionError, match="empty"):
         _service(tmp_path, EmptyCaptionBackend()).describe(t1, t2)
+
+
+def test_chg2cap_backend_checkpoint_verification(tmp_path: Path) -> None:
+    missing = tmp_path / "missing.pth"
+    t1_rgb = np.ones((3, 2, 2), dtype=np.float32)
+    t2_rgb = np.ones((3, 2, 2), dtype=np.float32)
+    with pytest.raises(ModelUnavailableError, match="Chg2Cap checkpoint is unavailable"):
+        Chg2CapBackend(missing, "0" * 64, captioner=lambda a, b: "caption").caption(t1_rgb, t2_rgb)
+
+    dummy = tmp_path / "checkpoint.pth"
+    dummy.write_bytes(b"bad-checkpoint")
+    with pytest.raises(ModelUnavailableError, match="Chg2Cap checkpoint hash is invalid"):
+        Chg2CapBackend(dummy, "0" * 64, captioner=lambda a, b: "caption").caption(t1_rgb, t2_rgb)

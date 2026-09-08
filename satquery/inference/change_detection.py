@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, Protocol
@@ -10,7 +9,6 @@ from uuid import uuid4
 
 import numpy as np
 import rasterio
-from pydantic import ValidationError
 
 from satquery.evidence.models import (
     ChangeMaskEvidence,
@@ -21,6 +19,7 @@ from satquery.evidence.models import (
     MaskAsset,
     TemporalPairEvidence,
 )
+from satquery.inference.checkpoints import require_checkpoint, sha256_file
 from satquery.inference.exceptions import (
     ModelExecutionError,
     ModelInputUnsupportedError,
@@ -49,7 +48,7 @@ class ChangerExBackend:
         self.predictor = predictor
 
     def predict(self, t1_rgb: np.ndarray, t2_rgb: np.ndarray) -> np.ndarray:
-        _verify_checkpoint(self.checkpoint_path, self.checkpoint_sha256)
+        require_checkpoint(self.checkpoint_path, self.checkpoint_sha256, model_name="ChangerEx")
         if self.predictor is not None:
             return self.predictor(t1_rgb, t2_rgb)
         raise ModelUnavailableError(
@@ -113,7 +112,7 @@ class StructuralChangeService:
             mask=MaskAsset(
                 asset_id=asset_id,
                 path=str(mask_path),
-                sha256=_sha256(mask_path),
+                sha256=sha256_file(mask_path),
                 width=t1.raster.width,
                 height=t1.raster.height,
                 crs=t1.geo.crs,
@@ -165,16 +164,3 @@ def _read_rgb(observation: ObservationState) -> np.ndarray:
     with rasterio.open(observation.source_asset.path) as source:
         values = source.read((1, 2, 3)).astype("float32") / 255.0
     return values
-
-
-def _verify_checkpoint(path: Path, expected: str) -> None:
-    if not path.is_file():
-        raise ModelUnavailableError("ChangerEx checkpoint is unavailable")
-    actual = _sha256(path)
-    if actual != expected:
-        raise ModelUnavailableError("ChangerEx checkpoint hash is invalid")
-
-
-def _sha256(path: Path) -> str:
-    with path.open("rb") as file_handle:
-        return hashlib.file_digest(file_handle, "sha256").hexdigest()

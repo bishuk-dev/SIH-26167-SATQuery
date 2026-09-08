@@ -9,8 +9,8 @@ import rasterio
 from affine import Affine
 
 from satquery.evidence.models import DomainStatus, EvidenceModelProvenance
-from satquery.inference.exceptions import ModelInputUnsupportedError
-from satquery.inference.flood import FloodSegmentationService
+from satquery.inference.exceptions import ModelInputUnsupportedError, ModelUnavailableError
+from satquery.inference.flood import FloodSegmentationService, SturmS1Backend
 from satquery.ingestion.models import (
     BandMetadata,
     GeoBounds,
@@ -96,3 +96,15 @@ def test_risat_never_falls_through_to_sturm(tmp_path: Path) -> None:
         FloodSegmentationService(FakeFloodBackend(), tmp_path / "out", _model()).segment(
             _observation(path, sensor="RISAT-1")
         )
+
+
+def test_sturm_backend_checkpoint_verification(tmp_path: Path) -> None:
+    missing = tmp_path / "missing.pth"
+    image = np.ones((2, 128, 128), dtype=np.float32)
+    with pytest.raises(ModelUnavailableError, match="STURM checkpoint is unavailable"):
+        SturmS1Backend(missing, "0" * 64, segmenter=lambda img: np.zeros((128, 128), dtype=np.float32)).segment(image)
+
+    dummy = tmp_path / "checkpoint.pth"
+    dummy.write_bytes(b"bad-checkpoint")
+    with pytest.raises(ModelUnavailableError, match="STURM checkpoint hash is invalid"):
+        SturmS1Backend(dummy, "0" * 64, segmenter=lambda img: np.zeros((128, 128), dtype=np.float32)).segment(image)
