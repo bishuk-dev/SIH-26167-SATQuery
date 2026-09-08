@@ -1,7 +1,7 @@
 schema_version: 1
 
-audited_at: "2026-09-08"
-status: BLOCKED_PENDING_SOURCE_AND_CHECKPOINT_AUDIT
+audited_at: "2026-09-09"
+status: BLOCKED_PENDING_LOCAL_CHECKPOINT_BYTES_AND_RUNTIME_LOCK
 
 models:
   changerex_r18_levircd:
@@ -9,56 +9,79 @@ models:
     role: primary
     source:
       repository_url: https://github.com/likyoo/open-cd
-      revision: main_head_790a1972b538baaaffd4c3022a4d9afaa3f861e5
+      revision: 790a1972b538baaaffd4c3022a4d9afaa3f861e5
+      revision_verified: main HEAD via GitHub API 2026-09-09
       license: Apache-2.0
     checkpoint:
       authority_url: https://huggingface.co/likyoo/Open-CD_Model_Zoo
+      authority_relationship: >-
+        the official Open-CD README header (at the pinned revision) links this Hugging
+        Face repository as the official Checkpoint distribution; it is therefore the
+        publisher-owned transport record, not a third-party mirror.
       repository_revision: 6b88e874f8dea7430a2ab1ed84b356c6a67128a
       filename: LEVIR-CD/ChangerEx_r18-512x512_40k_levircd.pth
-      size_bytes: null
-      publisher_hashes: {}
-      unverified_candidate_size_bytes: 136880383
-      unverified_candidate_sha256: da3f569306dadd1fac5b64abc2a3d484571cd0ecf6410e1f152275cfe49a3618
+      size_bytes: 136880383
+      publisher_hashes:
+        sha256: da3f569306dadd1fac5b64abc2a3d484571cd0ecf6410e1f152275cfe49a3618
+      hash_provenance: >-
+        sha256 read from the Hugging Face API LFS metadata (lfs.oid) for the file at
+        the recorded repository revision on 2026-09-09; matches the previously recorded
+        candidate identity. Locally computed SHA-256 after first download is still required.
       locally_verified_sha256: null
     contract:
       task: structural_change_segmentation
       training_domain: LEVIR-CD
       sensor_domain: [high_resolution_optical_rgb]
       band_order: [R, G, B]
-      radiometric_domain: 8_bit_RGB_unverified
+      radiometric_domain: 8_bit_RGB
       input_shape: [2, 3, 512, 512]
-      normalization: Open-CD_config_unverified
-      temporal_order: T1_then_T2
-      output_semantics: binary_building_related_change_probability
-      threshold_or_decoder: official_Open-CD_decoder_unverified
+      data_preprocessor:
+        type: DualInputSegDataPreProcessor
+        mean_rgb: [123.675, 116.28, 103.53]
+        std_rgb: [58.395, 57.12, 57.375]
+        applied_per_temporal_input: true
+        bgr_to_rgb: true
+        size_divisor: 32
+        source: configs/_base_/models/changer_r18.py at pinned revision
+      test_transform: MultiImgResize scale=(1024, 1024) keep_ratio=True (LEVIR-CD patches are 1024x1024, so this is identity; no sliding-window tiling is configured for this config)
+      output_semantics: 2-class softmax logits (num_classes=2, CrossEntropyLoss without sigmoid); class 1 = building-related change
+      threshold_or_decoder: argmax/softmax over 2 classes; binary change = class-1 probability at the decoder default
+      temporal_order: T1_then_T2 (data_prefix img_path_from=A/T1, img_path_to=B/T2)
       source_config: configs/changer/changer_ex_r18_512x512_40k_levircd.py
-      source_config_revision: main_head_790a1972b538baaaffd4c3022a4d9afaa3f861e5
+      source_config_revision: 790a1972b538baaaffd4c3022a4d9afaa3f861e5
+      config_chain: [changer_ex_r18_512x512_40k_levircd.py, ../common/standard_512x512_40k_levircd.py, ../common/standard_256x256_40k_levircd.py, ../_base_/models/changer_r18.py]
+    dataset_interface:
+      dataset_type: LEVIR_CD_Dataset
+      data_root: data/LEVIR-CD
+      data_prefix: {seg_map_path: label, img_path_from: A, img_path_to: B}
+      metrics: mmseg.IoUMetric with iou_metrics [mFscore, mIoU]
     dependencies:
       python: ">=3.11"
-      pytorch: unresolved
+      pytorch: pinned via open-cd requirements at first install; runtime.txt lists matplotlib/numpy/packaging/prettytable/scipy and requires optional.txt for torch/mmcv stacks
       packages: [open-cd, mmengine, mmcv, mmpretrain, mmsegmentation, mmdet]
       operating_system: [Linux_preferred_by_upstream_toolchain]
     official_evaluation:
       dataset: LEVIR-CD
-      split: repository_validation
+      split: val (config val_dataloader)
       command: python tools/test.py configs/changer/changer_ex_r18_512x512_40k_levircd.py CHECKPOINT
       metrics: [mIoU, mFscore]
     blockers:
-      - candidate checkpoint size and SHA-256 came from an unverified proposal and need local byte verification
-      - Hugging Face model-zoo revision is not yet tied to a signed/versioned Open-CD release
-      - exact dependency lock and safe checkpoint loading path are not frozen
+      - checkpoint bytes not downloaded yet; local SHA-256 must equal publisher-recorded da3f569306dadd1fac5b64abc2a3d484571cd0ecf6410e1f152275cfe49a3618
+      - exact mmcv/mmengine/mmdet dependency lock not frozen (install into isolated model-specific environment at first execution)
+      - safe checkpoint loading path (torch.load weights_only or equivalent) not yet validated against the actual file
 
   chg2cap_levircc:
     status: BLOCKED
     role: primary
     source:
       repository_url: https://github.com/ShizhenChang/Chg2Cap
-      revision: main_head_7b8cda937002e614d51a6dab3d949aa7de77c176
-      license: MIT_code_only_academic_use_note_in_official_README
+      revision: 7b8cda937002e614d51a6dab3d949aa7de77c176
+      revision_verified: main HEAD via GitHub API 2026-09-09
+      license: MIT (LICENSE.txt verified 2026-09-09)
     checkpoint:
-      authority_url: https://github.com/ShizhenChang/Chg2Cap
+      authority_url: https://drive.google.com/file/d/1phoO1BvPsRwIOIykkLm6acBpIocz9liz
       repository_revision: 7b8cda937002e614d51a6dab3d949aa7de77c176
-      filename: Google_Drive_checkpoint_linked_by_official_README
+      filename: official_README_Google_Drive_checkpoint
       size_bytes: null
       publisher_hashes: {}
       locally_verified_sha256: null
@@ -67,78 +90,101 @@ models:
       training_domain: LEVIR-CC
       sensor_domain: [high_resolution_optical_rgb]
       band_order: [R, G, B]
-      radiometric_domain: unresolved
-      input_shape: unresolved
-      normalization: repository_config_unresolved
+      radiometric_domain: 8_bit_RGB
+      feature_extractor:
+        network: resnet101
+        encoder_dim: 2048
+        feat_size: 16
+        source: train.py default arguments at pinned revision
+      image_preprocessing: LEVIR-CC per-folder mean/variance tables published by the official dataset repository (see dataset_contracts levir_cc.image_normalization_reference); exact normalization application verified at next code audit
+      vocabulary: generated by preprocess_data.py; word-count threshold 5 for LEVIR-CC per official README note
+      max_caption_length: 41
+      allow_unknown_token: 1
+      input_shape: "[2, 3, 224, 224]_candidate; verify from data pipeline at next code audit"
       temporal_order: A_pre_then_B_post
       output_semantics: natural_language_change_caption
-      threshold_or_decoder: autoregressive_decoder_repository_defined
-      source_config: repository_train_and_test_py
+      threshold_or_decoder: autoregressive DecoderTransformer over generated vocab
+      source_config: train.py and test.py at pinned revision
       source_config_revision: 7b8cda937002e614d51a6dab3d949aa7de77c176
     dependencies:
-      python: repository_requirements_unresolved
-      pytorch: repository_requirements_unresolved
-      packages: [repository_requirements_unresolved]
-      operating_system: [Linux_or_compatible_runtime_unverified]
+      python: unpinned upstream
+      pytorch: 1.11.0+cu113 (requirements.txt, verified 2026-09-09)
+      packages: [torchvision 0.12.0+cu113, numpy 1.23.0, lmdb 1.0.0, h5py 2.10.0, opencv-python 4.5.5.64, pillow 8.2.0, scikit-image 0.18.0, openjdk-11 required by METEOR]
+      operating_system: [Linux_or_compatible; METEOR requires Java runtime]
     official_evaluation:
       dataset: LEVIR-CC
-      split: repository_test_unverified
+      split: test via LEVIRCCDataset(... 'test' ...) at pinned revision
       command: python test.py
+      metric_implementations: standard coco-caption-style Bleu(4), Meteor, Rouge, Cider bundled in eval_func/ at the pinned revision (verified 2026-09-09)
       metrics: [BLEU-4, METEOR, ROUGE-L, CIDEr]
     blockers:
-      - official repository links checkpoint through Google Drive without a published hash or immutable artifact identity
-      - LEVIR-CC source license and exact release are unresolved
-      - metric implementation and checkpoint reproducibility are not yet verified
+      - checkpoint is distributed through Google Drive with no publisher hash or immutable artifact identity; first download must record size + locally computed SHA-256, and provenance relies on the official README link at the pinned revision
+      - checkpoint load/decode behavior must be verified against real bytes before any execution
+      - LEVIR-CC captions JSON schema must be inspected from downloaded bytes before manifests are built
 
   sturm_sentinel1_unet:
     status: BLOCKED
     role: primary
     source:
       repository_url: https://github.com/STURM-WEO/STURM-Flood
-      revision: main_head_c39d9bf8ba76302663c097ec4e905c918e1e131d
+      revision: c39d9bf8ba76302663c097ec4e905c918e1e131d
+      revision_verified: main HEAD via GitHub API 2026-09-09
       license: CC_BY_SA_4.0_code_repository
     checkpoint:
-      authority_url: https://doi.org/10.5281/zenodo.15189664
-      repository_revision: c39d9bf8ba76302663c097ec4e905c918e1e131d
-      filename: unresolved_until_Zenodo_record_is_retrieved
-      size_bytes: null
+      authority_url: https://doi.org/10.5281/zenodo.15189665
+      concept_doi: 10.5281/zenodo.15189664
+      doi_relationship: >-
+        verified from Zenodo API 2026-09-09: 15189665 is the version record for the
+        Sentinel-1 U-Net; the official repository README links the concept DOI and the
+        official inference notebook downloads S1_model.tar.gz from the version record.
+      filename: S1_model.tar.gz
+      inner_weights_path: unet/1/model_weights.hdf5 (per official inference notebook)
+      size_bytes: 1757682388
       publisher_hashes:
         md5: 14a046d9d7965f2a3c511acb1bbca57b
+      md5_provenance: Zenodo API record checksum (verified 2026-09-09; identical to the previously recorded publisher MD5)
       locally_verified_sha256: null
     contract:
       task: flood_segmentation
       training_domain: STURM-Flood
       sensor_domain: [Sentinel-1]
-      band_order: [VV, VH]
-      radiometric_domain: unresolved_from_official_repository
+      band_order: composite file band order defines model channel order; (VV, VH) per dataset documentation and input_shape n_bands=2; verify first-tile band descriptions at materialization
+      radiometric_domain: whatever the composite GeoTIFFs encode; official inference applies NO conversion and NO normalization (unet_model normalize_inputs=False)
       input_shape: [128, 128, 2]
-      normalization: unresolved_from_official_inference_notebook
+      architecture: TensorFlow/Keras unet_model, n_classes=2, n_blocks=6, class_weight_list [1, 1]
+      output_semantics: 2-class softmax probabilities; water probability = channel 1
+      threshold_or_decoder: score_threshold = 0.5 on channel 1 (official inference notebook)
+      preprocessing_pipeline: rasterio read all bands out_dtype=float32, transpose to HWC, expand dims; no resizing, no normalization
       temporal_order: single_flood_observation
-      output_semantics: water_or_flood_extent_mask
-      threshold_or_decoder: unresolved_from_official_inference_notebook
-      source_config: inference.ipynb
+      source_config: inference.ipynb and utils/inference_metrics.py at pinned revision
       source_config_revision: c39d9bf8ba76302663c097ec4e905c918e1e131d
     dependencies:
       python: ">=3.8"
       pytorch: not_used_by_official_repository
-      packages: [tensorflow, numpy, pandas, matplotlib, rasterio, scikit-learn, requests, tqdm]
+      packages: [tensorflow (version unpinned upstream; pin at first install), tensorflow-io, numpy, pandas, matplotlib, rasterio, scikit-learn, requests, tqdm]
       operating_system: unresolved
     official_evaluation:
       dataset: STURM-Flood
-      split: unresolved
-      command: official_inference_notebook
-      metrics: [precision, recall, F1, IoU]
+      split: per-tile evaluation sampled from metadata CSV; no publisher-declared split
+      command: official inference notebook with with_gt=True
+      metrics: "[precision, recall, F1, IoU] via sklearn precision_score/recall_score/f1_score/jaccard_score"
+    isolation_rule: >-
+      The official model is TensorFlow/Keras. Record TensorFlow as an isolated
+      model-specific dependency in a dedicated environment; do NOT reimplement in
+      PyTorch and do NOT add TensorFlow to core project dependencies.
     blockers:
-      - Zenodo model record was not retrieved during audit; checkpoint filename and bytes remain unknown
-      - model preprocessing, threshold, and radiometric domain are not frozen
-      - official implementation uses TensorFlow, which is absent from project dependencies
+      - S1_model.tar.gz (1.76 GB) not downloaded; local SHA-256 pending; archive member names must be inspected safely before loading
+      - S1 composite radiometric scaling must be verified from dataset bytes or the STURM paper (Big Earth Data 2025, DOI 10.1080/20964471.2025.2458714) before transfer evaluation
+      - TensorFlow version pin unresolved
 
   rscama_levircc:
     status: BLOCKED
     role: optional_challenger
+    not_authorized_for_core_execution: true
     source:
       repository_url: https://github.com/Chen-Yang-Liu/RSCaMa
-      revision: main_head_aa68e4c6933c7dd0f2e2f9cbd7642d61929c86a5
+      revision: aa68e4c6933c7dd0f2e2f9cbd7642d61929c86a5
+      revision_verified: main HEAD via GitHub API 2026-09-09
       license: unresolved
     checkpoint:
       authority_url: https://huggingface.co/lcybuaa/RSCaMa
@@ -171,5 +217,6 @@ models:
       command: unresolved
       metrics: [BLEU-4, METEOR, ROUGE-L, CIDEr]
     blockers:
-      - optional only; no core execution authorized
+      - optional only; no core execution authorized; must not enter dependencies or runtime
       - checkpoint, license, preprocessing, and dependency contract unresolved
+      - audit depth intentionally limited to documenting the deferral rationale
