@@ -9,7 +9,7 @@ from typing import Literal
 
 from pydantic import Field, field_validator, model_validator
 
-from satquery.ingestion.models import ContractModel, Modality
+from satquery.ingestion.models import AffineTransform, ContractModel, Modality
 
 
 class DomainStatus(StrEnum):
@@ -157,3 +157,108 @@ class GroundingEvidence(ContractModel):
     domain: DomainAssessment
     warnings: tuple[str, ...] = ()
     provenance: EvidenceProvenance
+
+
+class MaskAsset(ContractModel):
+    asset_id: str = Field(min_length=1)
+    path: str = Field(min_length=1)
+    sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    width: int = Field(gt=0)
+    height: int = Field(gt=0)
+    crs: str | None = None
+    transform: AffineTransform | None = None
+    source_grid_observation_id: str = Field(min_length=1)
+    value_semantics: Literal["binary_0_1"]
+    immutable: Literal[True] = True
+
+
+class TemporalPairEvidence(ContractModel):
+    t1_observation_id: str = Field(min_length=1)
+    t2_observation_id: str = Field(min_length=1)
+    order_source: Literal["metadata", "explicit_user_mapping", "frozen_dataset_contract"]
+
+    @model_validator(mode="after")
+    def require_distinct_observations(self) -> TemporalPairEvidence:
+        if self.t1_observation_id == self.t2_observation_id:
+            raise ValueError("temporal pair requires distinct observations")
+        return self
+
+
+class ChangeMaskEvidence(ContractModel):
+    evidence_id: str = Field(pattern=r"^evidence_[0-9a-f]{32}$")
+    task: Literal["change_localize"] = "change_localize"
+    target_class: str = Field(min_length=1)
+    change_kind: Literal["gain", "loss", "symmetric_change"]
+    temporal: TemporalPairEvidence
+    mask: MaskAsset
+    raw_model_score: float | None = Field(default=None, ge=0.0, le=1.0)
+    model: EvidenceModelProvenance | None = None
+    tool_id: str | None = None
+    domain: DomainAssessment
+    warnings: tuple[str, ...] = ()
+    provenance: EvidenceProvenance
+
+    @model_validator(mode="after")
+    def require_temporal_source_grid(self) -> ChangeMaskEvidence:
+        if self.mask.source_grid_observation_id not in {
+            self.temporal.t1_observation_id,
+            self.temporal.t2_observation_id,
+        }:
+            raise ValueError("mask source grid must belong to temporal pair")
+        if self.model is None and self.tool_id is None:
+            raise ValueError("change mask requires model or tool provenance")
+        return self
+
+
+class FloodMaskEvidence(ContractModel):
+    evidence_id: str = Field(pattern=r"^evidence_[0-9a-f]{32}$")
+    task: Literal["flood_segmentation"] = "flood_segmentation"
+    target_class: Literal["water_or_flood_extent"]
+    source_observation_id: str = Field(min_length=1)
+    mask: MaskAsset
+    raw_model_score: float | None = Field(default=None, ge=0.0, le=1.0)
+    model: EvidenceModelProvenance
+    domain: DomainAssessment
+    warnings: tuple[str, ...] = ()
+    provenance: EvidenceProvenance
+
+
+class ChangeCaptionEvidence(ContractModel):
+    evidence_id: str = Field(pattern=r"^evidence_[0-9a-f]{32}$")
+    task: Literal["change_captioning"] = "change_captioning"
+    caption: str = Field(min_length=1)
+    temporal: TemporalPairEvidence
+    model: EvidenceModelProvenance | None = None
+    domain: DomainAssessment
+    warnings: tuple[str, ...] = ()
+    provenance: EvidenceProvenance
+
+
+class MeasurementEvidence(ContractModel):
+    evidence_id: str = Field(pattern=r"^evidence_[0-9a-f]{32}$")
+    task: Literal["measurement"] = "measurement"
+    name: str = Field(min_length=1)
+    value: float
+    unit: Literal["m2", "ha", "km2"]
+    source_evidence_id: str = Field(min_length=1)
+    tool_id: str = Field(min_length=1)
+    tool_version: str = Field(min_length=1)
+    calculation_crs: str = Field(min_length=1)
+    positive_pixel_count: int = Field(ge=0)
+
+    @field_validator("value")
+    @classmethod
+    def require_finite_value(cls, value: float) -> float:
+        if not math.isfinite(value):
+            raise ValueError("measurement value must be finite")
+        return value
+
+
+class AgreementEvidence(ContractModel):
+    evidence_id: str = Field(pattern=r"^evidence_[0-9a-f]{32}$")
+    task: Literal["modality_agreement"] = "modality_agreement"
+    first_evidence_id: str = Field(min_length=1)
+    second_evidence_id: str = Field(min_length=1)
+    metric: Literal["mask_iou"] = "mask_iou"
+    value: float | None = Field(default=None, ge=0.0, le=1.0)
+    interpretation: Literal["agreement_not_accuracy"] = "agreement_not_accuracy"
