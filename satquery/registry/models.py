@@ -61,6 +61,78 @@ class MultisensorModelRegistration(ContractModel):
     allow_remote_code: Literal[False]
 
 
+class _TemporalModelRegistration(ContractModel):
+    """Shared contract for Phase 4 temporal specialists.
+
+    Sensor-specific assumptions (SAR polarizations, radiometric domains, GSD)
+    belong on the concrete subclasses, never here.
+    """
+
+    provider: Literal["huggingface", "github", "zenodo"]
+    model_id: str = Field(min_length=1)
+    revision: str = Field(min_length=1)
+    checkpoint_file: str = Field(min_length=1)
+    checkpoint_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    checkpoint_size_bytes: int = Field(gt=0)
+    architecture: str = Field(min_length=1)
+    license: str = Field(min_length=1)
+    checkpoint_license: str = Field(min_length=1)
+    preprocessing_profile: str = Field(min_length=1)
+    training_domain: str = Field(min_length=1)
+    supported_modalities: tuple[str, ...]
+    temporal_order: Literal[
+        "T1_then_T2",
+        "A_pre_then_B_post",
+        "single_flood_observation",
+    ]
+    input_shape: tuple[int, ...]
+    output_semantics: str = Field(min_length=1)
+    domain_limitations: tuple[str, ...]
+    frozen: Literal[True]
+    allow_remote_code: Literal[False]
+
+    @field_validator(
+        "supported_modalities", "domain_limitations", "input_shape", mode="before"
+    )
+    @classmethod
+    def _normalize_sequences(cls, value: object) -> object:
+        return tuple(value) if isinstance(value, list) else value
+
+
+class ChangeDetectionRegistration(_TemporalModelRegistration):
+    task: Literal["structural_change_segmentation"]
+
+
+class ChangeCaptionRegistration(_TemporalModelRegistration):
+    task: Literal["change_captioning"]
+
+
+class FloodSegmentationRegistration(_TemporalModelRegistration):
+    task: Literal["flood_segmentation"]
+    required_sensor_names: tuple[str, ...]
+    # exact ordered VV-then-VH contract; any other order or count is invalid
+    required_polarizations: tuple[
+        Literal["VV"],
+        Literal["VH"],
+    ]
+    required_radiometric_domain: str = Field(min_length=1)
+    expected_resolution_m: float = Field(gt=0)
+
+    @field_validator(
+        "required_sensor_names", "required_polarizations", mode="before"
+    )
+    @classmethod
+    def _normalize_sensor_names(cls, value: object) -> object:
+        return tuple(value) if isinstance(value, list) else value
+
+    @field_validator("required_sensor_names")
+    @classmethod
+    def _require_sensor_names(cls, value: tuple[str, ...]) -> tuple[str, ...]:
+        if not value:
+            raise ValueError("flood registration must name its required sensors")
+        return value
+
+
 class ModelRegistry(ContractModel):
     schema_version: Literal[1]
     models: dict[
@@ -68,7 +140,10 @@ class ModelRegistry(ContractModel):
         Annotated[
             ModelRegistration
             | GroundingModelRegistration
-            | MultisensorModelRegistration,
+            | MultisensorModelRegistration
+            | ChangeDetectionRegistration
+            | ChangeCaptionRegistration
+            | FloodSegmentationRegistration,
             Field(discriminator="task"),
         ],
     ]
