@@ -26,7 +26,7 @@ from satquery.inference.exceptions import (
     ModelUnavailableError,
 )
 from satquery.inference.temporal_inputs import read_aligned_rgb_pair
-from satquery.ingestion.models import Modality, ObservationState
+from satquery.ingestion.models import ObservationState
 
 
 class StructuralChangeBackend(Protocol):

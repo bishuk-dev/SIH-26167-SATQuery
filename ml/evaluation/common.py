@@ -31,13 +31,11 @@ def binary_confusion(
     truth: np.ndarray,
     valid: np.ndarray | None = None,
 ) -> dict[str, int]:
-    """Calculate binary confusion matrix counts."""
+    """Calculate binary confusion matrix counts, excluding pixels outside valid."""
     pred_bool = np.asarray(prediction, dtype=bool)
     truth_bool = np.asarray(truth, dtype=bool)
     if valid is not None:
         valid_bool = np.asarray(valid, dtype=bool)
-        pred_bool = pred_bool & valid_bool
-        truth_bool = truth_bool & valid_bool
         return {
             "tp": int(np.count_nonzero(pred_bool & truth_bool & valid_bool)),
             "fp": int(np.count_nonzero(pred_bool & ~truth_bool & valid_bool)),

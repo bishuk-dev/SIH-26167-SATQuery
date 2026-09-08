@@ -8,7 +8,6 @@ from typing import Callable, Protocol
 from uuid import uuid4
 
 import numpy as np
-import rasterio
 
 from satquery.evidence.models import (
     ChangeCaptionEvidence,
@@ -21,12 +20,11 @@ from satquery.evidence.models import (
 from satquery.inference.checkpoints import require_checkpoint
 from satquery.inference.exceptions import (
     ModelExecutionError,
-    ModelInputUnsupportedError,
     ModelUnavailableError,
     TemporalOrderUnknownError,
 )
 from satquery.inference.temporal_inputs import read_aligned_rgb_pair
-from satquery.ingestion.models import Modality, ObservationState
+from satquery.ingestion.models import ObservationState
 
 
 class ChangeCaptionBackend(Protocol):
@@ -60,8 +58,8 @@ class ChangeCaptionService:
         self.model = model
 
     def describe(self, t1: ObservationState, t2: ObservationState) -> ChangeCaptionEvidence:
-        _validate_temporal_order(t1, t2)
         first, second = read_aligned_rgb_pair(t1, t2)
+        _validate_temporal_order(t1, t2)
         try:
             caption = self.backend.caption(first, second).strip()
         except ModelUnavailableError:
