@@ -36,7 +36,6 @@ from satquery.ingestion.models import (
 )
 
 INSPECTOR_VERSION = "raster-inspector/0.1.0"
-HASH_CHUNK_SIZE = 1024 * 1024
 
 
 class RasterInspector:
@@ -307,8 +306,5 @@ def _acquisition_time(tags: dict[str, str]) -> datetime | None:
 
 
 def _sha256(path: Path) -> str:
-    digest = hashlib.sha256()
     with path.open("rb") as file_handle:
-        for chunk in iter(lambda: file_handle.read(HASH_CHUNK_SIZE), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
+        return hashlib.file_digest(file_handle, "sha256").hexdigest()

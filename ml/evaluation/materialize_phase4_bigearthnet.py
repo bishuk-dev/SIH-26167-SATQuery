@@ -719,11 +719,8 @@ def _verify_package(package_path: Path, expected: Mapping[str, int]) -> None:
 
 
 def _file_sha256(path: Path) -> str:
-    digest = hashlib.sha256()
     with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(BUFFER_SIZE), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
+        return hashlib.file_digest(handle, "sha256").hexdigest()
 
 
 def _package_manifest(packages: Mapping[str, Any]) -> dict[str, Any]:

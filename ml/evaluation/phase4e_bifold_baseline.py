@@ -706,13 +706,10 @@ def _read_native_band(path: Path) -> np.ndarray:
 
 
 def _sha256(path: Path) -> str:
-    digest = hashlib.sha256()
     try:
         with path.open("rb") as handle:
-            for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-                digest.update(chunk)
+            return hashlib.file_digest(handle, "sha256").hexdigest()
     except OSError as exc:
         raise Phase4DNotReadyError(
             f"Phase 4D not ready: cannot hash required artifact {path}"
         ) from exc
-    return digest.hexdigest()

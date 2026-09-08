@@ -253,12 +253,9 @@ def _read_json(path: Path) -> dict[str, Any]:
 
 
 def _sha256(path: Path) -> str:
-    digest = hashlib.sha256()
     try:
         with path.open("rb") as handle:
-            for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-                digest.update(chunk)
+            return hashlib.file_digest(handle, "sha256").hexdigest()
     except OSError as exc:
         raise NativeAuditPreparationError(f"Cannot hash package: {path}") from exc
-    return digest.hexdigest()
 

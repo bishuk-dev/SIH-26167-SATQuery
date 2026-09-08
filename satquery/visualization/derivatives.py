@@ -32,7 +32,6 @@ from satquery.visualization.models import (
 
 GENERATOR_VERSION = "visualization-cog/0.1.0"
 WEB_MERCATOR_CRS = "EPSG:3857"
-HASH_CHUNK_SIZE = 1024 * 1024
 PERCENTILE_LOW = 2.0
 PERCENTILE_HIGH = 98.0
 
@@ -326,8 +325,5 @@ def _tile_metadata(
 
 
 def _sha256(path: Path) -> str:
-    digest = hashlib.sha256()
     with path.open("rb") as file_handle:
-        for chunk in iter(lambda: file_handle.read(HASH_CHUNK_SIZE), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
+        return hashlib.file_digest(file_handle, "sha256").hexdigest()
