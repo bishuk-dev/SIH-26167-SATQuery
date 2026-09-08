@@ -36,6 +36,16 @@ class VqaRuntimeSettings(BaseModel):
         )
 
 
+class StructuralChangeRuntimeSettings(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    model_root: Path = Path("./models")
+    device: str = "cpu"
+    threshold: float = Field(default=0.5, ge=0, le=1)
+    tile_size: int = Field(default=512, gt=0, le=4096)
+    tile_overlap: int = Field(default=32, ge=0, le=1024)
+
+
 class GroundingRuntimeSettings(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
