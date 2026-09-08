@@ -177,6 +177,9 @@ phase4-e02-levircc-change-description:
     - validation_metrics.json
     - validation_predictions.jsonl
     - runner_meta.json
+  failure_result_files:
+    - evaluation_failure.json
+    - runner_meta.json
   gpu: true
   internet: true
 
@@ -188,6 +191,9 @@ phase4-e04-modified-sen1floods11-validation:
   result_files:
     - sar_validation_metrics.json
     - sar_validation_predictions.jsonl
+    - runner_meta.json
+  failure_result_files:
+    - evaluation_failure.json
     - runner_meta.json
   gpu: false
   internet: true

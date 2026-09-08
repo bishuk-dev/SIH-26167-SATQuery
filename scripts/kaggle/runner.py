@@ -39,6 +39,16 @@ from typing import Any
 
 import yaml  # PyYAML is already a project dependency
 
+# Ensure UTF-8 stdout/stderr on Windows console
+if sys.platform == "win32":
+    try:
+        if hasattr(sys.stdout, "reconfigure"):
+            sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        if hasattr(sys.stderr, "reconfigure"):
+            sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 
 # ---------------------------------------------------------------------------
 # Paths
@@ -461,26 +471,94 @@ def _build_file_pattern(result_files: list[str]) -> str:
     return f".*/(?:{alternation})$"
 
 
+def _archive_current_result_files(
+    output_dir: Path,
+    result_files: list[str],
+    failure_result_files: list[str] | None = None,
+) -> Path | None:
+    """
+    Archive only declared current scientific result files (and failure result files /
+    runner_meta.json / .dirty_worktree) from output_dir/results to:
+        results/archive/<timestamp>_<previous-git-sha>/
+    BEFORE launching or polling the new experiment.
+
+    Preserves results/invalid_initial/ unchanged (does not archive or remove
+    that historical integrity record).
+    """
+    results_dir = output_dir / "results"
+    if not results_dir.exists() or not results_dir.is_dir():
+        return None
+
+    declared_names = set()
+    for rf in result_files:
+        declared_names.add(Path(rf).name)
+    if failure_result_files:
+        for ff in failure_result_files:
+            declared_names.add(Path(ff).name)
+    declared_names.add(".dirty_worktree")
+
+    # Only consider files directly in results_dir that match declared names
+    files_to_archive: list[Path] = []
+    for item in results_dir.iterdir():
+        # NEVER touch directories (e.g. invalid_initial/, archive/)
+        if item.is_file() and item.name in declared_names:
+            files_to_archive.append(item)
+
+    if not files_to_archive:
+        return None
+
+    prev_sha = "unknown"
+    meta_file = results_dir / "runner_meta.json"
+    if meta_file.exists():
+        try:
+            meta = json.loads(meta_file.read_text(encoding="utf-8"))
+            if isinstance(meta, dict) and meta.get("git_sha"):
+                prev_sha = str(meta["git_sha"])[:12]
+        except Exception:
+            pass
+
+    timestamp = time.strftime("%Y%m%d_%H%M%S")
+    archive_dir = results_dir / "archive" / f"{timestamp}_{prev_sha}"
+    archive_dir.mkdir(parents=True, exist_ok=True)
+
+    for src_file in files_to_archive:
+        shutil.move(str(src_file), str(archive_dir / src_file.name))
+
+    print(
+        f"📦  Archived {len(files_to_archive)} previous result file(s) → "
+        f"{archive_dir.resolve().relative_to(REPO_ROOT.resolve(), walk_up=True)}/"
+    )
+    return archive_dir
+
+
 def _download_artifacts(
     username: str,
     kernel_slug: str,
     experiment: dict[str, Any],
     output_dir: Path,
     allow_dirty: bool,
+    kernel_status: str = "complete",
 ) -> None:
     """
-    Download ONLY the configured result_files from a completed Kaggle kernel.
+    Download artifacts from a Kaggle kernel into output_dir/results/.
 
-    Uses `kaggle kernels output --file-pattern <regex>` so only matching files
-    are transferred.  The full /kaggle/working tree (cloned repo, .git packs,
-    hundreds of MB of source) is never downloaded.
+    Understands two result states:
+      1. SUCCESS ARTIFACTS: declared in `result_files`
+      2. FAILURE ARTIFACTS: declared in `failure_result_files` (e.g. evaluation_failure.json)
 
-    Raises SystemExit if any configured result file is absent after download.
+    Distinguishes Kaggle execution status from scientific evaluation status:
+      - If evaluation_failure.json is produced, success metrics are NOT required,
+        failure artifacts are retrieved, and an error is reported.
+      - If the Kaggle kernel itself errored, available failure artifacts are retrieved
+        if exposed, and no stale success metrics remain in results/.
     """
     kernel_id = f"{username}/{kernel_slug}"
     result_files: list[str] = experiment.get("result_files", [])
+    failure_result_files: list[str] = experiment.get(
+        "failure_result_files", ["evaluation_failure.json", "runner_meta.json"]
+    )
     large_result_files: list[str] = experiment.get("large_result_files", [])
-    remote_output_dir: str  = experiment["remote_output_dir"]
+    remote_output_dir: str = experiment["remote_output_dir"]
 
     if experiment.get("download_policy") == "metadata_only":
         overlap = set(result_files) & set(large_result_files)
@@ -490,11 +568,12 @@ def _download_artifacts(
                 + ", ".join(sorted(overlap))
             )
 
-    if not result_files:
+    all_download_files = list(dict.fromkeys(result_files + failure_result_files))
+    if not all_download_files:
         print("⚠️  No result_files configured for this experiment — skipping download.")
         return
 
-    pattern = _build_file_pattern(result_files)
+    pattern = _build_file_pattern(all_download_files)
     print(f"⬇️   Downloading selected artifacts for {kernel_id}")
     print(f"    file-pattern: {pattern}")
     if large_result_files:
@@ -517,18 +596,61 @@ def _download_artifacts(
         if dl_result.returncode != 0:
             _warn(
                 f"kaggle kernels output exited with code {dl_result.returncode} "
-                "(often a Windows encoding issue — checking whether files arrived)"
+                "(often a Windows encoding issue or partial error — checking whether files arrived)"
             )
 
-        # Kaggle CLI mirrors the remote path structure under tmp_path.
-        # Notebook artifacts live at:
-        #   /kaggle/working/satquery-output/<remote_output_dir>/<file>
-        # Downloaded mirror:
-        #   <tmp>/satquery-output/<remote_output_dir>/<file>
-        # We also accept a flat layout in case the CLI version differs.
         results_dest = output_dir / "results"
         results_dest.mkdir(parents=True, exist_ok=True)
 
+        # Check if evaluation_failure.json was produced (scientific evaluation failure)
+        fail_hits = [p for p in tmp_path.rglob("evaluation_failure.json") if p.is_file()]
+
+        if fail_hits:
+            print("\n⚠️  Detected scientific evaluation failure artifact (evaluation_failure.json).")
+            copied_fail: list[Path] = []
+            for ff in failure_result_files:
+                fname = Path(ff).name
+                candidate = tmp_path / "satquery-output" / remote_output_dir / ff
+                if candidate.exists():
+                    dest = results_dest / fname
+                    shutil.copy2(candidate, dest)
+                    copied_fail.append(dest)
+                    continue
+                hits = [p for p in tmp_path.rglob(fname) if p.is_file()]
+                if hits:
+                    dest = results_dest / fname
+                    shutil.copy2(hits[0], dest)
+                    copied_fail.append(dest)
+                    continue
+
+            # Ensure NO success metrics exist in results_dest
+            for rf in result_files:
+                rf_name = Path(rf).name
+                stale_rf = results_dest / rf_name
+                if stale_rf.exists() and rf_name not in [Path(f).name for f in failure_result_files]:
+                    stale_rf.unlink()
+
+            try:
+                failure_info = json.loads(fail_hits[0].read_text(encoding="utf-8"))
+                reason = failure_info.get("failure_reason", "UNKNOWN")
+                details = failure_info.get("details", "")
+                print(f"❌  Scientific evaluation FAILED:\n    Reason:  {reason}\n    Details: {details}", file=sys.stderr)
+            except Exception:
+                print("❌  Scientific evaluation FAILED (malformed evaluation_failure.json)", file=sys.stderr)
+
+            print(f"📦  Copied {len(copied_fail)} failure artifact(s) → {results_dest.resolve().relative_to(REPO_ROOT.resolve(), walk_up=True)}/")
+            sys.exit(1)
+
+        # If no evaluation_failure.json was found and kernel itself errored:
+        if kernel_status != "complete":
+            print(
+                f"❌  Kernel did not complete successfully (status: {kernel_status}) and no evaluation_failure.json was produced.\n"
+                f"    Inspect the run at: https://www.kaggle.com/code/{kernel_id}\n",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
+        # Kernel succeeded and no evaluation_failure.json: retrieve SUCCESS artifacts
         missing: list[str] = []
         copied: list[Path] = []
 
@@ -573,7 +695,7 @@ def _download_artifacts(
                 "Results from a dirty working tree run — not a reproducible artifact.\n"
             )
 
-        print(f"\n📦  Copied {len(copied)} artifact(s) → {results_dest.relative_to(REPO_ROOT, walk_up=True)}/")
+        print(f"\n📦  Copied {len(copied)} artifact(s) → {results_dest.resolve().relative_to(REPO_ROOT.resolve(), walk_up=True)}/")
         for p in copied:
             print(f"    {p.name}  ({p.stat().st_size:,} bytes)")
 
@@ -630,12 +752,19 @@ def cmd_download(args: argparse.Namespace) -> None:
     print(f"    Kernel: {username}/{slug}")
     print(f"    Destination: {output_dir.relative_to(REPO_ROOT)}/results/\n")
 
+    _archive_current_result_files(
+        output_dir=output_dir,
+        result_files=exp.get("result_files", []),
+        failure_result_files=exp.get("failure_result_files", []),
+    )
+
     _download_artifacts(
         username=username,
         kernel_slug=slug,
         experiment=exp,
         output_dir=output_dir,
         allow_dirty=False,   # downloads never mark as dirty
+        kernel_status="complete",
     )
 
     print("\n✅  Done.")
@@ -688,6 +817,13 @@ def cmd_run(args: argparse.Namespace) -> None:
     output_dir = Path(args.output_dir) if args.output_dir else exp_dir
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    # Archive previous result files BEFORE launching or polling
+    _archive_current_result_files(
+        output_dir=output_dir,
+        result_files=exp.get("result_files", []),
+        failure_result_files=exp.get("failure_result_files", []),
+    )
+
     # 3. Prepare push working directory
     push_dir = PUSH_WORK_DIR / slug
     push_dir.mkdir(parents=True, exist_ok=True)
@@ -738,20 +874,14 @@ def cmd_run(args: argparse.Namespace) -> None:
     # 7. Poll status
     final_status = _poll_status(username, slug, args.poll_interval)
 
-    if final_status != "complete":
-        print(
-            f"❌  Kernel did not complete successfully (status: {final_status}).\n"
-            f"    Inspect the run at: https://www.kaggle.com/code/{username}/{slug}\n"
-        )
-        sys.exit(1)
-
-    # 8. Download artifacts
+    # 8. Download artifacts (handles both complete and error statuses, retrieves failure artifacts if present)
     _download_artifacts(
         username=username,
         kernel_slug=slug,
         experiment=exp,
         output_dir=output_dir,
         allow_dirty=args.allow_dirty,
+        kernel_status=final_status,
     )
 
     print("\n✅  Done.")

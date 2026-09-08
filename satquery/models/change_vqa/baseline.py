@@ -60,46 +60,76 @@ class BiTemporalChangeVQABackend:
         self._model = None
         self._torch = None
 
+    def load(self) -> None:
+        """Explicitly load and verify the bi-temporal model and processor."""
+        self._ensure_loaded()
+
     def _ensure_loaded(self) -> None:
         if self._model is not None:
             return
 
-        if not self.settings.allow_remote_network:
-            # Check if weights exist locally in HF cache
-            cache_dir = Path.home() / ".cache" / "huggingface" / "hub"
-            model_dir_name = f"models--{self.registration.model_id.replace('/', '--')}"
-            if not (cache_dir / model_dir_name).exists():
-                raise ModelUnavailableError(
-                    f"Change-VQA model {self.registration.model_id} not cached locally and remote network disabled."
-                )
-
         try:
             import torch
-            from transformers import AutoModelForVision2Seq, AutoProcessor
+            from huggingface_hub import snapshot_download
+            from transformers import AutoModelForImageTextToText, AutoProcessor
+        except ImportError as exc:
+            raise ModelUnavailableError(
+                "The local bi-temporal Change-VQA runtime dependencies are unavailable"
+            ) from exc
 
-            self._torch = torch
-            dtype = torch.float16 if self.settings.device == "cuda" else torch.float32
-            local_files_only = not self.settings.allow_remote_network
-
-            self._processor = AutoProcessor.from_pretrained(
-                self.registration.model_id,
-                revision=self.registration.revision,
-                local_files_only=local_files_only,
+        if self.settings.device != "cpu" and not (
+            self.settings.device.startswith("cuda") and torch.cuda.is_available()
+        ):
+            raise ModelUnavailableError(
+                f"Configured bi-temporal device {self.settings.device!r} is unavailable"
             )
-            self._model = AutoModelForVision2Seq.from_pretrained(
-                self.registration.model_id,
-                revision=self.registration.revision,
+
+        cache_dir = (self.settings.model_root / "cache").resolve()
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            snapshot = Path(
+                snapshot_download(
+                    repo_id=self.registration.model_id,
+                    revision=self.registration.revision,
+                    cache_dir=cache_dir,
+                    local_files_only=not self.settings.allow_remote_network,
+                )
+            )
+            checkpoint = snapshot / self.registration.checkpoint_file
+            h = hashlib.sha256()
+            with checkpoint.open("rb") as handle:
+                for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                    h.update(chunk)
+            if h.hexdigest() != self.registration.checkpoint_sha256:
+                raise ModelUnavailableError("Cached bi-temporal checkpoint hash is invalid")
+
+            processor = AutoProcessor.from_pretrained(
+                snapshot,
+                local_files_only=True,
+                trust_remote_code=self.registration.allow_remote_code,
+            )
+            dtype = torch.float16 if self.settings.device == "cuda" else torch.float32
+            model = AutoModelForImageTextToText.from_pretrained(
+                snapshot,
+                local_files_only=True,
+                trust_remote_code=self.registration.allow_remote_code,
                 torch_dtype=dtype,
                 low_cpu_mem_usage=True,
-                local_files_only=local_files_only,
             )
-            self._model.to(self.settings.device)
-            self._model.eval()
-
+            if self.settings.device == "cpu":
+                torch.set_num_threads(self.settings.cpu_threads)
+            model.to(self.settings.device)
+            model.eval()
+        except ModelUnavailableError:
+            raise
         except Exception as exc:
             raise ModelExecutionError(
                 f"Failed to load Change-VQA model {self.registration.model_id}: {exc}"
             ) from exc
+
+        self._torch = torch
+        self._processor = processor
+        self._model = model
 
     def answer_change_vqa(
         self,

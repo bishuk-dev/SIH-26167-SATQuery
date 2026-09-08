@@ -1,0 +1,36 @@
+{
+  "experiment": "P4-E02",
+  "task": "bitemporal_change_description",
+  "model_id": "HuggingFaceTB/SmolVLM-256M-Instruct",
+  "model_revision": "7e3e67edbbed1bf9888184d9df282b700a323964",
+  "device": "cuda",
+  "cuda_available": true,
+  "sample_count": 0,
+  "validation_subset_size": 100,
+  "evaluation_split": "val",
+  "test_set_policy": "SEALED (evaluated on validation split only)",
+  "status": "FAIL",
+  "caption_metrics": {},
+  "license_gates": {
+    "cdvqa_annotation_license": "Apache-2.0",
+    "second_dataset_access": "public",
+    "second_image_license_status": "UNRESOLVED",
+    "cdvqa_full_dataset_license_gate": "BLOCKED"
+  },
+  "primary_benchmark": {
+    "name": "LEVIR-CC",
+    "task": "change_description",
+    "provenance": "Chenyang Liu et al. (IEEE TGRS 2022) / LEVIR Lab (Beihang University)",
+    "upstream_imagery": "LEVIR-CD (Academic / non-commercial research use only)",
+    "test_set_policy": "SEALED (evaluated on validation split)",
+    "huggingface_repo": "lcybuaa/LEVIR-CC",
+    "huggingface_revision": "881887bfc8a0f856f9059bcedf74c388e0d92ad7",
+    "zip_sha256": "e05d38c0fdfda8c9b2048d314e5f95974d8b81e1b9f83f107acc39d55015e130",
+    "split_pairs": {
+      "train": 6815,
+      "val": 1332,
+      "test": 1930
+    }
+  },
+  "execution_time_seconds": 82.08
+}

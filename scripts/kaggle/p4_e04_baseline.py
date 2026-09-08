@@ -59,7 +59,7 @@ BENCHMARK_PROVENANCE: dict[str, Any] = {
     ],
 }
 
-ZENODO_BASE_URL = "https://zenodo.org/record/7946594/files"
+ZENODO_BASE_URL = "https://zenodo.org/records/7946594/files"
 
 
 def _md5_file(path: Path, chunk_size: int = 1 << 20) -> str:
@@ -73,7 +73,14 @@ def _md5_file(path: Path, chunk_size: int = 1 << 20) -> str:
     return h.hexdigest()
 
 
-def _download_file(url: str, dest: Path, expected_size: int, expected_md5: str) -> None:
+def _download_file_robust(
+    url: str,
+    dest: Path,
+    expected_size: int,
+    expected_md5: str,
+    max_attempts: int = 6,
+) -> None:
+    """Download a file with HTTP Range resume, exponential backoff, and hash verification."""
     import urllib.request
     import urllib.error
 
@@ -82,35 +89,85 @@ def _download_file(url: str, dest: Path, expected_size: int, expected_md5: str) 
     if dest.exists() and dest.stat().st_size == expected_size:
         actual_md5 = _md5_file(dest)
         if actual_md5 == expected_md5:
-            print(f"[P4-E04] Verified existing file: {dest.name}")
+            print(f"[P4-E04] Verified existing archive: {dest.name}")
             return
-        print(f"[P4-E04] MD5 mismatch for {dest.name}, re-downloading")
+        print(f"[P4-E04] MD5 mismatch for existing {dest.name}, re-downloading")
         dest.unlink()
 
-    print(f"[P4-E04] Downloading {url} ...")
-    try:
-        req = urllib.request.Request(url, headers={"User-Agent": "satquery-P4-E04"})
-        with urllib.request.urlopen(req, timeout=300) as resp, open(dest, "wb") as f:
-            while True:
-                chunk = resp.read(65536)
-                if not chunk:
-                    break
-                f.write(chunk)
-    except urllib.error.URLError as exc:
-        raise RuntimeError(f"Failed to download {url}: {exc}") from exc
+    part_path = dest.parent / f"{dest.name}.part"
 
-    actual_size = dest.stat().st_size
-    if actual_size != expected_size:
-        raise RuntimeError(
-            f"Size mismatch for {dest.name}: expected {expected_size}, got {actual_size}"
-        )
+    for attempt in range(1, max_attempts + 1):
+        existing_bytes = part_path.stat().st_size if part_path.exists() else 0
+        if existing_bytes > expected_size:
+            print(f"[P4-E04] .part size ({existing_bytes}) exceeds expected ({expected_size}), resetting")
+            part_path.unlink()
+            existing_bytes = 0
 
-    actual_md5 = _md5_file(dest)
-    if actual_md5 != expected_md5:
-        raise RuntimeError(
-            f"MD5 mismatch for {dest.name}: expected {expected_md5}, got {actual_md5}"
-        )
-    print(f"[P4-E04] Verified {dest.name}: {actual_size} bytes, MD5={actual_md5}")
+        headers = {"User-Agent": "satquery-P4-E04"}
+        if existing_bytes > 0:
+            headers["Range"] = f"bytes={existing_bytes}-"
+            print(f"[P4-E04] Attempt {attempt}/{max_attempts}: Resuming {dest.name} from byte {existing_bytes}...")
+        else:
+            print(f"[P4-E04] Attempt {attempt}/{max_attempts}: Downloading {dest.name}...")
+
+        req = urllib.request.Request(url, headers=headers)
+        try:
+            with urllib.request.urlopen(req, timeout=120) as resp:
+                status_code = getattr(resp, "status", getattr(resp, "code", 200))
+                if status_code == 206:
+                    # Partial Content: server accepted Range, append
+                    write_mode = "ab"
+                else:
+                    # 200 OK: server ignored Range header, overwrite from byte 0
+                    write_mode = "wb"
+                    existing_bytes = 0
+
+                with open(part_path, write_mode) as f:
+                    while True:
+                        chunk = resp.read(1024 * 1024)
+                        if not chunk:
+                            break
+                        f.write(chunk)
+
+            # Check downloaded .part
+            actual_size = part_path.stat().st_size
+            if actual_size == expected_size:
+                actual_md5 = _md5_file(part_path)
+                if actual_md5 == expected_md5:
+                    shutil.move(str(part_path), str(dest))
+                    print(f"[P4-E04] Verified & promoted {dest.name}: {actual_size} bytes, MD5={actual_md5}")
+                    return
+                else:
+                    print(f"[P4-E04] MD5 mismatch for {part_path.name}: {actual_md5} != {expected_md5}, restarting")
+                    if part_path.exists():
+                        part_path.unlink()
+            else:
+                print(f"[P4-E04] Incomplete transfer: {actual_size}/{expected_size} bytes")
+
+        except urllib.error.HTTPError as exc:
+            if exc.code == 416:
+                # Range Not Satisfiable: check if .part is already complete
+                if part_path.exists() and part_path.stat().st_size == expected_size:
+                    if _md5_file(part_path) == expected_md5:
+                        shutil.move(str(part_path), str(dest))
+                        print(f"[P4-E04] Range 416: verified complete archive {dest.name}")
+                        return
+                print(f"[P4-E04] Range 416 not satisfiable, resetting .part")
+                if part_path.exists():
+                    part_path.unlink()
+            elif exc.code in (429, 500, 502, 503, 504):
+                print(f"[P4-E04] Transient HTTP Error {exc.code}: {exc.reason}")
+            else:
+                raise RuntimeError(f"Non-retryable HTTP error {exc.code}: {exc.reason}") from exc
+        except (urllib.error.URLError, TimeoutError, ConnectionError, OSError) as exc:
+            print(f"[P4-E04] Transient network error: {exc}")
+
+        if attempt < max_attempts:
+            backoff = min(60.0, (2.0 ** (attempt - 1)) * 2.0)
+            print(f"[P4-E04] Backing off for {backoff:.1f}s before retry...")
+            time.sleep(backoff)
+
+    raise RuntimeError(f"Failed to acquire {dest.name} after {max_attempts} attempts from {url}")
 
 
 def _safe_zip_extract(zip_path: Path, dest_dir: Path) -> None:
@@ -138,29 +195,44 @@ def _acquire_modified_sen1floods11(base_dir: Path) -> Path:
     extracted_dir = cache_dir / "extracted"
     extracted_dir.mkdir(parents=True, exist_ok=True)
 
-    for pinned in BENCHMARK_PROVENANCE["pinned_files"]:
-        fname = pinned["filename"]
-        dest = downloads_dir / fname
-        if not dest.exists():
+    archive_env = os.environ.get("SEN1FLOODS11_ARCHIVE_DIR")
+    if archive_env:
+        archive_dir = Path(archive_env)
+        print(f"[P4-E04] Checking SEN1FLOODS11_ARCHIVE_DIR: {archive_dir}")
+        for pinned in BENCHMARK_PROVENANCE["pinned_files"]:
+            fname = pinned["filename"]
+            src_file = archive_dir / fname
+            if not src_file.exists():
+                raise RuntimeError(f"SEN1FLOODS11_ARCHIVE_DIR missing required archive: {fname}")
+            actual_size = src_file.stat().st_size
+            if actual_size != pinned["size_bytes"]:
+                raise RuntimeError(
+                    f"SEN1FLOODS11_ARCHIVE_DIR size mismatch for {fname}: "
+                    f"expected {pinned['size_bytes']}, got {actual_size}"
+                )
+            actual_md5 = _md5_file(src_file)
+            if actual_md5 != pinned["md5"]:
+                raise RuntimeError(
+                    f"SEN1FLOODS11_ARCHIVE_DIR MD5 mismatch for {fname}: "
+                    f"expected {pinned['md5']}, got {actual_md5}"
+                )
+            dest = downloads_dir / fname
+            if not dest.exists() or dest.stat().st_size != pinned["size_bytes"]:
+                shutil.copy2(src_file, dest)
+            print(f"[P4-E04] Verified pre-provisioned archive: {fname}")
+    else:
+        for pinned in BENCHMARK_PROVENANCE["pinned_files"]:
+            fname = pinned["filename"]
+            dest = downloads_dir / fname
             url = f"{ZENODO_BASE_URL}/{fname}?download=1"
-            _download_file(url, dest, pinned["size_bytes"], pinned["md5"])
-        else:
-            actual_size = dest.stat().st_size
-            actual_md5 = _md5_file(dest)
-            if actual_size != pinned["size_bytes"] or actual_md5 != pinned["md5"]:
-                print(f"[P4-E04] Re-downloading {fname} (size/hash mismatch)")
-                dest.unlink()
-                url = f"{ZENODO_BASE_URL}/{fname}?download=1"
-                _download_file(url, dest, pinned["size_bytes"], pinned["md5"])
-            else:
-                print(f"[P4-E04] Verified existing file: {fname}")
+            _download_file_robust(url, dest, pinned["size_bytes"], pinned["md5"])
 
     for pinned in BENCHMARK_PROVENANCE["pinned_files"]:
         fname = pinned["filename"]
         target_dir = extracted_dir / fname.replace(".zip", "")
         if not target_dir.exists() or not any(target_dir.rglob("*.tif")):
             zip_path = downloads_dir / fname
-            print(f"[P4-E04] Extracting {fname} ...")
+            print(f"[P4-E04] Extracting {fname} safely...")
             target_dir.mkdir(parents=True, exist_ok=True)
             _safe_zip_extract(zip_path, target_dir)
             print(f"[P4-E04] Extracted to {target_dir}")
@@ -345,8 +417,25 @@ def run_p4_e04_evaluation(output_dir: Path) -> dict[str, Any]:
         }
         with open(output_dir / "evaluation_failure.json", "w", encoding="utf-8") as f:
             json.dump(failure_meta, f, indent=2)
+        runner_meta = {
+            "experiment": "phase4-e04-modified-sen1floods11-validation",
+            "task": "sar_temporal_flood_validation",
+            "status": "FAIL",
+            "failure_reason": failure_meta["failure_reason"],
+            "timestamp": timestamp,
+        }
+        with open(output_dir / "runner_meta.json", "w", encoding="utf-8") as f:
+            json.dump(runner_meta, f, indent=2)
         print(f"[P4-E04] Aborting: {failure_meta['failure_reason']}")
         return failure_meta
+
+    all_tifs = sorted(extracted_dir.rglob("*.tif"))
+    pre_sample = [p.name for p in all_tifs if _is_pre_sar(p.name)][:5]
+    post_sample = [p.name for p in all_tifs if _is_post_sar(p.name)][:5]
+    label_sample = [p.name for p in all_tifs if _is_label(p.name)][:5]
+    print(f"[P4-E04] Representative PRE files ({len(pre_sample)}): {pre_sample}")
+    print(f"[P4-E04] Representative POST files ({len(post_sample)}): {post_sample}")
+    print(f"[P4-E04] Representative LABEL files ({len(label_sample)}): {label_sample}")
 
     scene_pairs = _find_raster_pairs(extracted_dir)
 
@@ -367,6 +456,12 @@ def run_p4_e04_evaluation(output_dir: Path) -> dict[str, Any]:
         "unmatched_pre": unmatched_pre,
         "unmatched_post": unmatched_post,
         "unmatched_label": unmatched_label,
+        "duplicate_keys": 0,
+        "representative_samples": {
+            "pre": pre_sample,
+            "post": post_sample,
+            "label": label_sample,
+        },
     }
     print(f"[P4-E04] Scene pairing audit: {audit}")
 
@@ -381,6 +476,15 @@ def run_p4_e04_evaluation(output_dir: Path) -> dict[str, Any]:
         }
         with open(output_dir / "evaluation_failure.json", "w", encoding="utf-8") as f:
             json.dump(failure_meta, f, indent=2)
+        runner_meta = {
+            "experiment": "phase4-e04-modified-sen1floods11-validation",
+            "task": "sar_temporal_flood_validation",
+            "status": "FAIL",
+            "failure_reason": failure_meta["failure_reason"],
+            "timestamp": timestamp,
+        }
+        with open(output_dir / "runner_meta.json", "w", encoding="utf-8") as f:
+            json.dump(runner_meta, f, indent=2)
         print("[P4-E04] Aborting: zero paired scenes found")
         return failure_meta
 

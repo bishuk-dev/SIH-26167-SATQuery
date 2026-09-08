@@ -31,6 +31,8 @@ import time
 from PIL import Image
 import torch
 
+from satquery.evaluation.rsicc_eval import compute_rsicc_caption_metrics
+
 
 LEVIR_CC_HF_REPO = "lcybuaa/LEVIR-CC"
 LEVIR_CC_HF_REVISION = "881887bfc8a0f856f9059bcedf74c388e0d92ad7"
@@ -184,282 +186,116 @@ def _acquire_levir_cc(base_dir: Path) -> Path:
     return _discover_dataset_root(extracted_dir)
 
 
-def _load_captions(caption_file: Path) -> dict[str, list[str]]:
+def _build_authoritative_val_pairs(
+    caption_file: Path,
+    val_a_dir: Path,
+    val_b_dir: Path,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """Derive authoritative validation membership from LevirCCcaptions.json.
+
+    Benchmark membership is strictly defined by `split == 'val'`.
+    Surfaces the 1333 observed vs 1332 historically documented discrepancy.
+    Test entries are sealed and never opened.
+    """
     with open(caption_file, "r", encoding="utf-8") as f:
         raw = json.load(f)
 
-    references: dict[str, list[str]] = {}
+    images = raw.get("images", []) if isinstance(raw, dict) else []
+    val_entries = [img for img in images if img.get("split") == "val"]
+    annotation_val_count = len(val_entries)
 
-    if isinstance(raw, dict) and "annotations" in raw:
-        for ann in raw["annotations"]:
-            filename = ann.get("filename") or ann.get("image_id")
-            sentence = ann.get("sentence") or ann.get("caption")
-            if filename and sentence:
-                if filename not in references:
-                    references[filename] = []
-                if sentence not in references[filename]:
-                    references[filename].append(sentence)
-    elif isinstance(raw, dict) and "images" in raw:
-        for img in raw["images"]:
-            filename = img.get("filename") or img.get("image_id")
-            if filename:
-                sentences = img.get("sentences", [])
-                if isinstance(sentences, list):
-                    refs = [s.get("raw", "") if isinstance(s, dict) else str(s) for s in sentences]
-                elif isinstance(sentences, dict):
-                    refs = [sentences.get("raw", "")]
-                else:
-                    refs = [str(sentences)]
-                references[filename] = [r for r in refs if r]
-    elif isinstance(raw, dict):
-        for key, val in raw.items():
-            if isinstance(val, dict):
-                filename = val.get("filename") or val.get("image_id") or key
-                sent_field = val.get("sentences") or val.get("caption") or val.get("sentence")
-                if filename and sent_field:
-                    if isinstance(sent_field, list):
-                        refs = sent_field
-                    elif isinstance(sent_field, dict):
-                        refs = [sent_field.get("raw", "")]
-                    else:
-                        refs = [str(sent_field)]
-                    references[filename] = [r for r in refs if r]
-    elif isinstance(raw, list):
-        for item in raw:
-            filename = item.get("filename") or item.get("image_id")
-            sentence = item.get("sentence") or item.get("caption")
-            if filename and sentence:
-                if filename not in references:
-                    references[filename] = []
-                if sentence not in references[filename]:
-                    references[filename].append(sentence)
+    val_a_files = {p.name for p in val_a_dir.glob("*.png")}
+    val_b_files = {p.name for p in val_b_dir.glob("*.png")}
+    val_a_stems = {p.stem for p in val_a_dir.glob("*.png")}
+    val_b_stems = {p.stem for p in val_b_dir.glob("*.png")}
 
-    split_filter = None
-    if isinstance(raw, dict) and "images" in raw:
-        for img in raw["images"]:
-            if img.get("split") == "val":
-                filename = img.get("filename") or img.get("image_id")
-                if filename and filename not in references:
-                    sentences = img.get("sentences", [])
-                    if isinstance(sentences, list):
-                        refs = [s.get("raw", "") if isinstance(s, dict) else str(s) for s in sentences]
-                    else:
-                        refs = [str(sentences)]
-                    references[filename] = [r for r in refs if r]
+    duplicate_annotation_filenames = 0
+    seen_filenames = set()
+    for e in val_entries:
+        fn = e.get("filename")
+        if fn in seen_filenames:
+            duplicate_annotation_filenames += 1
+        seen_filenames.add(fn)
 
-    print(f"[P4-E02] Loaded {len(references)} caption entries from {caption_file}")
-    return references
+    all_val_a_list = list(val_a_dir.glob("*.png"))
+    all_val_b_list = list(val_b_dir.glob("*.png"))
+    duplicate_a_filenames = len(all_val_a_list) - len(val_a_files)
+    duplicate_b_filenames = len(all_val_b_list) - len(val_b_files)
 
-
-def _build_val_pairs(val_a_dir: Path, val_b_dir: Path, references: dict[str, list[str]]) -> list[dict[str, Any]]:
     pairs = []
+    missing_a = 0
+    missing_b = 0
+    entries_without_references = 0
 
-    for img_a in sorted(val_a_dir.glob("*.png")):
-        stem = img_a.stem
-        img_b = val_b_dir / f"{stem}.png"
-        if not img_b.exists():
+    for item in val_entries:
+        filename = item.get("filename") or ""
+        stem = Path(filename).stem
+        has_a = filename in val_a_files or stem in val_a_stems
+        has_b = filename in val_b_files or stem in val_b_stems
+
+        if not has_a:
+            missing_a += 1
+        if not has_b:
+            missing_b += 1
+
+        sentences = item.get("sentences", [])
+        if isinstance(sentences, list):
+            refs = [s.get("raw", "").strip() if isinstance(s, dict) else str(s).strip() for s in sentences]
+        elif isinstance(sentences, dict):
+            refs = [sentences.get("raw", "").strip()]
+        else:
+            refs = [str(sentences).strip()]
+        refs = [r for r in refs if r]
+
+        if not refs:
+            entries_without_references += 1
             continue
 
-        filename_key = f"{stem}.png"
-        ref_captions = references.get(filename_key, references.get(stem, []))
+        if has_a and has_b:
+            img_a_path = val_a_dir / filename if (val_a_dir / filename).exists() else val_a_dir / f"{stem}.png"
+            img_b_path = val_b_dir / filename if (val_b_dir / filename).exists() else val_b_dir / f"{stem}.png"
+            pairs.append({
+                "pair_id": stem,
+                "filename": filename,
+                "before_image_path": str(img_a_path),
+                "after_image_path": str(img_b_path),
+                "reference_captions": refs,
+                "evaluation_split": "val",
+            })
 
-        if not ref_captions:
-            print(f"[P4-E02] WARNING: no reference captions for pair {stem}, skipping")
-            continue
+    # Sort deterministically by filename
+    pairs.sort(key=lambda p: p["filename"])
+    matched_annotated_pairs = len(pairs)
 
-        pairs.append({
-            "pair_id": stem,
-            "filename": filename_key,
-            "before_image_path": str(img_a),
-            "after_image_path": str(img_b),
-            "reference_captions": ref_captions,
-            "evaluation_split": "val",
-        })
+    audit_meta = {
+        "annotation_val_count": annotation_val_count,
+        "unique_annotation_filename_count": len(seen_filenames),
+        "val_A_file_count": len(val_a_files),
+        "val_B_file_count": len(val_b_files),
+        "matched_annotated_pairs": matched_annotated_pairs,
+        "missing_A": missing_a,
+        "missing_B": missing_b,
+        "duplicate_annotation_filenames": duplicate_annotation_filenames,
+        "duplicate_A_filenames": duplicate_a_filenames,
+        "duplicate_B_filenames": duplicate_b_filenames,
+        "entries_without_references": entries_without_references,
+        "historical_documented_count": 1332,
+        "pinned_artifact_observed_count": annotation_val_count,
+        "discrepancy_resolution": (
+            f"LevirCCcaptions.json defines {annotation_val_count} items with split=='val' "
+            f"(6815 train + {annotation_val_count} val + 1929 test = 10077 total). "
+            "Historical documentation colloquially cited 1332/1930, but the pinned authoritative "
+            f"annotation file assigns {annotation_val_count} items to val and 1929 to test."
+        ),
+    }
 
-    print(f"[P4-E02] Found {len(pairs)} validation pairs with reference captions")
-    return pairs
+    print(f"[P4-E02] Authoritative Validation Membership Audit:")
+    print(f"  Annotation val items: {annotation_val_count}")
+    print(f"  Filesystem val/A images: {len(val_a_files)}, val/B images: {len(val_b_files)}")
+    print(f"  Matched annotated pairs: {matched_annotated_pairs}")
+    print(f"  Discrepancy resolution: {audit_meta['discrepancy_resolution']}")
 
-
-def _bleu4_impl(reference_captions: list[str], candidate: str) -> float:
-    import math
-    import collections
-    import re
-
-    def tokenize(text: str) -> list[str]:
-        text = text.lower().strip()
-        return re.findall(r"\w+", text)
-
-    references = [tokenize(c) for c in reference_captions]
-    hypothesis = tokenize(candidate)
-
-    if len(hypothesis) == 0:
-        return 0.0
-
-    max_n = 4
-    precisions = []
-    for n in range(1, max_n + 1):
-        hyp_ngrams = collections.Counter(zip(*[hypothesis[i:] for i in range(n)])) if len(hypothesis) >= n else collections.Counter()
-        ref_ngram_counters = [collections.Counter(zip(*[ref[i:] for i in range(n)])) if len(ref) >= n else collections.Counter() for ref in references]
-
-        matched = 0
-        total = sum(hyp_ngrams.values())
-        if total == 0:
-            precisions.append(0.0)
-            continue
-        for ngram, count in hyp_ngrams.items():
-            max_ref_count = max((r.get(ngram, 0) for r in ref_ngram_counters), default=0)
-            matched += min(count, max_ref_count)
-        precisions.append(matched / total)
-
-    ref_lens = [len(ref) for ref in references]
-    closest_ref_len = min(ref_lens, key=lambda l: abs(l - len(hypothesis)))
-    bp = 1.0 if len(hypothesis) > closest_ref_len else math.exp(1 - closest_ref_len / len(hypothesis)) if len(hypothesis) > 0 else 0.0
-
-    valid_precisions = [p for p in precisions if p > 0]
-    if not valid_precisions:
-        return 0.0
-
-    geometric_mean = math.exp(sum(math.log(p) for p in valid_precisions) / len(valid_precisions))
-    return bp * geometric_mean
-
-
-def _rouge_l_score(reference_captions: list[str], candidate: str) -> float:
-    import re
-
-    def tokenize(text: str) -> list[str]:
-        text = text.lower().strip()
-        return re.findall(r"\w+", text)
-
-    refs_tokenized = [tokenize(c) for c in reference_captions]
-    hyp = tokenize(candidate)
-
-    if not hyp:
-        return 0.0
-
-    best_f1 = 0.0
-    for ref in refs_tokenized:
-        if not ref:
-            continue
-        m, n = len(ref), len(hyp)
-        dp = [[0] * (n + 1) for _ in range(m + 1)]
-        for i in range(m - 1, -1, -1):
-            for j in range(n - 1, -1, -1):
-                if ref[i] == hyp[j]:
-                    dp[i][j] = dp[i + 1][j + 1] + 1
-                else:
-                    dp[i][j] = max(dp[i + 1][j], dp[i][j + 1])
-        lcs_length = dp[0][0]
-
-        precision = lcs_length / n if n > 0 else 0.0
-        recall = lcs_length / m if m > 0 else 0.0
-        if precision + recall > 0:
-            f1 = 2 * precision * recall / (precision + recall)
-            best_f1 = max(best_f1, f1)
-
-    return best_f1
-
-
-def _cider_score(reference_captions: list[str], candidate: str, n: int = 4) -> float:
-    import math
-    import collections
-    import re
-    from math import sqrt
-
-    def tokenize(text: str) -> list[str]:
-        text = text.lower().strip()
-        return re.findall(r"\w+", text)
-
-    def get_ngrams(tokens: list[str], n_val: int) -> collections.Counter:
-        return collections.Counter(zip(*[tokens[i:] for i in range(n_val)])) if len(tokens) >= n_val else collections.Counter()
-
-    def tf(document_ngrams: collections.Counter) -> collections.Counter:
-        tf_vec = collections.Counter()
-        total = sum(document_ngrams.values())
-        if total == 0:
-            return tf_vec
-        for ngram, count in document_ngrams.items():
-            tf_vec[ngram] = count / total
-        return tf_vec
-
-    refs_tokenized = [tokenize(c) for c in reference_captions]
-    hyp = tokenize(candidate)
-
-    if not hyp or not refs_tokenized:
-        return 0.0
-
-    refs_tf = [tf(get_ngrams(ref, n)) for ref in refs_tokenized]
-    hyp_tf = tf(get_ngrams(hyp, n))
-
-    if not refs_tf:
-        return 0.0
-
-    doc_freq = collections.Counter()
-    for ref in refs_tokenized:
-        unique_ngrams = set(get_ngrams(ref, n).keys())
-        for ngram in unique_ngrams:
-            doc_freq[ngram] += 1
-
-    num_docs = len(refs_tokenized) + 1
-    idf = collections.Counter()
-    for ngram, df in doc_freq.items():
-        idf[ngram] = math.log(max(1.0, num_docs / (1 + df)))
-
-    hyp_tfidf = collections.Counter()
-    for ngram, tf_val in hyp_tf.items():
-        hyp_tfidf[ngram] = tf_val * idf.get(ngram, 0.0)
-
-    ref_tfidf_list = []
-    for ref_tf in refs_tf:
-        ref_tfidf = collections.Counter()
-        for ngram, tf_val in ref_tf.items():
-            ref_tfidf[ngram] = tf_val * idf.get(ngram, 0.0)
-        ref_tfidf_list.append(ref_tfidf)
-
-    if not ref_tfidf_list or not hyp_tfidf:
-        return 0.0
-
-    def cosine_sim(vec1: collections.Counter, vec2: collections.Counter) -> float:
-        dot = sum(vec1[k] * vec2[k] for k in vec1 if k in vec2)
-        norm1 = sqrt(sum(v * v for v in vec1.values()))
-        norm2 = sqrt(sum(v * v for v in vec2.values()))
-        if norm1 == 0.0 or norm2 == 0.0:
-            return 0.0
-        return dot / (norm1 * norm2)
-
-    scores = [cosine_sim(hyp_tfidf, ref_tfidf) for ref_tfidf in ref_tfidf_list]
-    return sum(scores) / len(scores) if scores else 0.0
-
-
-def _evaluate_captions(predictions: list[dict[str, Any]], references_map: dict[str, list[str]]) -> dict[str, float]:
-    bleu4_scores = []
-    rouge_l_scores = []
-    cider_scores = []
-
-    for pred in predictions:
-        pair_id = pred["pair_id"]
-        ref_captions = references_map.get(pair_id, [])
-        if not ref_captions:
-            print(f"[P4-E02] No reference captions for {pair_id}, skipping metric")
-            continue
-
-        generated = pred.get("predicted_answer", "")
-        if not generated:
-            print(f"[P4-E02] Empty generated caption for {pair_id}, skipping metric")
-            continue
-
-        bleu4_scores.append(_bleu4_impl(ref_captions, generated))
-        rouge_l_scores.append(_rouge_l_score(ref_captions, generated))
-        cider_scores.append(_cider_score(ref_captions, generated))
-
-    result = {}
-    if bleu4_scores:
-        result["bleu4"] = round(sum(bleu4_scores) / len(bleu4_scores), 6)
-    if rouge_l_scores:
-        result["rouge_l"] = round(sum(rouge_l_scores) / len(rouge_l_scores), 6)
-    if cider_scores:
-        result["cider"] = round(sum(cider_scores) / len(cider_scores), 6)
-
-    return result
+    return pairs, audit_meta
 
 
 def run_p4_e02_evaluation(output_dir: Path) -> dict[str, Any]:
@@ -470,34 +306,7 @@ def run_p4_e02_evaluation(output_dir: Path) -> dict[str, Any]:
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"[P4-E02] Running evaluation on device: {device}")
 
-    try:
-        from satquery.models.change_vqa.baseline import load_change_vqa_model
-        from satquery.inference.config import VqaRuntimeSettings
-
-        settings = VqaRuntimeSettings(
-            device=device,
-            allow_remote_network=True,
-        )
-        backend = load_change_vqa_model(settings=settings)
-        model_loaded = True
-        model_revision = backend.registration.revision
-        preprocessing_profile = backend.profile_id
-        model_id = backend.registration.model_id
-    except Exception as exc:
-        print(f"[P4-E02] Model load failed: {exc}")
-        failure_meta = {
-            "experiment": "P4-E02",
-            "task": "bitemporal_change_description",
-            "device": device,
-            "status": "MODEL_UNAVAILABLE",
-            "failure_reason": str(exc),
-            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-        }
-        with open(output_dir / "evaluation_failure.json", "w", encoding="utf-8") as f:
-            json.dump(failure_meta, f, indent=2)
-        print("[P4-E02] Aborting: cannot evaluate without loaded model.")
-        return failure_meta
-
+    # 1. Acquire LEVIR-CC
     try:
         dataset_root = _acquire_levir_cc(output_dir.parent)
     except Exception as exc:
@@ -511,9 +320,20 @@ def run_p4_e02_evaluation(output_dir: Path) -> dict[str, Any]:
         }
         with open(output_dir / "evaluation_failure.json", "w", encoding="utf-8") as f:
             json.dump(failure_meta, f, indent=2)
+        runner_meta = {
+            "experiment": "phase4-e02-levircc-change-description",
+            "task": "bitemporal_change_description",
+            "device": device,
+            "status": "FAIL",
+            "failure_reason": failure_meta["failure_reason"],
+            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        }
+        with open(output_dir / "runner_meta.json", "w", encoding="utf-8") as f:
+            json.dump(runner_meta, f, indent=2)
         print(f"[P4-E02] Aborting: {failure_meta['failure_reason']}")
         return failure_meta
 
+    # 2. Build Authoritative Validation Pairs
     try:
         caption_file = dataset_root / "LevirCCcaptions.json"
         val_a_dir = dataset_root / "images" / "val" / "A"
@@ -526,19 +346,28 @@ def run_p4_e02_evaluation(output_dir: Path) -> dict[str, Any]:
         if not val_b_dir.is_dir():
             raise RuntimeError(f"val/B directory not found: {val_b_dir}")
 
-        references = _load_captions(caption_file)
-        val_pairs = _build_val_pairs(val_a_dir, val_b_dir, references)
+        val_pairs, audit_meta = _build_authoritative_val_pairs(caption_file, val_a_dir, val_b_dir)
     except Exception as exc:
         failure_meta = {
             "experiment": "P4-E02",
             "task": "bitemporal_change_description",
             "device": device,
-            "status": "DATASET_UNAVAILABLE",
+            "status": "DATASET_MALSTRUCTURED",
             "failure_reason": f"Dataset structure invalid: {exc}",
             "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         }
         with open(output_dir / "evaluation_failure.json", "w", encoding="utf-8") as f:
             json.dump(failure_meta, f, indent=2)
+        runner_meta = {
+            "experiment": "phase4-e02-levircc-change-description",
+            "task": "bitemporal_change_description",
+            "device": device,
+            "status": "FAIL",
+            "failure_reason": failure_meta["failure_reason"],
+            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        }
+        with open(output_dir / "runner_meta.json", "w", encoding="utf-8") as f:
+            json.dump(runner_meta, f, indent=2)
         print(f"[P4-E02] Aborting: {failure_meta['failure_reason']}")
         return failure_meta
 
@@ -553,17 +382,90 @@ def run_p4_e02_evaluation(output_dir: Path) -> dict[str, Any]:
         }
         with open(output_dir / "evaluation_failure.json", "w", encoding="utf-8") as f:
             json.dump(failure_meta, f, indent=2)
+        runner_meta = {
+            "experiment": "phase4-e02-levircc-change-description",
+            "task": "bitemporal_change_description",
+            "device": device,
+            "status": "FAIL",
+            "failure_reason": failure_meta["failure_reason"],
+            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        }
+        with open(output_dir / "runner_meta.json", "w", encoding="utf-8") as f:
+            json.dump(runner_meta, f, indent=2)
         print("[P4-E02] Aborting: no validation pairs found.")
         return failure_meta
 
-    if len(val_pairs) > VALIDATION_SUBSET_SIZE:
-        val_pairs = val_pairs[:VALIDATION_SUBSET_SIZE]
-        print(f"[P4-E02] Using validation subset of {VALIDATION_SUBSET_SIZE} pairs (VALIDATION_SUBSET)")
+    # 3. Select deterministic subset
+    is_subset = len(val_pairs) > VALIDATION_SUBSET_SIZE
+    if is_subset:
+        eval_pairs = val_pairs[:VALIDATION_SUBSET_SIZE]
+        subset_label = "VALIDATION_SUBSET"
+        selection_rule = f"deterministic_first_{VALIDATION_SUBSET_SIZE}_sorted_by_filename"
+        print(f"[P4-E02] Selected {VALIDATION_SUBSET_SIZE} pairs ({subset_label}, rule: {selection_rule})")
+    else:
+        eval_pairs = val_pairs
+        subset_label = "FULL_VALIDATION"
+        selection_rule = "all_matched_validation_pairs"
 
-    references_map = {p["pair_id"]: p["reference_captions"] for p in val_pairs}
+    # 4. Load model ONCE and perform explicit readiness check before entering inference loop
+    try:
+        from satquery.models.change_vqa.baseline import load_change_vqa_model
+        from satquery.inference.config import VqaRuntimeSettings
 
+        settings = VqaRuntimeSettings(
+            device=device,
+            allow_remote_network=True,
+        )
+        backend = load_change_vqa_model(settings=settings)
+        backend.load()
+        model_loaded = True
+        model_revision = backend.registration.revision
+        preprocessing_profile = backend.profile_id
+        model_id = backend.registration.model_id
+        print(f"[P4-E02] Model loaded and readiness verified once: {model_id} (rev: {model_revision})")
+    except Exception as exc:
+        print(f"[P4-E02] Model load failed: {exc}")
+        failure_meta = {
+            "experiment": "P4-E02",
+            "task": "bitemporal_change_description",
+            "device": device,
+            "status": "MODEL_UNAVAILABLE",
+            "failure_reason": str(exc),
+            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        }
+        with open(output_dir / "evaluation_failure.json", "w", encoding="utf-8") as f:
+            json.dump(failure_meta, f, indent=2)
+        runner_meta = {
+            "experiment": "phase4-e02-levircc-change-description",
+            "task": "bitemporal_change_description",
+            "device": device,
+            "status": "FAIL",
+            "failure_reason": str(exc),
+            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        }
+        with open(output_dir / "runner_meta.json", "w", encoding="utf-8") as f:
+            json.dump(runner_meta, f, indent=2)
+        print("[P4-E02] Aborting: cannot evaluate without loaded model.")
+        return failure_meta
+
+    # 5. Run single-pair smoke test before running the full loop
+    print("[P4-E02] Executing 1-pair inference smoke test...")
+    smoke_pair = eval_pairs[0]
+    smoke_t1 = Image.open(smoke_pair["before_image_path"]).convert("RGB")
+    smoke_t2 = Image.open(smoke_pair["after_image_path"]).convert("RGB")
+    smoke_res = backend.describe_changes(
+        smoke_t1,
+        smoke_t2,
+        pair_id=smoke_pair["pair_id"],
+        evaluation_split="val",
+    )
+    if not smoke_res.description or not smoke_res.description.strip():
+        raise RuntimeError("Inference smoke test failed: empty caption produced")
+    print(f"[P4-E02] Inference smoke test PASSED: '{smoke_res.description[:80]}...'")
+
+    # 6. Run inference loop
     predictions: list[dict[str, Any]] = []
-    for pair in val_pairs:
+    for pair in eval_pairs:
         try:
             img_t1 = Image.open(pair["before_image_path"]).convert("RGB")
             img_t2 = Image.open(pair["after_image_path"]).convert("RGB")
@@ -595,7 +497,34 @@ def run_p4_e02_evaluation(output_dir: Path) -> dict[str, Any]:
     sample_count = len(predictions)
     elapsed = time.time() - start_time
 
-    caption_metrics = _evaluate_captions(predictions, references_map)
+    if sample_count == 0:
+        failure_meta = {
+            "experiment": "P4-E02",
+            "task": "bitemporal_change_description",
+            "device": device,
+            "status": "MODEL_EXECUTION_FAILED",
+            "failure_reason": "Zero predictions generated during evaluation loop",
+            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        }
+        with open(output_dir / "evaluation_failure.json", "w", encoding="utf-8") as f:
+            json.dump(failure_meta, f, indent=2)
+        runner_meta = {
+            "experiment": "phase4-e02-levircc-change-description",
+            "task": "bitemporal_change_description",
+            "device": device,
+            "status": "FAIL",
+            "failure_reason": failure_meta["failure_reason"],
+            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        }
+        with open(output_dir / "runner_meta.json", "w", encoding="utf-8") as f:
+            json.dump(runner_meta, f, indent=2)
+        print("[P4-E02] Aborting: zero successful predictions generated.")
+        return failure_meta
+
+    # 7. Compute corpus-level caption metrics from predictions
+    hyps = [p["generated_caption"] for p in predictions]
+    refs = [p["reference_captions"] for p in predictions]
+    caption_metrics = compute_rsicc_caption_metrics(refs, hyps)
 
     metrics = {
         "experiment": "P4-E02",
@@ -605,11 +534,15 @@ def run_p4_e02_evaluation(output_dir: Path) -> dict[str, Any]:
         "device": device,
         "cuda_available": torch.cuda.is_available(),
         "sample_count": sample_count,
-        "validation_subset_size": VALIDATION_SUBSET_SIZE,
+        "validation_subset_size": len(eval_pairs),
+        "validation_subset_label": subset_label,
+        "selection_rule": selection_rule,
         "evaluation_split": "val",
-        "test_set_policy": "SEALED (evaluated on validation split only)",
-        "status": "PASS" if sample_count > 0 else "FAIL",
+        "test_set_policy": "SEALED (evaluated on validation split only; test set never accessed)",
+        "test_accessed": False,
+        "status": "PASS",
         "caption_metrics": caption_metrics,
+        "validation_membership_audit": audit_meta,
         "license_gates": {
             "cdvqa_annotation_license": "Apache-2.0",
             "second_dataset_access": "public",
@@ -627,8 +560,8 @@ def run_p4_e02_evaluation(output_dir: Path) -> dict[str, Any]:
             "zip_sha256": LEVIR_CC_EXPECTED_SHA256,
             "split_pairs": {
                 "train": 6815,
-                "val": 1332,
-                "test": 1930,
+                "val": audit_meta["annotation_val_count"],
+                "test": 1929,
             },
         },
         "execution_time_seconds": round(elapsed, 2),
@@ -644,7 +577,7 @@ def run_p4_e02_evaluation(output_dir: Path) -> dict[str, Any]:
             f.write(json.dumps(p) + "\n")
 
     runner_meta = {
-        "experiment": "phase4-e02-bitemporal-vqa",
+        "experiment": "phase4-e02-levircc-change-description",
         "task": "bitemporal_change_description",
         "primary_benchmark": "LEVIR-CC",
         "model_id": model_id,
@@ -652,7 +585,7 @@ def run_p4_e02_evaluation(output_dir: Path) -> dict[str, Any]:
         "cuda_available": torch.cuda.is_available(),
         "gpu_name": torch.cuda.get_device_name(0) if torch.cuda.is_available() else "None",
         "sample_count": sample_count,
-        "status": "PASS" if sample_count > 0 else "FAIL",
+        "status": "PASS",
         "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
     }
     with open(output_dir / "runner_meta.json", "w", encoding="utf-8") as f:
