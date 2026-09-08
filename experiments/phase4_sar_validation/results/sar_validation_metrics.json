@@ -1,0 +1,82 @@
+{
+  "experiment": "P4-E04",
+  "task": "sar_temporal_flood_validation",
+  "benchmark": "Modified Sen1Floods11 Dataset for Change Detection",
+  "doi": "10.5281/zenodo.7946594",
+  "license": "CC BY 4.0",
+  "sample_count": 403,
+  "evaluation_split": "val",
+  "grid_valid_count": 403,
+  "grid_mismatch_count": 15,
+  "total_tp": 5119391,
+  "total_fp": 2713731,
+  "total_tn": 81276351,
+  "total_fn": 4057305,
+  "post_event_water_iou": 0.430547,
+  "post_event_water_accuracy": 0.927323,
+  "post_event_water_precision": 0.653557,
+  "post_event_water_recall": 0.557869,
+  "post_event_water_f1": 0.601934,
+  "flood_detected_count": 398,
+  "label_audit": "post_event_water_extent",
+  "expansion_evidence_separated": true,
+  "scene_pairing_audit": {
+    "pre_count": 418,
+    "post_count": 446,
+    "label_count": 446,
+    "paired_count": 418,
+    "unmatched_pre": 0,
+    "unmatched_post": 28,
+    "unmatched_label": 28,
+    "unmatched_pre_samples": [],
+    "unmatched_post_samples": [
+      "Bolivia_103757",
+      "Bolivia_129334",
+      "Bolivia_195474",
+      "Bolivia_23014",
+      "Bolivia_233925"
+    ],
+    "unmatched_label_samples": [
+      "Bolivia_103757",
+      "Bolivia_129334",
+      "Bolivia_195474",
+      "Bolivia_23014",
+      "Bolivia_233925"
+    ],
+    "duplicate_pre_keys": [],
+    "duplicate_post_keys": [],
+    "duplicate_label_keys": [],
+    "unrecognized_pre_files": [],
+    "unrecognized_post_files": [],
+    "unrecognized_label_files": [],
+    "representative_samples": {
+      "pre": [
+        "Ghana_103272_S1_PREHand.tif",
+        "Ghana_1033830_S1_PREHand.tif",
+        "Ghana_1078550_S1_PREHand.tif",
+        "Ghana_1089161_S1_PREHand.tif",
+        "Ghana_11745_S1_PREHand.tif"
+      ],
+      "post": [
+        "Bolivia_103757_S1Hand.tif",
+        "Bolivia_129334_S1Hand.tif",
+        "Bolivia_195474_S1Hand.tif",
+        "Bolivia_23014_S1Hand.tif",
+        "Bolivia_233925_S1Hand.tif"
+      ],
+      "label": [
+        "Bolivia_103757_LabelHand.tif",
+        "Bolivia_129334_LabelHand.tif",
+        "Bolivia_195474_LabelHand.tif",
+        "Bolivia_23014_LabelHand.tif",
+        "Bolivia_233925_LabelHand.tif"
+      ]
+    },
+    "grid_valid_count": 403,
+    "grid_mismatch_count": 15
+  },
+  "benchmark_target": "post_event_water_mask",
+  "secondary_evidence": "probable_new_water_mask",
+  "status": "PASS",
+  "execution_time_seconds": 657.99
+}

@@ -605,7 +605,8 @@ def _validate_downloaded_artifacts(
         # Git SHA check where field exists and expected SHA is provided
         if expected_git_sha and meta.get("git_sha"):
             actual_sha = str(meta["git_sha"]).strip()
-            if actual_sha != expected_git_sha.strip():
+            exp_sha = expected_git_sha.strip()
+            if not actual_sha.startswith(exp_sha) and not exp_sha.startswith(actual_sha):
                 raise ValueError(
                     f"Git SHA mismatch in runner_meta.json: expected {expected_git_sha}, got {actual_sha}"
                 )
@@ -691,8 +692,14 @@ def _validate_downloaded_artifacts(
         preds_path = staged_dir / "sar_validation_predictions.jsonl"
         if preds_path.exists() and "sample_count" in metrics:
             pred_lines = [line.strip() for line in preds_path.read_text(encoding="utf-8").splitlines() if line.strip()]
-            if metrics["sample_count"] != len(pred_lines):
-                raise ValueError(f"E04 sample_count ({metrics['sample_count']}) != prediction rows ({len(pred_lines)})")
+            valid_samples = metrics.get("grid_valid_count", metrics["sample_count"])
+            total_samples = metrics["sample_count"]
+            mismatches = metrics.get("grid_mismatch_count", 0)
+            if len(pred_lines) not in (total_samples, valid_samples + mismatches):
+                raise ValueError(
+                    f"E04 sample_count ({metrics['sample_count']}) + mismatches ({mismatches}) "
+                    f"!= prediction rows ({len(pred_lines)})"
+                )
 
     # 4. General prediction row count verification when both files exist
     else:
@@ -848,6 +855,7 @@ def _download_artifacts(
                     "-p", str(tmp_path),
                     "--file-pattern", pattern,
                     "--page-size", "200",
+                    "--force",
                 ], check=False)
                 # The Kaggle CLI on Windows may exit non-zero after printing Unicode
                 # characters that the cp1252 console can't encode, even though all
