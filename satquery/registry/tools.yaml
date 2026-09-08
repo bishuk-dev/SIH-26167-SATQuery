@@ -66,3 +66,33 @@ tools:
         enum: [m2, ha, km2]
     output:
       - measurement
+  sar_temporal_change_v1:
+    version: "1.0.0"
+    input:
+      - t1_sar
+      - t2_sar
+      - polarization_semantics
+      - radiometric_domain
+    preconditions:
+      - explicit_polarizations
+      - verified_common_grid
+    parameters:
+      radiometric_domain:
+        enum: [backscatter_db, backscatter_linear]
+      threshold:
+        type: number
+        minimum: 0
+    output:
+      - sar_change_score
+      - binary_change_mask
+  mask_agreement_v1:
+    version: "1.0.0"
+    input:
+      - first_mask
+      - second_mask
+      - valid_mask
+    preconditions:
+      - masks_on_same_grid
+    parameters: {}
+    output:
+      - mask_iou_diagnostic
