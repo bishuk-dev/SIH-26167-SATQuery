@@ -1,2 +1,68 @@
 schema_version: 1
-tools: {}
+tools:
+  compute_ndvi_v1:
+    version: "1.0.0"
+    input:
+      - RED_band
+      - NIR_band
+      - valid_mask
+    preconditions:
+      - semantic_RED_band
+      - semantic_NIR_band
+      - equal_band_shapes
+    parameters: {}
+    output:
+      - masked_index_raster
+  compute_ndwi_v1:
+    version: "1.0.0"
+    input:
+      - GREEN_band
+      - NIR_band
+      - valid_mask
+    preconditions:
+      - semantic_GREEN_band
+      - semantic_NIR_band
+      - equal_band_shapes
+    parameters: {}
+    output:
+      - masked_index_raster
+  compute_mndwi_v1:
+    version: "1.0.0"
+    input:
+      - GREEN_band
+      - SWIR1_band
+      - valid_mask
+    preconditions:
+      - semantic_GREEN_band
+      - semantic_SWIR1_band
+      - equal_band_shapes
+    parameters: {}
+    output:
+      - masked_index_raster
+  temporal_difference_v1:
+    version: "1.0.0"
+    input:
+      - t1_raster
+      - t2_raster
+      - valid_mask
+    preconditions:
+      - verified_common_grid
+      - finite_temporal_values
+    parameters:
+      threshold:
+        type: number
+        minimum: 0
+    output:
+      - binary_change_mask
+  compute_mask_area_v1:
+    version: "1.0.0"
+    input:
+      - georeferenced_mask
+    preconditions:
+      - valid_mask_geometry
+      - geospatial_area_computable
+    parameters:
+      output_unit:
+        enum: [m2, ha, km2]
+    output:
+      - measurement
