@@ -1421,3 +1421,282 @@ Stop affected path and preserve evidence when any occurs:
 - Any STURM adaptation to Sen1Floods11 or RISAT: add only with an explicit radiometric/sensor transfer experiment and untouched holdout.
 - Temporal API routes, natural-language query routing, answer composition, UI overlays, and downloadable reports: canonical Phases 5–6.
 - Generic framework for arbitrary spectral indices/models: add only when a second concrete implementation cannot use the explicit registered tools.
+
+---
+
+# Post-Implementation Code-Quality Remediation Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:safe-refactor` with `superpowers:test-driven-development`, then `superpowers:verification-before-completion`. Execute one task per commit.
+
+**Reviewed against:** `4aa8a786213fce61cfe0ce8c7d3486135b051f59`
+
+**Goal:** Remove proven duplication in the Phase 4 implementation without changing scientific behavior, failure outcomes, evidence schemas, experiment outputs, or the intentionally separate production and benchmark boundaries.
+
+**Architecture:** Keep model-specific Protocols and adapters because their signatures are typed dependency-injection seams used by tests and future audited runtimes. Share only stable mechanics: checkpoint integrity checks, aligned RGB-pair preparation, and Phase 4 evaluator utilities. Keep specialist-specific domain constraints in their specialists and keep offline evaluator contracts independent from production inference contracts.
+
+**Tech Stack:** Python 3.11+, NumPy, Rasterio, Pydantic 2, pytest.
+
+**Spec:** Thermo-nuclear review supplied after Phase 4 closeout, vetted against `AGENTS.md`, `docs/ARCHITECTURE.md`, `docs/FAILURE_POLICY.md`, existing tests, and the Phase 4 scope in this plan.
+
+## Review Disposition
+
+| Review item | Decision | Reason |
+|---|---|---|
+| Replace all specialist adapters with one generic `CheckpointedBackend` | **Reject** | `StructuralChangeBackend`, `ChangeCaptionBackend`, and `FloodBackend` intentionally expose different typed method contracts and support fake injection. A generic callable wrapper would save little while hiding model-specific signatures and provenance. |
+| Share checkpoint hashing/verification | **Accept, narrowed** | The three new specialist modules duplicate the same integrity mechanism. Share that mechanism only; retain each named adapter and its fail-closed runtime message. Do not sweep historical evaluators or unrelated ingestion/visualization modules merely to remove a one-line hash helper. |
+| Remove checks duplicated after `require_domain` | **Accept, narrowed** | Modality checks in both optical specialists and modality/sensor/polarization checks in `flood.py` exactly repeat the canonical gate. Remove only exact duplicates. Keep STURM radiometric-domain set, calibration, GSD, dimensions, NoData, and georeferencing checks because they are model-specific and are not fully represented by `require_domain`. |
+| Add GSD, calibration, and band-description options to `require_domain` | **Reject** | Those constraints differ by specialist and would turn the small universal gate into a model-policy parameter bag. Add a shared optical-pair input helper for the two real callers instead. |
+| Share optical aligned-pair validation and RGB reads | **Accept, relocated** | The duplication is real, but `satquery/analytics/temporal.py` is the deterministic GIS layer. Model tensor preparation belongs in `satquery/inference/temporal_inputs.py`. Temporal-order policy remains in captioning because structural change accepts explicit user ordering. |
+| Centralize API exception mapping | **Defer** | No `apps/api` file changed on this branch, and this plan explicitly keeps temporal API routing in Phases 5–6. Refactoring existing Phase 2/3 routes here would expand scope and risk public response-contract drift without enabling Phase 4. Revisit when the first temporal route is added. |
+| Share all evaluation orchestration and CLI code | **Reject** | P4-E01 through P4-E04 have different manifests, splits, outputs, result types, and scientific controls. A common runner/template would obscure those contracts. Share only byte-identical path, hash, and binary-metric functions. |
+| Reuse production backend Protocols in evaluators | **Reject** | `AGENTS.md` requires benchmark adapters to remain separate from production scientific APIs. The structurally typed evaluator Protocols are cheap and intentionally decouple offline evaluation. Remove the unused concrete `ChangerExBackend` import instead. |
+| Refactor `_parse_audit_file` into one generic Pydantic parse | **Reject for this pass** | The loader intentionally accepts heterogeneous audit metadata, then applies dataset-specific typing and explicit PASS/BLOCKED policy checks. A generic model would either admit the same loose shape behind more machinery or require a separate scientific-contract migration. |
+| Remove unused `ValidationError` import | **Accept** | It has no special purpose and no callers. |
+| Split files due to the 1,000-line rule | **No action** | No changed source file crossed 1,000 lines. `scripts/kaggle/runner.py` remains below the threshold and is outside this cleanup. |
+
+## Global Constraints for Tasks 14–17
+
+- Preserve exception classes, fail-closed ordering, accepted/rejected input domains, evidence fields, mask bytes, hashes, metrics, and JSON/JSONL schemas.
+- Do not modify frozen experiment artifacts, registries, model contracts, thresholds, preprocessing profiles, notebooks, API routes, or documentation outside `plan.md`.
+- Do not add a generic backend factory, generic model runner, evaluator framework, or new dependency.
+- Characterize behavior before moving logic. Existing fake backend seams must continue to work without inheritance or casts.
+- Do not claim Phase 4 scientific support: the recorded closeout remains `BLOCKED`, and these are maintainability changes only.
+- If a proposed extraction changes an error type, output path, serialized field, numerical result, or hash, stop and report instead of updating expectations.
+
+### Task 14: Centralize New-Specialist Checkpoint Integrity
+
+**Files:**
+- Create: `satquery/inference/checkpoints.py`
+- Modify: `satquery/inference/change_detection.py`
+- Modify: `satquery/inference/change_captioning.py`
+- Modify: `satquery/inference/flood.py`
+- Modify: `tests/inference/test_change_detection.py`
+- Modify: `tests/inference/test_change_captioning.py`
+- Modify: `tests/inference/test_flood.py`
+
+**Interfaces:**
+- Produces: `sha256_file(path: Path) -> str`.
+- Produces: `require_checkpoint(path: Path, expected_sha256: str, *, model_name: str) -> None` raising `ModelUnavailableError` with the existing `<model> checkpoint is unavailable|invalid` messages.
+- Preserves: all three named backend Protocols and adapter classes unchanged at their public boundaries.
+
+- [x] **Step 1: Add characterization tests before extraction**
+
+For each concrete adapter, invoke its public method and assert that a missing checkpoint and a wrong digest raise `ModelUnavailableError`. Keep the existing model label in the message:
+
+```python
+with pytest.raises(ModelUnavailableError, match="ChangerEx checkpoint is unavailable"):
+    ChangerExBackend(missing, "0" * 64, predictor=fake_predictor).predict(t1, t2)
+
+checkpoint.write_bytes(b"not-the-registered-checkpoint")
+with pytest.raises(ModelUnavailableError, match="checkpoint hash is invalid"):
+    Chg2CapBackend(checkpoint, "0" * 64, captioner=fake_captioner).caption(t1, t2)
+```
+
+Add the equivalent STURM assertion in `tests/inference/test_flood.py`.
+
+- [x] **Step 2: Run tests to establish the behavior baseline**
+
+```bash
+python -m pytest tests/inference/test_change_detection.py tests/inference/test_change_captioning.py tests/inference/test_flood.py -v
+```
+
+Expected: PASS before refactoring.
+
+- [x] **Step 3: Extract only integrity mechanics**
+
+Implement:
+
+```python
+def sha256_file(path: Path) -> str:
+    with path.open("rb") as handle:
+        return hashlib.file_digest(handle, "sha256").hexdigest()
+
+
+def require_checkpoint(path: Path, expected_sha256: str, *, model_name: str) -> None:
+    if not path.is_file():
+        raise ModelUnavailableError(f"{model_name} checkpoint is unavailable")
+    if sha256_file(path) != expected_sha256:
+        raise ModelUnavailableError(f"{model_name} checkpoint hash is invalid")
+```
+
+Replace the three private checkpoint-verification implementations and use `sha256_file` for derived mask hashes in change detection and flood. Remove only now-unused `hashlib` imports and the unused `ValidationError` import. Do not alter backend Protocols, constructor parameters, callable injection, or runtime-unavailable behavior.
+
+- [x] **Step 4: Verify and commit**
+
+```bash
+python -m pytest tests/inference/test_change_detection.py tests/inference/test_change_captioning.py tests/inference/test_flood.py -v
+python -m compileall -q satquery/inference
+
+git diff --check
+git add satquery/inference/checkpoints.py satquery/inference/change_detection.py \
+  satquery/inference/change_captioning.py satquery/inference/flood.py tests/inference
+git commit -m "refactor: share specialist checkpoint verification"
+```
+
+### Task 15: Canonicalize Temporal RGB Input Preparation
+
+**Files:**
+- Create: `satquery/inference/temporal_inputs.py`
+- Modify: `satquery/inference/change_detection.py`
+- Modify: `satquery/inference/change_captioning.py`
+- Modify: `satquery/inference/flood.py`
+- Create: `tests/inference/test_temporal_inputs.py`
+- Modify: `tests/inference/test_change_detection.py`
+- Modify: `tests/inference/test_change_captioning.py`
+- Modify: `tests/inference/test_flood.py`
+
+**Interfaces:**
+- Produces: `read_aligned_rgb_pair(t1: ObservationState, t2: ObservationState) -> tuple[np.ndarray, np.ndarray]`.
+- Preserves: captioning's metadata-based `T1 < T2` rule and structural change's explicit-user-mapping order source.
+- Preserves: STURM's accepted radiometric domains (`backscatter_db` and `backscatter_linear`) and all specialist-specific checks.
+
+- [x] **Step 1: Characterize shared and distinct policies**
+
+Add focused tests proving that `read_aligned_rgb_pair` rejects missing georeferencing, shifted transforms, and non-`("R", "G", "B")` semantics, and returns two `(3, H, W)` float32 arrays for a valid pair. Keep service tests proving captioning rejects unknown/reversed time while structural change does not begin requiring metadata order.
+
+Add flood tests for wrong modality, sensor, polarization, radiometric domain, calibration, GSD, and georeferencing. These tests distinguish checks owned by `require_domain` from checks that must remain local.
+
+- [x] **Step 2: Run the characterization suite**
+
+```bash
+python -m pytest tests/inference/test_temporal_inputs.py \
+  tests/inference/test_change_detection.py \
+  tests/inference/test_change_captioning.py \
+  tests/inference/test_flood.py \
+  tests/verification/test_domain.py -v
+```
+
+Expected first run: FAIL only because `temporal_inputs.py` does not exist; existing service tests remain PASS.
+
+- [x] **Step 3: Implement the shared inference-layer helper**
+
+`read_aligned_rgb_pair` must:
+
+1. call `require_domain` for each observation with optical/multispectral modalities;
+2. require CRS and affine transforms on both observations;
+3. require exact equality of `(width, height, CRS, transform)` because these model services do not perform reprojection;
+4. require exact semantic band descriptions `("R", "G", "B")` on both observations;
+5. read bands `(1, 2, 3)` as float32 and divide by `255.0` only after every metadata check passes.
+
+Use a generic temporal-RGB error message; do not pass model-name strings or boolean modes into this helper. Keep temporal ordering in `ChangeCaptionService.describe` before calling the helper. `StructuralChangeService.detect` calls the helper directly.
+
+- [x] **Step 4: Remove only exact domain-gate duplicates in flood**
+
+After `require_domain(... supported_modalities=(SAR,), required_sensor_names=(...), required_polarizations=("VV", "VH"))`, delete the repeated modality, sensor-name, and polarization branches. Keep local checks for:
+
+- radiometric domain membership in `{backscatter_db, backscatter_linear}`;
+- `CALIBRATION == calibrated`;
+- approximately 10 m X/Y GSD;
+- CRS and transform;
+- 128×128 dimensions, two channels, and NoData behavior.
+
+Do not extend `require_domain` in this task.
+
+- [x] **Step 5: Verify and commit**
+
+```bash
+python -m pytest tests/inference tests/verification/test_domain.py -v
+python -m compileall -q satquery/inference satquery/verification
+
+git diff --check
+git add satquery/inference/temporal_inputs.py satquery/inference/change_detection.py \
+  satquery/inference/change_captioning.py satquery/inference/flood.py \
+  tests/inference/test_temporal_inputs.py tests/inference/test_change_detection.py \
+  tests/inference/test_change_captioning.py tests/inference/test_flood.py
+git commit -m "refactor: share temporal RGB input checks"
+```
+
+### Task 16: Share Only Stable Phase 4 Evaluation Utilities
+
+**Files:**
+- Create: `ml/evaluation/common.py`
+- Modify: `ml/evaluation/run_p4_e01.py`
+- Modify: `ml/evaluation/run_p4_e02.py`
+- Modify: `ml/evaluation/run_p4_e03.py`
+- Modify: `ml/evaluation/run_p4_e04.py`
+- Create: `tests/ml/test_phase4_evaluation_common.py`
+- Modify: `tests/ml/test_p4_e01.py`
+- Modify: `tests/ml/test_p4_e02.py`
+- Modify: `tests/ml/test_p4_e03.py`
+- Modify: `tests/ml/test_p4_e04.py`
+
+**Interfaces:**
+- Produces: `resolve_under_root(root: Path, relative: str) -> Path`.
+- Produces: `verify_sha256(path: Path, expected: str) -> None` with the existing `ValueError("manifest hash mismatch: ...")` behavior.
+- Produces: `binary_confusion(prediction: np.ndarray, truth: np.ndarray, valid: np.ndarray | None = None) -> dict[str, int]`.
+- Produces: `binary_metrics(counts: Mapping[str, int]) -> dict[str, float | None]`.
+- Preserves: each evaluator's Protocol, manifest checks, split restrictions, threshold freeze, output rows, result type, and CLI.
+
+- [x] **Step 1: Add direct utility tests and strengthen output characterization**
+
+Test path traversal rejection, correct SHA-256 acceptance, digest mismatch rejection, valid-mask exclusion, empty-positive metric `None` values, and exact TP/FP/FN/TN calculations. In each existing P4 evaluator test, retain the current fixture and assert the complete `confusion` and `metrics` dictionaries (or caption counts for P4-E03), not only IoU.
+
+- [x] **Step 2: Run the baseline tests**
+
+```bash
+python -m pytest tests/ml/test_phase4_evaluation_common.py tests/ml/test_p4_e01.py \
+  tests/ml/test_p4_e02.py tests/ml/test_p4_e03.py tests/ml/test_p4_e04.py -v
+```
+
+Expected first run: FAIL only because `ml.evaluation.common` does not exist.
+
+- [x] **Step 3: Extract the four stable helpers**
+
+Move only the byte-identical path containment, digest verification, confusion-count, and binary-metric logic. `binary_confusion` treats `valid=None` as an all-valid mask; P4-E01 passes its real valid mask, while P4-E02 and P4-E04 omit it.
+
+Do not extract manifest parsing, sample loops, output serialization, argparse setup, thresholds, split logic, or caption evaluation. Keep `BinaryChangeBackend`, `CaptionBackend`, and `FloodEvaluationBackend` local to the benchmark modules. Remove the unused `ChangerExBackend` import from `run_p4_e02.py`.
+
+- [x] **Step 4: Prove serialized behavior remains unchanged**
+
+Run all four fixture evaluators and compare their generated JSON/JSONL fields through the strengthened tests. No golden scientific metrics or experiment artifacts may be regenerated.
+
+```bash
+python -m pytest tests/ml/test_phase4_evaluation_common.py tests/ml/test_p4_e01.py \
+  tests/ml/test_p4_e02.py tests/ml/test_p4_e03.py tests/ml/test_p4_e04.py -v
+python -m compileall -q ml/evaluation
+
+git diff --check
+git add ml/evaluation/common.py ml/evaluation/run_p4_e01.py ml/evaluation/run_p4_e02.py \
+  ml/evaluation/run_p4_e03.py ml/evaluation/run_p4_e04.py \
+  tests/ml/test_phase4_evaluation_common.py tests/ml/test_p4_e01.py \
+  tests/ml/test_p4_e02.py tests/ml/test_p4_e03.py tests/ml/test_p4_e04.py
+git commit -m "refactor: share phase 4 evaluation utilities"
+```
+
+### Task 17: Final Regression Gate
+
+**Files:** No source changes expected.
+
+- [x] **Step 1: Inspect the complete cleanup diff**
+
+```bash
+git diff 4aa8a786213fce61cfe0ce8c7d3486135b051f59...HEAD --stat
+git diff 4aa8a786213fce61cfe0ce8c7d3486135b051f59...HEAD -- satquery/inference ml/evaluation tests
+```
+
+Confirm there are no changes under `apps/api`, `models`, `satquery/registry`, `experiments`, or `notebooks`.
+
+- [x] **Step 2: Run affected and full verification**
+
+```bash
+python -m pytest tests/inference tests/verification tests/ml/test_p4_e01.py \
+  tests/ml/test_p4_e02.py tests/ml/test_p4_e03.py tests/ml/test_p4_e04.py -v
+python -m pytest
+python -m compileall -q satquery ml apps scripts
+git diff --check
+git status --short
+```
+
+Expected: all tests pass; compileall and diff checks are clean; only intentional source/test changes plus this planning document are present.
+
+- [x] **Step 3: Confirm scientific non-impact**
+
+Verify explicitly:
+
+- no experiment artifact or registry hash changed;
+- no accepted sensor, modality, polarization, radiometric domain, calibration, GSD, dimensions, grid, bands, or temporal-order rule changed;
+- no exception class or evidence schema changed;
+- no evaluator row key, metric formula, threshold, split, output path, or result type changed;
+- fake backends still satisfy Protocols structurally without inheritance.
+
+If any item differs, stop and revert the responsible task rather than redefining expected behavior.
