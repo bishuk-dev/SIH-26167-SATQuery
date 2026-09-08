@@ -49,6 +49,10 @@ def test_flood_metrics_reconstruct_from_saved_confusion_counts(tmp_path: Path) -
     )
 
     assert result["sample_count"] == 1
+    assert result["confusion"] == {"tp": 128 * 128, "fp": 0, "fn": 0, "tn": 0}
+    assert result["metrics"]["precision"] == pytest.approx(1.0)
+    assert result["metrics"]["recall"] == pytest.approx(1.0)
+    assert result["metrics"]["f1"] == pytest.approx(1.0)
     assert result["metrics"]["iou"] == pytest.approx(1.0)
 
 

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 from pathlib import Path
 from typing import Any, Literal, Protocol
@@ -11,7 +10,12 @@ from typing import Any, Literal, Protocol
 import numpy as np
 import rasterio
 
-from satquery.inference.change_detection import ChangerExBackend
+from ml.evaluation.common import (
+    binary_confusion,
+    binary_metrics,
+    resolve_under_root,
+    verify_sha256,
+)
 from satquery.inference.exceptions import ModelUnavailableError
 
 
@@ -45,11 +49,11 @@ def run_p4_e02(
     output_dir.mkdir(parents=True, exist_ok=True)
     rows = []
     for sample in samples:
-        t1 = _resolve(data_root, sample["t1"])
-        t2 = _resolve(data_root, sample["t2"])
-        label_path = _resolve(data_root, sample["label"])
+        t1 = resolve_under_root(data_root, sample["t1"])
+        t2 = resolve_under_root(data_root, sample["t2"])
+        label_path = resolve_under_root(data_root, sample["label"])
         for path, key in ((t1, "t1_sha256"), (t2, "t2_sha256"), (label_path, "label_sha256")):
-            _verify_hash(path, sample[key])
+            verify_sha256(path, sample[key])
         with rasterio.open(t1) as first, rasterio.open(t2) as second, rasterio.open(label_path) as label_file:
             first_rgb = first.read((1, 2, 3)).astype("float32") / 255.0
             second_rgb = second.read((1, 2, 3)).astype("float32") / 255.0
@@ -58,48 +62,14 @@ def run_p4_e02(
                 raise ValueError("ChangerEx backend returned invalid scores")
             truth = label_file.read(1) > 0
             prediction = scores >= threshold_value
-            counts = _confusion(prediction, truth)
+            counts = binary_confusion(prediction, truth)
         rows.append({"pair_id": sample["pair_id"], "split": split, "threshold": threshold_value, **counts})
     prediction_path = output_dir / "predictions.jsonl"
     prediction_path.write_text("".join(json.dumps(row, sort_keys=True) + "\n" for row in rows), encoding="utf-8")
     totals = {key: sum(row[key] for row in rows) for key in ("tp", "fp", "fn", "tn")}
-    result = {"schema_version": 1, "dataset": dataset, "split": split, "sample_count": len(rows), "prediction_path": str(prediction_path), "confusion": totals, "metrics": _metrics(totals)}
+    result = {"schema_version": 1, "dataset": dataset, "split": split, "sample_count": len(rows), "prediction_path": str(prediction_path), "confusion": totals, "metrics": binary_metrics(totals)}
     (output_dir / "metrics.json").write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
     return result
-
-
-def _confusion(prediction: np.ndarray, truth: np.ndarray) -> dict[str, int]:
-    return {
-        "tp": int(np.count_nonzero(prediction & truth)),
-        "fp": int(np.count_nonzero(prediction & ~truth)),
-        "fn": int(np.count_nonzero(~prediction & truth)),
-        "tn": int(np.count_nonzero(~prediction & ~truth)),
-    }
-
-
-def _metrics(counts: dict[str, int]) -> dict[str, float | None]:
-    tp, fp, fn = counts["tp"], counts["fp"], counts["fn"]
-    return {
-        "precision": tp / (tp + fp) if tp + fp else None,
-        "recall": tp / (tp + fn) if tp + fn else None,
-        "f1": 2 * tp / (2 * tp + fp + fn) if 2 * tp + fp + fn else None,
-        "iou": tp / (tp + fp + fn) if tp + fp + fn else None,
-    }
-
-
-def _resolve(root: Path, relative: str) -> Path:
-    root = root.resolve()
-    path = (root / relative).resolve()
-    if path != root and root not in path.parents:
-        raise ValueError("manifest path escapes data root")
-    return path
-
-
-def _verify_hash(path: Path, expected: str) -> None:
-    with path.open("rb") as file_handle:
-        actual = hashlib.file_digest(file_handle, "sha256").hexdigest()
-    if actual != expected:
-        raise ValueError(f"manifest hash mismatch: {path}")
 
 
 def main() -> None:

@@ -63,6 +63,10 @@ def test_p4_e02_metrics_reconstruct_from_prediction_rows(tmp_path: Path) -> None
     )
 
     assert result["sample_count"] == 1
+    assert result["confusion"] == {"tp": 2, "fp": 0, "fn": 0, "tn": 2}
+    assert result["metrics"]["precision"] == pytest.approx(1.0)
+    assert result["metrics"]["recall"] == pytest.approx(1.0)
+    assert result["metrics"]["f1"] == pytest.approx(1.0)
     assert result["metrics"]["iou"] == pytest.approx(1.0)
 
 

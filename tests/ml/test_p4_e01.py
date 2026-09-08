@@ -96,4 +96,8 @@ def test_runner_writes_reconstructible_fixture_metrics(tmp_path: Path) -> None:
     result = run_p4_e01(manifest_path, tmp_path, tmp_path / "out", split="validation")
 
     assert result["sample_count"] == 1
+    assert result["confusion"] == {"tp": 1, "fp": 0, "fn": 0, "tn": 3}
+    assert result["metrics"]["precision"] == pytest.approx(1.0)
+    assert result["metrics"]["recall"] == pytest.approx(1.0)
+    assert result["metrics"]["f1"] == pytest.approx(1.0)
     assert result["metrics"]["iou"] == pytest.approx(1.0)

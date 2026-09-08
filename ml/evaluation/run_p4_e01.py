@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 from pathlib import Path
 from typing import Any, Literal
@@ -11,6 +10,12 @@ from typing import Any, Literal
 import numpy as np
 import rasterio
 
+from ml.evaluation.common import (
+    binary_confusion,
+    binary_metrics,
+    resolve_under_root,
+    verify_sha256,
+)
 from satquery.analytics.spectral import compute_index
 from satquery.analytics.temporal import prepare_common_grid, threshold_temporal_difference
 
@@ -44,12 +49,12 @@ def run_p4_e01(
     threshold = float(payload.get("threshold", 0.05))
     for sample in samples:
         pair_id = str(sample["pair_id"])
-        t1 = _resolve(data_root, sample["t1"])
-        t2 = _resolve(data_root, sample["t2"])
-        label_path = _resolve(data_root, sample["label"])
-        _verify_hash(t1, sample["t1_sha256"])
-        _verify_hash(t2, sample["t2_sha256"])
-        _verify_hash(label_path, sample["label_sha256"])
+        t1 = resolve_under_root(data_root, sample["t1"])
+        t2 = resolve_under_root(data_root, sample["t2"])
+        label_path = resolve_under_root(data_root, sample["label"])
+        verify_sha256(t1, sample["t1_sha256"])
+        verify_sha256(t2, sample["t2_sha256"])
+        verify_sha256(label_path, sample["label_sha256"])
         aligned = prepare_common_grid(
             t1,
             t2,
@@ -81,7 +86,7 @@ def run_p4_e01(
                 threshold=threshold,
                 valid=valid,
             )
-            counts = _confusion(prediction, truth, valid)
+            counts = binary_confusion(prediction, truth, valid=valid)
             mask_path = output_dir / "masks" / f"{_safe_id(pair_id)}.tif"
             mask_path.parent.mkdir(parents=True, exist_ok=True)
             profile = first.profile.copy()
@@ -114,43 +119,10 @@ def run_p4_e01(
         "sample_count": len(rows),
         "predictions_path": str(predictions_path),
         "confusion": totals,
-        "metrics": _metrics(totals),
+        "metrics": binary_metrics(totals),
     }
     (output_dir / "metrics.json").write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
     return result
-
-
-def _confusion(prediction: np.ndarray, truth: np.ndarray, valid: np.ndarray) -> dict[str, int]:
-    return {
-        "tp": int(np.count_nonzero(prediction & truth & valid)),
-        "fp": int(np.count_nonzero(prediction & ~truth & valid)),
-        "fn": int(np.count_nonzero(~prediction & truth & valid)),
-        "tn": int(np.count_nonzero(~prediction & ~truth & valid)),
-    }
-
-
-def _metrics(counts: dict[str, int]) -> dict[str, float | None]:
-    tp, fp, fn = counts["tp"], counts["fp"], counts["fn"]
-    precision = tp / (tp + fp) if tp + fp else None
-    recall = tp / (tp + fn) if tp + fn else None
-    f1 = 2 * tp / (2 * tp + fp + fn) if 2 * tp + fp + fn else None
-    iou = tp / (tp + fp + fn) if tp + fp + fn else None
-    return {"precision": precision, "recall": recall, "f1": f1, "iou": iou}
-
-
-def _resolve(root: Path, relative: str) -> Path:
-    root = root.resolve()
-    path = (root / relative).resolve()
-    if path != root and root not in path.parents:
-        raise ValueError("manifest path escapes data root")
-    return path
-
-
-def _verify_hash(path: Path, expected: str) -> None:
-    with path.open("rb") as file_handle:
-        actual = hashlib.file_digest(file_handle, "sha256").hexdigest()
-    if actual != expected:
-        raise ValueError(f"manifest hash mismatch: {path}")
 
 
 def _safe_id(value: str) -> str:

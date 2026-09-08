@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -11,6 +10,8 @@ from typing import Any, Literal, Protocol
 
 import numpy as np
 import rasterio
+
+from ml.evaluation.common import resolve_under_root, verify_sha256
 
 
 class CaptionBackend(Protocol):
@@ -46,10 +47,10 @@ def run_p4_e03(
     output_dir.mkdir(parents=True, exist_ok=True)
     rows = []
     for sample in samples:
-        t1 = _resolve(data_root, sample["t1"])
-        t2 = _resolve(data_root, sample["t2"])
-        _verify_hash(t1, sample["t1_sha256"])
-        _verify_hash(t2, sample["t2_sha256"])
+        t1 = resolve_under_root(data_root, sample["t1"])
+        t2 = resolve_under_root(data_root, sample["t2"])
+        verify_sha256(t1, sample["t1_sha256"])
+        verify_sha256(t2, sample["t2_sha256"])
         with rasterio.open(t1) as first, rasterio.open(t2) as second:
             caption = backend.caption(
                 first.read((1, 2, 3)).astype("float32") / 255.0,
@@ -68,21 +69,6 @@ def run_p4_e03(
     )
     (output_dir / "metrics.json").write_text(json.dumps(asdict(result), default=str, indent=2) + "\n", encoding="utf-8")
     return result
-
-
-def _resolve(root: Path, relative: str) -> Path:
-    root = root.resolve()
-    path = (root / relative).resolve()
-    if path != root and root not in path.parents:
-        raise ValueError("manifest path escapes data root")
-    return path
-
-
-def _verify_hash(path: Path, expected: str) -> None:
-    with path.open("rb") as file_handle:
-        actual = hashlib.file_digest(file_handle, "sha256").hexdigest()
-    if actual != expected:
-        raise ValueError(f"manifest hash mismatch: {path}")
 
 
 def main() -> None:
