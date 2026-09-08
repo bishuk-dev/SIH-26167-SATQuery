@@ -1,0 +1,364 @@
+schema_version: 1
+
+audited_at: "2026-09-08"
+status: BLOCKED_PENDING_SOURCE_AND_CHECKPOINT_AUDIT
+
+datasets:
+  oscd:
+    status: BLOCKED
+    role: primary_benchmark
+    authority:
+      title: Onera Satellite Change Detection Dataset
+      landing_url: https://rcdaudt.github.io/oscd/
+      repository_url: null
+      doi: null
+      version: website_current_2026-06-15
+    license:
+      dataset_license: CC BY 4.0
+      imagery_terms: IEEE DataPort metadata declares CC BY 4.0; confirm downloadable archive terms before redistribution
+      redistribution_allowed: null
+    transport:
+      url: https://ieee-dataport.org/open-access/oscd-onera-satellite-change-detection
+      mirror_role: official_publisher_page
+      expected_files: []
+      expected_size_bytes: null
+      publisher_hashes: {}
+      locally_verified_sha256: null
+    contract:
+      modalities: [multispectral_optical]
+      sensors: [Sentinel-2]
+      bands_or_polarizations: [B01, B02, B03, B04, B05, B06, B07, B08, B8A, B09, B10, B11, B12]
+      radiometric_domain: not stated on project page; verify archive/code
+      spatial_resolution_m: [10, 20, 60]
+      pair_order: T1_then_T2
+      registration_claim: registered pairs according to project page; verify transforms in files
+      labels: pixel_level_binary_change; urban changes such as buildings and roads
+      label_limitations: [not a water-expansion ground truth, not a vegetation-loss ground truth]
+    splits:
+      authority_defined: true
+      grouping_unit: registered_temporal_pair
+      train: 14 pairs
+      validation: null
+      test: 10 pairs; labels now reported open by project page
+      test_sealed: false
+    references:
+      - url: https://rcdaudt.github.io/oscd/
+        supports: dataset size, bands, resolutions, registration, label scope
+      - url: https://ieee-dataport.org/open-access/oscd-onera-satellite-change-detection
+        supports: publisher page and CC BY 4.0 dataset metadata
+    blockers:
+      - archive file list, size, checksum, and on-disk transforms not frozen
+      - official page has no immutable dataset release identifier
+      - test must remain excluded from tuning despite public labels
+
+  sentinel2_l2a_demo:
+    status: BLOCKED
+    role: operational_demonstration_only
+    authority:
+      title: Sentinel-2 data products
+      landing_url: https://sentinels.copernicus.eu/sentinel-data-access/sentinel-products/sentinel-2-data-products
+      repository_url: null
+      doi: null
+      version: product-specific
+    license:
+      dataset_license: product and Copernicus terms vary by acquisition/provider
+      imagery_terms: record product-level terms with each selected pair
+      redistribution_allowed: null
+    transport:
+      url: https://dataspace.copernicus.eu/
+      mirror_role: official_provider
+      expected_files: []
+      expected_size_bytes: null
+      publisher_hashes: {}
+      locally_verified_sha256: null
+    contract:
+      modalities: [multispectral_optical]
+      sensors: [Sentinel-2 MSI]
+      bands_or_polarizations: [B02, B03, B04, B08, B11, B12]
+      radiometric_domain: surface_reflectance_L2A_required
+      spatial_resolution_m: product_band_specific
+      pair_order: acquisition_metadata_required
+      registration_claim: must verify per selected pair
+      labels: no benchmark labels; deterministic index demonstration
+      label_limitations: [not benchmark evidence, no learned change ground truth]
+    splits:
+      authority_defined: false
+      grouping_unit: acquisition_pair
+      train: none
+      validation: none
+      test: none
+      test_sealed: true
+    references:
+      - url: https://sentinels.copernicus.eu/sentinel-data-access/sentinel-products/sentinel-2-data-products
+        supports: Sentinel-2 product family
+      - url: https://dataspace.copernicus.eu/
+        supports: official acquisition provider
+    blockers:
+      - selected product IDs, acquisition metadata, checksums, and terms not frozen
+
+  levir_cd:
+    status: BLOCKED
+    role: primary_benchmark
+    authority:
+      title: LEVIR-CD
+      landing_url: https://justchenhao.github.io/LEVIR/
+      repository_url: https://github.com/justchenhao/LEVIR
+      doi: 10.3390/rs12101662
+      version: repository_head_fb19600da4dad999b6dd07c635a5c79fdf7bc935
+    license:
+      dataset_license: academic_only
+      imagery_terms: Google Earth terms apply; official page prohibits commercial use
+      redistribution_allowed: false
+    transport:
+      url: https://github.com/justchenhao/LEVIR
+      mirror_role: official_repository_with_external_image_links
+      expected_files: [train/A, train/B, train/label, val/A, val/B, val/label, test/A, test/B, test/label]
+      expected_size_bytes: null
+      publisher_hashes: {}
+      locally_verified_sha256: null
+    contract:
+      modalities: [optical_rgb]
+      sensors: [Google Earth imagery]
+      bands_or_polarizations: [R, G, B]
+      radiometric_domain: 8_bit_RGB_files; verify archive
+      spatial_resolution_m: 0.5
+      pair_order: A_pre_then_B_post
+      registration_claim: bitemporal image pairs; verify transforms/geographic supplement
+      labels: binary building-related change
+      label_limitations: [not generic land-cover change, not SAR, not multispectral index ground truth]
+    splits:
+      authority_defined: true
+      grouping_unit: geographic_region_and_temporal_pair
+      train: repository-defined
+      validation: repository-defined
+      test: repository-defined
+      test_sealed: true
+    references:
+      - url: https://justchenhao.github.io/LEVIR/
+        supports: size, resolution, geography, label scope, imagery terms
+      - url: https://github.com/justchenhao/LEVIR
+        supports: repository revision and data layout
+    blockers:
+      - archive bytes and hashes not frozen
+      - exact split manifest and geographic grouping not checked locally
+
+  s2looking:
+    status: BLOCKED
+    role: robustness_gate
+    authority:
+      title: S2Looking Change Detection Dataset
+      landing_url: https://github.com/S2Looking/Dataset
+      repository_url: https://github.com/S2Looking/Dataset
+      doi: null
+      version: repository_head_6a0e4b0e9cc0057a913132fa2963a192755259d6
+    license:
+      dataset_license: not stated in official README
+      imagery_terms: unresolved
+      redistribution_allowed: null
+    transport:
+      url: https://github.com/S2Looking/Dataset
+      mirror_role: official_repository_with_drive_links
+      expected_files: []
+      expected_size_bytes: null
+      publisher_hashes: {}
+      locally_verified_sha256: null
+    contract:
+      modalities: [optical_rgb]
+      sensors: [Gaofen, SuperView, Beijing-2 reported by proposal; verify authoritative dataset documentation]
+      bands_or_polarizations: [R, G, B]
+      radiometric_domain: unresolved
+      spatial_resolution_m: unresolved
+      pair_order: unresolved
+      registration_claim: off_nadir and registration difficulty reported by cited research; verify dataset documentation
+      labels: binary change expected; verify annotation semantics
+      label_limitations: [robustness only, no tuning, no promotion without license/contract audit]
+    splits:
+      authority_defined: false
+      grouping_unit: temporal_pair
+      train: unresolved
+      validation: unresolved
+      test: unresolved
+      test_sealed: true
+    references:
+      - url: https://github.com/S2Looking/Dataset
+        supports: official transport links and repository revision
+    blockers:
+      - official README does not provide license, versioned archive, split counts, or complete input contract
+      - source archive and annotation hashes not frozen
+
+  levir_cc:
+    status: BLOCKED
+    role: primary_benchmark
+    authority:
+      title: LEVIR-CC remote sensing change captioning dataset
+      landing_url: https://github.com/Chen-Yang-Liu/RSICC
+      repository_url: https://github.com/Chen-Yang-Liu/RSICC
+      doi: null
+      version: repository_head_d1505e514c450c3728782ca723e82761e70bafd3
+    license:
+      dataset_license: unresolved
+      imagery_terms: source repository points to dataset distribution; verify upstream terms
+      redistribution_allowed: null
+    transport:
+      url: https://github.com/Chen-Yang-Liu/RSICC
+      mirror_role: official_related_repository_with_external_data
+      expected_files: [LevirCCcaptions.json, images/train/A, images/train/B, images/val/A, images/val/B, images/test/A, images/test/B]
+      expected_size_bytes: null
+      publisher_hashes: {}
+      locally_verified_sha256: null
+    contract:
+      modalities: [optical_rgb]
+      sensors: [high_resolution_remote_sensing; verify source]
+      bands_or_polarizations: [R, G, B]
+      radiometric_domain: unresolved
+      spatial_resolution_m: unresolved
+      pair_order: A_pre_then_B_post
+      registration_claim: paired images; verify files and source documentation
+      labels: multiple natural-language change descriptions per pair
+      label_limitations: [caption references are not segmentation masks, captions cannot support area measurement]
+    splits:
+      authority_defined: true
+      grouping_unit: temporal_pair
+      train: repository-defined
+      validation: repository-defined
+      test: repository-defined
+      test_sealed: true
+    references:
+      - url: https://github.com/ShizhenChang/Chg2Cap
+        supports: official Chg2Cap data layout and A/B temporal semantics
+      - url: https://github.com/Chen-Yang-Liu/RSICC
+        supports: related dataset repository revision
+    blockers:
+      - dataset license and authoritative release terms unresolved
+      - exact caption counts, archive hashes, and split manifest not frozen
+
+  sturm_flood:
+    status: BLOCKED
+    role: primary_benchmark
+    authority:
+      title: STURM-Flood
+      landing_url: https://doi.org/10.5281/zenodo.12748982
+      repository_url: https://github.com/STURM-WEO/STURM-Flood
+      doi: 10.5281/zenodo.12748982
+      version: repository_head_c39d9bf8ba76302663c097ec4e905c918e1e131d
+    license:
+      dataset_license: unresolved at dataset-record level
+      imagery_terms: repository lists source terms; verify Zenodo record and source imagery terms
+      redistribution_allowed: null
+    transport:
+      url: https://doi.org/10.5281/zenodo.12748982
+      mirror_role: official_zenodo
+      expected_files: []
+      expected_size_bytes: null
+      publisher_hashes: {}
+      locally_verified_sha256: null
+    contract:
+      modalities: [sar, multispectral_optical]
+      sensors: [Sentinel-1, Sentinel-2]
+      bands_or_polarizations: [VV, VH, S2_multispectral]
+      radiometric_domain: unresolved; official README does not define S1 units
+      spatial_resolution_m: 10
+      pair_order: acquisition_metadata_required
+      registration_claim: corresponding water masks; verify files and metadata
+      labels: water/flood extent masks
+      label_limitations: [flood labels are not generic SAR change labels]
+    splits:
+      authority_defined: unresolved
+      grouping_unit: flood_event_and_tile
+      train: unresolved
+      validation: unresolved
+      test: unresolved
+      test_sealed: true
+    references:
+      - url: https://github.com/STURM-WEO/STURM-Flood
+        supports: tile counts, dimensions, resolution, event count, resource DOIs, repository license
+      - url: https://doi.org/10.5281/zenodo.12748982
+        supports: official dataset record
+    blockers:
+      - Zenodo record metadata/archive not retrieved
+      - exact archive files, hashes, split policy, S1 radiometric units, and labels not frozen
+
+  sen1floods11:
+    status: BLOCKED
+    role: independent_external_holdout
+    authority:
+      title: Sen1Floods11
+      landing_url: https://github.com/cloudtostreet/Sen1Floods11
+      repository_url: https://github.com/cloudtostreet/Sen1Floods11
+      doi: null
+      version: repository_head_b9e460dabe70230111a3c3d36cd0c5ce03606ee9
+    license:
+      dataset_license: unresolved in official README
+      imagery_terms: Sentinel-1 source terms require confirmation
+      redistribution_allowed: null
+    transport:
+      url: gs://sen1floods11/
+      mirror_role: official_publisher_bucket
+      expected_files: [S1, QC, Sen1Floods11_Metadata.geojson]
+      expected_size_bytes: null
+      publisher_hashes: {}
+      locally_verified_sha256: null
+    contract:
+      modalities: [sar]
+      sensors: [Sentinel-1]
+      bands_or_polarizations: [VV, VH]
+      radiometric_domain: backscatter_db
+      spatial_resolution_m: 10
+      pair_order: event_metadata_required
+      registration_claim: WGS84 512x512 chips; verify per file
+      labels: QC values -1 NoData, 0 Not Water, 1 Water
+      label_limitations: [independent holdout only, no threshold tuning]
+    splits:
+      authority_defined: true
+      grouping_unit: flood_event_and_chip
+      train: bucket-defined
+      validation: bucket-defined
+      test: bucket-defined
+      test_sealed: true
+    references:
+      - url: https://github.com/cloudtostreet/Sen1Floods11
+        supports: bucket, dimensions, CRS, dB/VV/VH, labels, metadata fields
+    blockers:
+      - bucket manifest, file hashes, license, and exact split files not frozen
+      - compatibility with STURM preprocessing not established
+
+  modified_sen1floods11:
+    status: BLOCKED
+    role: excluded_from_core
+    authority:
+      title: Modified Sen1Floods11
+      landing_url: https://github.com/cloudtostreet/Sen1Floods11
+      repository_url: https://github.com/cloudtostreet/Sen1Floods11
+      doi: null
+      version: not_selected
+    license:
+      dataset_license: not_audited
+      imagery_terms: not_audited
+      redistribution_allowed: null
+    transport:
+      url: null
+      mirror_role: not_selected
+      expected_files: []
+      expected_size_bytes: null
+      publisher_hashes: {}
+      locally_verified_sha256: null
+    contract:
+      modalities: []
+      sensors: []
+      bands_or_polarizations: []
+      radiometric_domain: unresolved
+      spatial_resolution_m: null
+      pair_order: unresolved
+      registration_claim: unresolved
+      labels: unresolved
+      label_limitations: [not part of mandatory Phase 4]
+    splits:
+      authority_defined: false
+      grouping_unit: temporal_pair
+      train: none
+      validation: none
+      test: none
+      test_sealed: true
+    references: []
+    blockers:
+      - deliberately excluded from core Phase 4; no acquisition authorized

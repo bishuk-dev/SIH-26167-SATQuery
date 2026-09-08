@@ -1,0 +1,100 @@
+schema_version: 1
+experiment_family: phase4_temporal_analytics
+status: BLOCKED_PENDING_SOURCE_AND_CHECKPOINT_AUDIT
+
+shared_policy:
+  source_git_sha: 7c92ad064999de7a33d116120491e7ce3aaf2ded
+  grouping_unit: temporal_pair_or_flood_event
+  development_splits: [validation]
+  sealed_splits: [test, external_holdout]
+  test_access: forbidden_until_design_freeze
+  threshold_tuning: validation_only
+  metric_rule: every aggregate must reconstruct from saved prediction or confusion rows
+  zero_sample_rule: report not_measured, never zero_score
+  output_rule: no source imagery, checkpoints, caches, or third_party_repository_files
+
+experiments:
+  P4-E01:
+    status: BLOCKED
+    hypothesis: Deterministic band-aware temporal operations produce reproducible multispectral evidence and measurements.
+    datasets: [oscd, sentinel2_l2a_demo]
+    model_or_tools: [compute_ndvi_v1, compute_ndwi_v1, compute_mndwi_v1, temporal_difference_v1, compute_mask_area_v1]
+    sample_selection:
+      source: OSCD official train/test pair declaration
+      development_split: train_or_declared_validation_only
+      robustness_split: null
+      sealed_splits: [oscd_test]
+      demonstration_samples: sentinel2_l2a_demo
+      seed: 0
+    preprocessing_profile_ids: [oscd_native_band_contract, sentinel2_l2a_l2a_reflectance_contract]
+    metrics: [valid_pixel_index_error, precision, recall, F1, IoU, area_MAE, area_relative_error]
+    sanities: [identity_pair_T1_T1, reversed_pair_T2_T1, deliberate_grid_misalignment, hand_calculated_index_fixture, projected_area_fixture, geographic_CRS_fixture]
+    output_files: [manifest.json, validation_predictions.jsonl, validation_result.json, provenance.json]
+    pass_condition: All semantic bands, masks, grids, formulas, and measurement paths pass deterministic fixtures; any benchmark metric has nonzero samples and reconstructible rows.
+    blockers: [oscd_archive_contract, sentinel2_selected_pair_contract]
+    stop_conditions: [missing_band_semantics, unverified_grid, missing_CRS_for_area, test_access]
+
+  P4-E02:
+    status: BLOCKED
+    hypothesis: ChangerEx-R18 supplies useful high-resolution structural-change masks on LEVIR-CD and exposes domain degradation on S2Looking.
+    datasets: [levir_cd, s2looking]
+    model_or_tools: [changerex_r18_levircd]
+    sample_selection:
+      source: official dataset split after local manifest verification
+      development_split: levir_cd_validation
+      robustness_split: s2looking_frozen_robustness
+      sealed_splits: [levir_cd_test]
+      seed: 0
+    preprocessing_profile_ids: [changerex_r18_levircd_frozen]
+    metrics: [precision, recall, F1, IoU, mIoU, Acc_at_IoU_0.5, absolute_domain_drop, relative_domain_drop, latency_ms, peak_vram_mb]
+    sanities: [identity_pair_T1_T1, reversed_pair_T2_T1, deliberate_misalignment, source_coordinate_round_trip, checkpoint_hash_check]
+    output_files: [levir_manifest.json, s2looking_manifest.json, validation_predictions.jsonl, robustness_predictions.jsonl, validation_result.json, robustness_result.json, provenance.json]
+    pass_condition: Official LEVIR-CD validation reproduces within frozen tolerance; unchanged checkpoint/profile/threshold then runs on S2Looking and reports degradation.
+    blockers: [checkpoint_bytes_and_sha256, immutable_model_source_revision, dataset_archive_hashes, s2looking_license_and_contract]
+    stop_conditions: [checkpoint_mismatch, unsupported_loader, official_metric_mismatch, test_access, robustness_tuning]
+
+  P4-E03:
+    status: BLOCKED
+    hypothesis: Chg2Cap provides more meaningful remote-sensing change captions than a generic single-image VLM.
+    datasets: [levir_cc]
+    model_or_tools: [chg2cap_levircc]
+    sample_selection:
+      source: official_related LEVIR-CC repository after local manifest verification
+      development_split: levir_cc_validation
+      robustness_split: null
+      sealed_splits: [levir_cc_test]
+      seed: 0
+    preprocessing_profile_ids: [chg2cap_levircc_frozen]
+    metrics: [BLEU_4, METEOR, ROUGE_L, CIDEr, caption_row_count, latency_ms, peak_vram_mb]
+    sanities: [identity_pair_T1_T1, reversed_pair_T2_T1, pair_order_check, caption_count_check, checkpoint_hash_check]
+    output_files: [manifest.json, validation_predictions.jsonl, validation_result.json, provenance.json]
+    pass_condition: Official/pretrained validation protocol and metric implementation are reproduced or discrepancy is explicitly documented; all references and predictions are preserved.
+    blockers: [checkpoint_hash_unavailable, levir_cc_license, exact_dataset_release, metric_protocol]
+    stop_conditions: [checkpoint_mismatch, missing_reference_rows, test_access, metric_substitution]
+
+  P4-E04:
+    status: BLOCKED
+    hypothesis: STURM Sentinel-1 U-Net supplies useful flood masks on its source domain while deterministic SAR evidence exposes contract limits on independent data.
+    datasets: [sturm_flood, sen1floods11]
+    model_or_tools: [sturm_sentinel1_unet, sar_temporal_change_v1, mask_agreement_v1]
+    sample_selection:
+      source: official dataset split after event-level manifest verification
+      development_split: sturm_flood_validation
+      robustness_split: sen1floods11_external_holdout
+      sealed_splits: [sturm_flood_test]
+      seed: 0
+    preprocessing_profile_ids: [sturm_sentinel1_frozen, sen1floods11_native_db_v1]
+    metrics: [precision, recall, F1, IoU, event_level_metrics, absolute_domain_drop, relative_domain_drop, identity_pair_false_positive_rate, mask_agreement_IoU, latency_ms, peak_vram_mb]
+    sanities: [identity_pair_T1_T1, known_db_difference_fixture, unknown_radiometric_domain_rejection, wrong_polarization_rejection, checkpoint_hash_check]
+    output_files: [sturm_manifest.json, sen1floods11_manifest.json, validation_predictions.jsonl, external_predictions.jsonl, validation_result.json, external_result.json, agreement_result.json, provenance.json]
+    pass_condition: STURM validation has nonzero samples and reconstructible segmentation metrics; external evaluation runs unchanged only when input contracts are compatible, otherwise records blocked status.
+    blockers: [Zenodo_record_unavailable, model_archive_and_hash, official_preprocessing, tensorflow_dependency, sen1floods11_compatibility]
+    stop_conditions: [unknown_SAR_domain, wrong_polarization, checkpoint_mismatch, test_access, external_threshold_tuning]
+
+promotion:
+  structural_change: requires P4-E02_pass
+  change_captioning: requires P4-E03_pass
+  flood_segmentation: requires P4-E04_pass
+  deterministic_tools: requires P4-E01_local_fixture_pass
+  risat_claim: forbidden_without_dedicated_sensor_transfer_experiment
+  cartosat_claim: forbidden_without_dedicated_sensor_transfer_experiment

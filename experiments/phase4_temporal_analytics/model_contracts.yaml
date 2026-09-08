@@ -1,0 +1,175 @@
+schema_version: 1
+
+audited_at: "2026-09-08"
+status: BLOCKED_PENDING_SOURCE_AND_CHECKPOINT_AUDIT
+
+models:
+  changerex_r18_levircd:
+    status: BLOCKED
+    role: primary
+    source:
+      repository_url: https://github.com/likyoo/open-cd
+      revision: main_head_790a1972b538baaaffd4c3022a4d9afaa3f861e5
+      license: Apache-2.0
+    checkpoint:
+      authority_url: https://huggingface.co/likyoo/Open-CD_Model_Zoo
+      repository_revision: 6b88e874f8dea7430a2ab1ed84b356c6a67128a
+      filename: LEVIR-CD/ChangerEx_r18-512x512_40k_levircd.pth
+      size_bytes: null
+      publisher_hashes: {}
+      unverified_candidate_size_bytes: 136880383
+      unverified_candidate_sha256: da3f569306dadd1fac5b64abc2a3d484571cd0ecf6410e1f152275cfe49a3618
+      locally_verified_sha256: null
+    contract:
+      task: structural_change_segmentation
+      training_domain: LEVIR-CD
+      sensor_domain: [high_resolution_optical_rgb]
+      band_order: [R, G, B]
+      radiometric_domain: 8_bit_RGB_unverified
+      input_shape: [2, 3, 512, 512]
+      normalization: Open-CD_config_unverified
+      temporal_order: T1_then_T2
+      output_semantics: binary_building_related_change_probability
+      threshold_or_decoder: official_Open-CD_decoder_unverified
+      source_config: configs/changer/changer_ex_r18_512x512_40k_levircd.py
+      source_config_revision: main_head_790a1972b538baaaffd4c3022a4d9afaa3f861e5
+    dependencies:
+      python: ">=3.11"
+      pytorch: unresolved
+      packages: [open-cd, mmengine, mmcv, mmpretrain, mmsegmentation, mmdet]
+      operating_system: [Linux_preferred_by_upstream_toolchain]
+    official_evaluation:
+      dataset: LEVIR-CD
+      split: repository_validation
+      command: python tools/test.py configs/changer/changer_ex_r18_512x512_40k_levircd.py CHECKPOINT
+      metrics: [mIoU, mFscore]
+    blockers:
+      - candidate checkpoint size and SHA-256 came from an unverified proposal and need local byte verification
+      - Hugging Face model-zoo revision is not yet tied to a signed/versioned Open-CD release
+      - exact dependency lock and safe checkpoint loading path are not frozen
+
+  chg2cap_levircc:
+    status: BLOCKED
+    role: primary
+    source:
+      repository_url: https://github.com/ShizhenChang/Chg2Cap
+      revision: main_head_7b8cda937002e614d51a6dab3d949aa7de77c176
+      license: MIT_code_only_academic_use_note_in_official_README
+    checkpoint:
+      authority_url: https://github.com/ShizhenChang/Chg2Cap
+      repository_revision: 7b8cda937002e614d51a6dab3d949aa7de77c176
+      filename: Google_Drive_checkpoint_linked_by_official_README
+      size_bytes: null
+      publisher_hashes: {}
+      locally_verified_sha256: null
+    contract:
+      task: change_captioning
+      training_domain: LEVIR-CC
+      sensor_domain: [high_resolution_optical_rgb]
+      band_order: [R, G, B]
+      radiometric_domain: unresolved
+      input_shape: unresolved
+      normalization: repository_config_unresolved
+      temporal_order: A_pre_then_B_post
+      output_semantics: natural_language_change_caption
+      threshold_or_decoder: autoregressive_decoder_repository_defined
+      source_config: repository_train_and_test_py
+      source_config_revision: 7b8cda937002e614d51a6dab3d949aa7de77c176
+    dependencies:
+      python: repository_requirements_unresolved
+      pytorch: repository_requirements_unresolved
+      packages: [repository_requirements_unresolved]
+      operating_system: [Linux_or_compatible_runtime_unverified]
+    official_evaluation:
+      dataset: LEVIR-CC
+      split: repository_test_unverified
+      command: python test.py
+      metrics: [BLEU-4, METEOR, ROUGE-L, CIDEr]
+    blockers:
+      - official repository links checkpoint through Google Drive without a published hash or immutable artifact identity
+      - LEVIR-CC source license and exact release are unresolved
+      - metric implementation and checkpoint reproducibility are not yet verified
+
+  sturm_sentinel1_unet:
+    status: BLOCKED
+    role: primary
+    source:
+      repository_url: https://github.com/STURM-WEO/STURM-Flood
+      revision: main_head_c39d9bf8ba76302663c097ec4e905c918e1e131d
+      license: CC_BY_SA_4.0_code_repository
+    checkpoint:
+      authority_url: https://doi.org/10.5281/zenodo.15189664
+      repository_revision: c39d9bf8ba76302663c097ec4e905c918e1e131d
+      filename: unresolved_until_Zenodo_record_is_retrieved
+      size_bytes: null
+      publisher_hashes:
+        md5: 14a046d9d7965f2a3c511acb1bbca57b
+      locally_verified_sha256: null
+    contract:
+      task: flood_segmentation
+      training_domain: STURM-Flood
+      sensor_domain: [Sentinel-1]
+      band_order: [VV, VH]
+      radiometric_domain: unresolved_from_official_repository
+      input_shape: [128, 128, 2]
+      normalization: unresolved_from_official_inference_notebook
+      temporal_order: single_flood_observation
+      output_semantics: water_or_flood_extent_mask
+      threshold_or_decoder: unresolved_from_official_inference_notebook
+      source_config: inference.ipynb
+      source_config_revision: c39d9bf8ba76302663c097ec4e905c918e1e131d
+    dependencies:
+      python: ">=3.8"
+      pytorch: not_used_by_official_repository
+      packages: [tensorflow, numpy, pandas, matplotlib, rasterio, scikit-learn, requests, tqdm]
+      operating_system: unresolved
+    official_evaluation:
+      dataset: STURM-Flood
+      split: unresolved
+      command: official_inference_notebook
+      metrics: [precision, recall, F1, IoU]
+    blockers:
+      - Zenodo model record was not retrieved during audit; checkpoint filename and bytes remain unknown
+      - model preprocessing, threshold, and radiometric domain are not frozen
+      - official implementation uses TensorFlow, which is absent from project dependencies
+
+  rscama_levircc:
+    status: BLOCKED
+    role: optional_challenger
+    source:
+      repository_url: https://github.com/Chen-Yang-Liu/RSCaMa
+      revision: main_head_aa68e4c6933c7dd0f2e2f9cbd7642d61929c86a5
+      license: unresolved
+    checkpoint:
+      authority_url: https://huggingface.co/lcybuaa/RSCaMa
+      repository_revision: null
+      filename: unresolved
+      size_bytes: null
+      publisher_hashes: {}
+      locally_verified_sha256: null
+    contract:
+      task: change_captioning
+      training_domain: LEVIR-CC
+      sensor_domain: [high_resolution_optical_rgb]
+      band_order: [R, G, B]
+      radiometric_domain: unresolved
+      input_shape: unresolved
+      normalization: unresolved
+      temporal_order: T1_then_T2
+      output_semantics: natural_language_change_caption
+      threshold_or_decoder: unresolved
+      source_config: unresolved
+      source_config_revision: null
+    dependencies:
+      python: unresolved
+      pytorch: unresolved
+      packages: [Mamba_unverified]
+      operating_system: [Linux_only_claim_requires_source_verification]
+    official_evaluation:
+      dataset: LEVIR-CC
+      split: unresolved
+      command: unresolved
+      metrics: [BLEU-4, METEOR, ROUGE-L, CIDEr]
+    blockers:
+      - optional only; no core execution authorized
+      - checkpoint, license, preprocessing, and dependency contract unresolved
