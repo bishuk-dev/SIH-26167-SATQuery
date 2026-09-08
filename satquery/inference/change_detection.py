@@ -25,8 +25,8 @@ from satquery.inference.exceptions import (
     ModelInputUnsupportedError,
     ModelUnavailableError,
 )
+from satquery.inference.temporal_inputs import read_aligned_rgb_pair
 from satquery.ingestion.models import Modality, ObservationState
-from satquery.verification.domain import require_domain
 
 
 class StructuralChangeBackend(Protocol):
@@ -73,9 +73,7 @@ class StructuralChangeService:
         self.threshold = threshold
 
     def detect(self, t1: ObservationState, t2: ObservationState) -> ChangeMaskEvidence:
-        _validate_pair(t1, t2)
-        first = _read_rgb(t1)
-        second = _read_rgb(t2)
+        first, second = read_aligned_rgb_pair(t1, t2)
         try:
             scores = np.asarray(self.backend.predict(first, second), dtype="float32")
         except ModelInputUnsupportedError:
@@ -130,37 +128,3 @@ class StructuralChangeService:
                 input_asset_id=t1.source_asset.asset_id,
             ),
         )
-
-
-def _validate_pair(t1: ObservationState, t2: ObservationState) -> None:
-    require_domain(t1, supported_modalities=(Modality.OPTICAL, Modality.MULTISPECTRAL))
-    require_domain(t2, supported_modalities=(Modality.OPTICAL, Modality.MULTISPECTRAL))
-    if t1.sensor.modality not in {Modality.OPTICAL, Modality.MULTISPECTRAL} or t2.sensor.modality not in {
-        Modality.OPTICAL,
-        Modality.MULTISPECTRAL,
-    }:
-        raise ModelInputUnsupportedError("ChangerEx requires optical RGB observations")
-    if t1.geo.crs is None or t2.geo.crs is None or t1.geo.transform is None or t2.geo.transform is None:
-        raise ModelInputUnsupportedError("ChangerEx requires verified georeferencing")
-    if (
-        t1.raster.width,
-        t1.raster.height,
-        t1.geo.crs,
-        t1.geo.transform,
-    ) != (
-        t2.raster.width,
-        t2.raster.height,
-        t2.geo.crs,
-        t2.geo.transform,
-    ):
-        raise ModelInputUnsupportedError("ChangerEx requires an aligned temporal pair")
-    for observation in (t1, t2):
-        semantics = tuple(band.description for band in observation.sensor.bands)
-        if semantics != ("R", "G", "B"):
-            raise ModelInputUnsupportedError("ChangerEx requires semantic R/G/B bands")
-
-
-def _read_rgb(observation: ObservationState) -> np.ndarray:
-    with rasterio.open(observation.source_asset.path) as source:
-        values = source.read((1, 2, 3)).astype("float32") / 255.0
-    return values

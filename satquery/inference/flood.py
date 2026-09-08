@@ -112,12 +112,6 @@ def _validate_observation(observation: ObservationState) -> None:
         required_sensor_names=("Sentinel-1", "Sentinel-1 C-SAR"),
         required_polarizations=("VV", "VH"),
     )
-    if observation.sensor.modality is not Modality.SAR:
-        raise ModelInputUnsupportedError("STURM requires SAR")
-    if observation.sensor.sensor_name not in {"Sentinel-1", "Sentinel-1 C-SAR"}:
-        raise ModelInputUnsupportedError("STURM only accepts audited Sentinel-1")
-    if observation.sensor.polarizations != ("VV", "VH"):
-        raise ModelInputUnsupportedError("STURM requires ordered VV/VH polarization")
     if observation.raster.tags.get("RADIOMETRIC_DOMAIN") not in {"backscatter_db", "backscatter_linear"}:
         raise ModelInputUnsupportedError("STURM requires an explicit radiometric domain")
     if observation.raster.tags.get("CALIBRATION") != "calibrated":
