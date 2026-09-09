@@ -91,3 +91,90 @@ class PairValidationResponse(ApiModel):
 class PairPage(ApiModel):
     items: tuple[PairValidationResponse, ...]
     next_cursor: str | None = None
+
+
+class AnalysisSummaryV1(ApiModel):
+    """History projection of one persisted analysis submission."""
+
+    analysis_id: str = Field(pattern=r"^ana_[0-9a-f]{32}$")
+    status: str
+    intent: str
+    created_at: datetime
+    updated_at: datetime
+    rerun_of: str | None = Field(default=None, pattern=r"^ana_[0-9a-f]{32}$")
+
+
+class AnalysisDetailV1(AnalysisSummaryV1):
+    observation_ids: tuple[str, ...] = ()
+    plan_hash: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+    registry_hash: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+
+
+class AnalysisPageV1(ApiModel):
+    items: tuple[AnalysisSummaryV1, ...]
+    next_cursor: str | None = None
+
+
+class EvidenceEdgeV1(ApiModel):
+    source_evidence_id: str = Field(pattern=r"^evidence_[0-9a-f]{32}$")
+    target_evidence_id: str = Field(pattern=r"^evidence_[0-9a-f]{32}$")
+    edge_type: str = Field(min_length=1)
+
+
+class EvidenceItemV1(ApiModel):
+    """Persisted evidence payload with local filesystem paths removed."""
+
+    evidence_id: str = Field(pattern=r"^evidence_[0-9a-f]{32}$")
+    created_at: datetime
+    evidence: dict[str, Any]
+
+
+class AnalysisEvidenceV1(ApiModel):
+    items: tuple[EvidenceItemV1, ...]
+    edges: tuple[EvidenceEdgeV1, ...]
+
+
+class TraceEventV1(ApiModel):
+    job_id: str = Field(pattern=r"^job_[0-9a-f]{32}$")
+    sequence: int = Field(ge=0)
+    event_type: str = Field(min_length=1)
+    created_at: datetime
+    payload: dict[str, Any]
+
+
+class AnalysisTraceV1(ApiModel):
+    items: tuple[TraceEventV1, ...]
+
+
+class AnalysisArtifactV1(ApiModel):
+    artifact_id: str = Field(pattern=r"^artifact_[0-9a-f]{32}$")
+    evidence_id: str | None = Field(default=None, pattern=r"^evidence_[0-9a-f]{32}$")
+    media_type: str = Field(min_length=1)
+    sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    size_bytes: int = Field(ge=0)
+
+
+class AnalysisArtifactsV1(ApiModel):
+    items: tuple[AnalysisArtifactV1, ...]
+
+
+class AnalysisReproducibilityV1(ApiModel):
+    """Exact frozen identities needed to reproduce one analysis."""
+
+    analysis_id: str = Field(pattern=r"^ana_[0-9a-f]{32}$")
+    status: str
+    plan_hash: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+    registry_hash: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+    observation_ids: tuple[str, ...] = ()
+    input_hashes: dict[str, str]
+    steps: tuple[dict[str, Any], ...]
+    artifacts: tuple[AnalysisArtifactV1, ...]
+
+
+class AnalysisRerunResponseV1(ApiModel):
+    analysis_id: str = Field(pattern=r"^ana_[0-9a-f]{32}$")
+    job_id: str = Field(pattern=r"^job_[0-9a-f]{32}$")
+    status: str
+    rerun_of: str = Field(pattern=r"^ana_[0-9a-f]{32}$")
+    plan_hash: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+    registry_hash: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
