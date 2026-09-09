@@ -22,6 +22,7 @@ from satquery.analytics.exceptions import (
     GridPreparationError,
     InvalidRasterArrayError,
     NoSpatialOverlapError,
+    SourceAssetIntegrityError,
 )
 from satquery.geo.pairing import PairValidator
 from satquery.ingestion.models import AffineTransform, ObservationState
@@ -189,45 +190,81 @@ def _reproject_onto_reference(
         f"{source.observation_id}_{resampling}_on_{reference.observation_id}_grid_valid.tif"
     )
 
+    destination_grid = (
+        reference.raster.height,
+        reference.raster.width,
+    )
     with rasterio.open(source_path) as src:
         if src.crs is None:
             raise GridPreparationError(
                 f"source raster file lacks CRS metadata: {source_path}"
             )
-        destination = np.zeros(
-            (src.count, reference.raster.height, reference.raster.width),
-            dtype=src.dtypes[0],
-        )
-        source_validity = (src.read_masks() > 0).all(axis=0).astype("uint8")
-        destination_validity = np.zeros(
-            (reference.raster.height, reference.raster.width), dtype="uint8"
-        )
-        warp_kwargs = {
+        warp_grid = {
             "src_transform": src.transform,
             "src_crs": src.crs,
             "dst_transform": reference_affine,
             "dst_crs": rasterio.crs.CRS.from_string(reference.geo.crs),
-            "resampling": _RESAMPLING[resampling],
         }
+        out_dtype = np.dtype(src.dtypes[0])
+        destination = np.zeros((src.count, *destination_grid), dtype=out_dtype)
+        # start optimistic; every band must declare support for a pixel to be valid
+        destination_validity = np.ones(destination_grid, dtype=bool)
+
         for band in range(1, src.count + 1):
-            band_values = np.zeros(
-                (reference.raster.height, reference.raster.width), dtype=src.dtypes[band - 1]
-            )
-            rasterio.warp.reproject(
-                source=rasterio.band(src, band),
-                destination=band_values,
-                src_nodata=src.nodatavals[band - 1],
-                dst_nodata=src.nodatavals[band - 1],
-                **warp_kwargs,
-            )
-            destination[band - 1] = band_values
-        rasterio.warp.reproject(
-            source=source_validity,
-            destination=destination_validity,
-            src_nodata=0,
-            dst_nodata=0,
-            **{**warp_kwargs, "resampling": Resampling.nearest},
-        )
+            band_data = src.read(band)
+            band_valid = src.read_masks(band) > 0
+            nodata = src.nodatavals[band - 1]
+            if nodata is not None:
+                with np.errstate(invalid="ignore"):
+                    band_valid &= band_data != nodata
+
+            if resampling == "bilinear":
+                # mask-aware normalized bilinear: invalid source pixels must
+                # never contaminate interpolated neighbours. Zero the invalid
+                # contributions, reproject data and support weights with the
+                # same kernel, then renormalize where support exists.
+                weight_source = band_valid.astype("float64")
+                data_source = np.where(band_valid, band_data.astype("float64"), 0.0)
+                numerator = np.zeros(destination_grid, dtype="float64")
+                weight = np.zeros(destination_grid, dtype="float64")
+                rasterio.warp.reproject(
+                    source=data_source,
+                    destination=numerator,
+                    resampling=Resampling.bilinear,
+                    **warp_grid,
+                )
+                rasterio.warp.reproject(
+                    source=weight_source,
+                    destination=weight,
+                    resampling=Resampling.bilinear,
+                    **warp_grid,
+                )
+                supported = weight > 0.0
+                values = np.zeros(destination_grid, dtype="float64")
+                np.divide(numerator, weight, out=values, where=supported)
+                destination[band - 1] = values.astype(out_dtype)
+                destination_validity &= supported
+            else:
+                band_out = np.zeros(destination_grid, dtype=out_dtype)
+                rasterio.warp.reproject(
+                    source=rasterio.band(src, band),
+                    destination=band_out,
+                    src_nodata=nodata,
+                    dst_nodata=nodata,
+                    resampling=Resampling.nearest,
+                    **warp_grid,
+                )
+                destination[band - 1] = band_out
+                validity_out = np.zeros(destination_grid, dtype="uint8")
+                rasterio.warp.reproject(
+                    source=band_valid.astype("uint8"),
+                    destination=validity_out,
+                    src_nodata=0,
+                    dst_nodata=0,
+                    resampling=Resampling.nearest,
+                    **warp_grid,
+                )
+                destination_validity &= validity_out > 0
 
         profile = src.profile.copy()
         profile.update(
@@ -244,7 +281,7 @@ def _reproject_onto_reference(
     valid_profile = profile.copy()
     valid_profile.update(count=1, dtype="uint8", nodata=0)
     with rasterio.open(valid_path, "w", **valid_profile) as target:
-        target.write(destination_validity, 1)
+        target.write(destination_validity.astype("uint8"), 1)
 
     return derived_path, valid_path
 
@@ -259,15 +296,24 @@ def prepare_common_grid(
 ) -> AlignedPair:
     """Place a temporal pair on exactly one declared observation grid.
 
-    Identical grids return the original paths untouched; otherwise only the
-    non-reference observation is reprojected (with an explicit valid-mask
-    raster) and originals stay byte-identical.
+    Source files are hash-verified against their registered SHA-256 before
+    anything else runs. Identical grids return the original paths untouched;
+    otherwise only the non-reference observation is reprojected (with an
+    explicit valid-mask raster) and originals stay byte-identical.
     """
 
     if resampling not in _RESAMPLING:
         raise ValueError(f"unsupported resampling method: {resampling!r}")
     if reference not in ("t1", "t2"):
         raise ValueError(f"reference must be 't1' or 't2', got {reference!r}")
+
+    for observation in (t1, t2):
+        actual = _file_sha256(Path(observation.source_asset.path))
+        if actual != observation.source_asset.sha256:
+            raise SourceAssetIntegrityError(
+                f"source asset hash mismatch for {observation.observation_id}: "
+                f"{observation.source_asset.path}"
+            )
 
     reference_observation, source_observation, warnings = _validate_before_alignment(
         t1, t2, reference

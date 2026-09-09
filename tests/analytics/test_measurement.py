@@ -82,18 +82,108 @@ def test_malformed_crs_rejects() -> None:
         )
 
 
-def test_geographic_crs_uses_geodesic_area_not_degree_squaring() -> None:
+def test_geographic_crs_uses_ellipsoidal_area_not_degree_squaring() -> None:
     transform = Affine(0.001, 0, 0, 0, -0.001, 0)
 
     result = measure_mask_area(
         np.array([[True]], dtype=bool), transform, "EPSG:4326", unit="m2"
     )
 
-    # a 0.001° x 0.001° cell at the equator on WGS84 is about 111.32 m per
-    # side; degrees squared would be ~1e-6 and a constant approximation
-    # would not vary with latitude
+    assert result.method == "ellipsoidal_parallel_band_sum"
+    # published WGS84 scale check: 0.001° of longitude at the equator is
+    # ~111.32 m and 0.001° of meridian arc is ~110.57 m; a degrees-squared
+    # computation would return ~1e-6 instead
     assert 11_000.0 < result.value < 13_000.0
-    assert result.method.startswith("geodesic")
+
+
+def _decimal_reference_band_area_m2(
+    lat_top_deg: float, lat_bottom_deg: float, delta_lon_deg: float
+) -> float:
+    """Independent WGS84 reference: closed-form antiderivative
+
+    F(phi) = a^2 (1 - e^2) [ u / (2(1 - e^2 u^2)) + artanh(e u) / (2e) ],
+    u = sin(phi), e^2 = f (2 - f), f = 1 / 298.257223563,
+
+    evaluated with ``decimal`` at 40 significant digits (independent of the
+    NumPy implementation under test). Cell area = delta-lon * (F(top) -
+    F(bottom)).
+    """
+
+    from decimal import Decimal, getcontext
+
+    getcontext().prec = 40
+
+    def sin_decimal(x: Decimal) -> Decimal:
+        term = x
+        total = x
+        n = 1
+        while True:
+            term = -term * x * x / Decimal((2 * n) * (2 * n + 1))
+            if abs(term) < Decimal("1e-38"):
+                return total
+            total += term
+            n += 1
+
+    inverse_flattening = Decimal("298.257223563")
+    flattening = Decimal(1) / inverse_flattening
+    eccentricity = (flattening * (2 - flattening)).sqrt()
+    semi_major = Decimal("6378137")
+    degrees_to_radians = Decimal(
+        "0.017453292519943295769236907684886127111602282460942"
+    )
+
+    def antiderivative(lat_deg: float) -> Decimal:
+        phi = Decimal(str(lat_deg)) * degrees_to_radians
+        u = sin_decimal(phi)
+        one_minus = 1 - eccentricity**2 * u**2
+        artanh = ((1 + eccentricity * u).ln() - (1 - eccentricity * u).ln()) / 2
+        return semi_major**2 * (1 - eccentricity**2) * (
+            u / (2 * one_minus) + artanh / (2 * eccentricity)
+        )
+
+    delta_lambda = Decimal(str(delta_lon_deg)) * degrees_to_radians
+    area = delta_lambda * (antiderivative(lat_top_deg) - antiderivative(lat_bottom_deg))
+    return float(abs(area))
+
+
+def test_equator_cell_matches_independent_wgs84_reference() -> None:
+    transform = Affine(0.001, 0, 0, 0, -0.001, 0)
+
+    result = measure_mask_area(
+        np.array([[True]], dtype=bool), transform, "EPSG:4326", unit="m2"
+    )
+    expected = _decimal_reference_band_area_m2(0.0, -0.001, 0.001)
+
+    assert result.value == pytest.approx(expected, rel=1e-9)
+
+
+def test_sixty_degree_cell_matches_independent_wgs84_reference() -> None:
+    transform = Affine(0.001, 0, 0, 0, -0.001, 60.001)
+
+    result = measure_mask_area(
+        np.array([[True]], dtype=bool), transform, "EPSG:4326", unit="m2"
+    )
+    expected = _decimal_reference_band_area_m2(60.001, 60.0, 0.001)
+
+    assert result.value == pytest.approx(expected, rel=1e-9)
+    # materially smaller than the equatorial cell: degrees are not metres
+    assert result.value < 0.6 * 12_300.0
+
+
+def test_ellipsoid_parameters_derive_eccentricity_from_flattening() -> None:
+    from rasterio.crs import CRS
+
+    from satquery.analytics.measurement import _ellipsoid_parameters
+
+    semi_major, flattening, eccentricity = _ellipsoid_parameters(CRS.from_epsg(4326))
+
+    assert semi_major == 6378137.0
+    expected_flattening = 1.0 / 298.257223563
+    assert flattening == pytest.approx(expected_flattening, rel=1e-15)
+    expected_eccentricity = (expected_flattening * (2.0 - expected_flattening)) ** 0.5
+    assert eccentricity == pytest.approx(expected_eccentricity, abs=1e-15)
+    # the value passed around must be the eccentricity, never the flattening
+    assert eccentricity != pytest.approx(flattening, abs=1e-3)
 
 
 def test_geographic_area_varies_with_latitude() -> None:

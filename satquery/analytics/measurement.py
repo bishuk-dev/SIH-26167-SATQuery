@@ -87,15 +87,24 @@ _DATUM_ELLIPSOIDS = {
 }
 
 
-def _ellipsoid(crs_object: CRS) -> tuple[float, float]:
+def _ellipsoid_parameters(crs_object: CRS) -> tuple[float, float, float]:
+    """Return ``(semi_major_metres, flattening, eccentricity)`` for the datum.
+
+    The eccentricity is derived explicitly from the flattening via
+    ``e = sqrt(f * (2 - f))``; the flattening itself is never used where an
+    eccentricity is required.
+    """
+
     datum = crs_object.to_dict().get("datum")
-    if datum in _DATUM_ELLIPSOIDS:
-        semi_major, inverse_flattening = _DATUM_ELLIPSOIDS[datum]
-        return semi_major, 1.0 / inverse_flattening
-    raise UnsupportedCrsMeasurementError(
-        f"geographic datum {datum!r} has no pinned ellipsoid parameters; "
-        "cannot measure area without guessing"
-    )
+    if datum not in _DATUM_ELLIPSOIDS:
+        raise UnsupportedCrsMeasurementError(
+            f"geographic datum {datum!r} has no pinned ellipsoid parameters; "
+            "cannot measure area without guessing"
+        )
+    semi_major, inverse_flattening = _DATUM_ELLIPSOIDS[datum]
+    flattening = 1.0 / inverse_flattening
+    eccentricity_squared = flattening * (2.0 - flattening)
+    return semi_major, flattening, math.sqrt(eccentricity_squared)
 
 
 def measure_mask_area(
@@ -150,7 +159,7 @@ def measure_mask_area(
                 "rotated geographic grids require a geodesic library; "
                 "only north-up geographic grids are supported exactly"
             )
-        semi_major, eccentricity = _ellipsoid(crs_object)
+        semi_major, _flattening, eccentricity = _ellipsoid_parameters(crs_object)
         rows = positives.shape[0]
         area_m2 = 0.0
         for row in range(rows):
@@ -162,7 +171,7 @@ def measure_mask_area(
             )
             delta_lambda = math.radians(abs(affine.a))
             area_m2 += int(positives[row].sum()) * band * delta_lambda
-        method = "geodesic_parallel_band_sum"
+        method = "ellipsoidal_parallel_band_sum"
     else:
         raise UnsupportedCrsMeasurementError(
             f"CRS {crs!r} is neither projected nor geographic; cannot measure area"

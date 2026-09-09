@@ -35,6 +35,7 @@ __all__ = [
     "MissingRequiredBandError",
     "NoSpatialOverlapError",
     "SingularTransformError",
+    "SourceAssetIntegrityError",
     "SpectralBandRole",
     "SpectralIndex",
     "UnsupportedCrsMeasurementError",

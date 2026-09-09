@@ -27,6 +27,10 @@ class SingularTransformError(InvalidRasterArrayError):
     """Raised when an affine transform is non-invertible or has zero area."""
 
 
+class SourceAssetIntegrityError(GridPreparationError):
+    """Raised when a source file no longer matches its registered SHA-256."""
+
+
 class CrsRequiredForMeasurementError(AnalyticsError):
     """Raised when an area cannot be computed without a valid spatial reference."""
 

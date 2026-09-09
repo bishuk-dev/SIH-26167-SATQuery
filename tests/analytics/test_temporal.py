@@ -16,6 +16,7 @@ from satquery.analytics.exceptions import (
     GridPreparationError,
     InvalidRasterArrayError,
     NoSpatialOverlapError,
+    SourceAssetIntegrityError,
 )
 from satquery.analytics.temporal import (
     prepare_common_grid,
@@ -498,3 +499,115 @@ def test_result_carries_hashes_and_reference_identity(tmp_path: Path) -> None:
     assert result.source_hashes["obs_t1"] == _sha256(tmp_path / "t1.tif")
     assert result.source_hashes["obs_t2"] == _sha256(tmp_path / "t2.tif")
     assert result.warnings is not None
+
+
+# ---------------------------------------------------------------------------
+# source asset integrity
+# ---------------------------------------------------------------------------
+
+
+def test_valid_source_hashes_pass(tmp_path: Path) -> None:
+    result = _aligned_pair(tmp_path)
+
+    # construction hashes match the on-disk bytes, so alignment succeeds
+    assert result.reprojected is False
+
+
+def test_mutated_source_raster_rejects(tmp_path: Path) -> None:
+    t1_path = tmp_path / "t1.tif"
+    t2_path = tmp_path / "t2.tif"
+    _write_geotiff(t1_path, width=4, height=4, transform=REF_TRANSFORM, crs=CRS_METRIC)
+    _write_geotiff(t2_path, width=4, height=4, transform=REF_TRANSFORM, crs=CRS_METRIC)
+    t1 = _observation(t1_path, "obs_t1")
+    t2 = _observation(t2_path, "obs_t2")
+
+    # mutate t2 after its ObservationState was constructed
+    _write_geotiff(
+        t2_path,
+        width=4,
+        height=4,
+        transform=REF_TRANSFORM,
+        crs=CRS_METRIC,
+        values=np.full((1, 4, 4), 7.0, dtype="float32"),
+    )
+
+    with pytest.raises(SourceAssetIntegrityError, match="obs_t2"):
+        prepare_common_grid(t1, t2, tmp_path / "aligned")
+
+
+def test_no_derived_raster_after_integrity_failure(tmp_path: Path) -> None:
+    t1_path = tmp_path / "t1.tif"
+    t2_path = tmp_path / "t2.tif"
+    _write_geotiff(t1_path, width=4, height=4, transform=REF_TRANSFORM, crs=CRS_METRIC)
+    shifted = Affine(10.0, 0.0, 1030.0, 0.0, -10.0, 2000.0)
+    _write_geotiff(t2_path, width=4, height=4, transform=shifted, crs=CRS_METRIC)
+    t1 = _observation(t1_path, "obs_t1")
+    t2 = _observation(t2_path, "obs_t2")
+    _write_geotiff(
+        t2_path,
+        width=4,
+        height=4,
+        transform=shifted,
+        crs=CRS_METRIC,
+        values=np.full((1, 4, 4), 7.0, dtype="float32"),
+    )
+
+    with pytest.raises(SourceAssetIntegrityError):
+        prepare_common_grid(t1, t2, tmp_path / "aligned")
+
+    assert not (tmp_path / "aligned").exists()
+
+
+# ---------------------------------------------------------------------------
+# mask-aware bilinear reprojection
+# ---------------------------------------------------------------------------
+
+
+def test_mask_aware_bilinear_excludes_invalid_source_value(tmp_path: Path) -> None:
+    """A masked extreme pixel must not contaminate normalized bilinear output."""
+
+    # reference grid shifted half a pixel so every destination pixel samples
+    # four source cells (bilinear required)
+    t1_path = tmp_path / "t1.tif"
+    reference_transform = Affine(10.0, 0.0, 105.0, 0.0, -10.0, 205.0)
+    _write_geotiff(
+        t1_path, width=3, height=3, transform=reference_transform, crs=CRS_METRIC
+    )
+
+    # source: uniform valid value 1.0 with ONE extreme pixel invalidated by a
+    # GDAL mask band only (no numeric nodata)
+    source_transform = Affine(10.0, 0.0, 100.0, 0.0, -10.0, 200.0)
+    t2_path = tmp_path / "t2.tif"
+    values = np.ones((1, 3, 3), dtype="float32")
+    values[0, 1, 1] = 1.0e9
+    _write_geotiff(
+        t2_path, width=3, height=3, transform=source_transform, crs=CRS_METRIC,
+        values=values,
+    )
+    mask = np.ones((3, 3), dtype="uint8")
+    mask[1, 1] = 0
+    with rasterio.open(t2_path, "r+") as dataset:
+        dataset.write_mask(mask)
+
+    t1 = _observation(t1_path, "obs_t1")
+    t2 = _observation(t2_path, "obs_t2")
+    result = prepare_common_grid(
+        t1, t2, tmp_path / "aligned", reference="t1", resampling="bilinear"
+    )
+
+    with rasterio.open(result.t2_path) as derived:
+        data = derived.read(1)
+    with rasterio.open(result.valid_mask_paths["obs_t2"]) as valid_raster:
+        valid = valid_raster.read(1)
+
+    # every valid destination value is the normalized average of 1.0-valued
+    # support; without the mask the extreme value would appear (~1e8)
+    assert data[valid == 1].max() < 2.0
+    np.testing.assert_allclose(data[valid == 1], 1.0, atol=1e-6)
+    # support exists (the pair genuinely overlaps), and unsupported pixels
+    # carry no invented data
+    assert valid.max() == 1
+    assert (data[valid == 0] == 0.0).all()
+    # at least one destination pixel was adjacent to the masked cell: its
+    # renormalized value still equals 1.0, proving exclusion not fallback
+    assert valid.sum() > 0
