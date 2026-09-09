@@ -8,7 +8,9 @@ tools:
     description: >-
       Absolute-change score between two co-observed SAR arrays under an
       explicitly contracted radiometric domain and semantic polarizations.
-      Unknown radiometric semantics (amplitude, complex, raw DN) reject.
+      The execution adapter publishes the derived binary mask as an immutable
+      artifact with source observation hashes. Unknown radiometric semantics
+      (amplitude, complex, raw DN) reject.
     inputs:
       - name: t1
         kind: observation_array
@@ -40,8 +42,9 @@ tools:
     executor: mask_agreement
     implementation: satquery.analytics.reconciliation.diagnostic_mask_agreement
     description: >-
-      Intersection/union/IoU between two binary masks over valid pixels.
-      Agreement is diagnostic only and maps to no decision policy.
+      Intersection/union/IoU between two immutable binary-mask evidence
+      artifacts over valid pixels. Agreement is diagnostic only and maps to no
+      decision policy.
     inputs:
       - name: first
         kind: mask
@@ -61,8 +64,8 @@ tools:
     executor: mask_area
     implementation: satquery.analytics.measurement.measure_mask_area
     description: >-
-      Measures positive pixels from a verified binary mask using CRS-safe
-      projected or geographic area calculation.
+      Measures positive pixels from immutable binary-mask evidence using
+      CRS-safe projected or geographic area calculation.
     inputs:
       - name: mask
         kind: mask

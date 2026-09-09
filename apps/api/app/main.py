@@ -50,6 +50,7 @@ from satquery.ingestion import (
 )
 from satquery.artifacts import ArtifactStore
 from satquery.execution import ExecutionEngine, JobRunner
+from satquery.execution.adapters import build_registered_adapters
 from satquery.persistence import Database, MetadataRepository
 from satquery.registry import (
     load_model_registry,
@@ -113,7 +114,9 @@ def create_app(
     application.state.runtime_capabilities = runtime_capabilities
     artifact_store = ArtifactStore(store.data_root)
     execution_engine = ExecutionEngine(
-        {}, artifact_store=artifact_store, tool_registry=tool_registry,
+        build_registered_adapters(tool_registry, artifact_store=artifact_store),
+        artifact_store=artifact_store,
+        tool_registry=tool_registry,
         timeout_seconds=float(os.environ.get("SATQUERY_TOOL_TIMEOUT_SECONDS", "300")),
     )
     application.state.artifact_store = artifact_store
