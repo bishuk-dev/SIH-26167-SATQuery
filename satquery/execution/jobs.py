@@ -80,7 +80,22 @@ class JobRunner:
             payload={"plan": plan.as_payload()},
         )
         self.repository.create_job(record)
-        self._append_event(job_id, ExecutionEventType.SUBMITTED, {"analysis_id": analysis_id})
+        return self.enqueue_existing(job_id)
+
+    def enqueue_existing(self, job_id: str) -> JobRecord:
+        """Submit an already-persisted QUEUED job to the in-process queue.
+
+        This supports API submission transactions that create the analysis,
+        immutable inputs, frozen plan, and job atomically before making the job
+        visible to workers.
+        """
+
+        record = self.repository.get_job(job_id)
+        if record is None:
+            raise KeyError(job_id)
+        if record.status is not JobStatus.QUEUED:
+            raise ValueError("only QUEUED jobs can be submitted")
+        self._append_event(job_id, ExecutionEventType.SUBMITTED, {"analysis_id": record.analysis_id})
         try:
             self._queue.put_nowait(job_id)
         except queue.Full as exc:
@@ -188,16 +203,16 @@ class JobRunner:
             cancel_event = self._cancel_events.setdefault(job.job_id, cancel_event)
         try:
             plan = ExecutionPlan.from_payload(job.payload["plan"])
+            metadata = dict(job.payload.get("metadata", {})) if isinstance(job.payload.get("metadata"), dict) else {}
+            metadata["event_callback"] = lambda event_type, payload: self._append_event(
+                job.job_id, event_type, payload
+            )
             context = ExecutionContext(
                 job_id=job.job_id,
                 analysis_id=job.analysis_id,
                 repository=self.repository,
                 cancel_event=cancel_event,
-                metadata={
-                    "event_callback": lambda event_type, payload: self._append_event(
-                        job.job_id, event_type, payload
-                    )
-                },
+                metadata=metadata,
             )
             self.engine.execute(plan, context)
             current = self.repository.get_job(job.job_id)

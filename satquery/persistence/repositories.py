@@ -67,6 +67,7 @@ _ANALYSIS_TRANSITIONS: dict[AnalysisStatus, frozenset[AnalysisStatus]] = {
     AnalysisStatus.PENDING: frozenset(
         {
             AnalysisStatus.RUNNING,
+            AnalysisStatus.FAILED,
             AnalysisStatus.ABSTAINED,
             AnalysisStatus.REJECTED,
             AnalysisStatus.CANCELLED,
@@ -95,7 +96,7 @@ for _terminal in (
 
 
 _JOB_TRANSITIONS: dict[JobStatus, frozenset[JobStatus]] = {
-    JobStatus.QUEUED: frozenset({JobStatus.RUNNING, JobStatus.CANCELLED}),
+    JobStatus.QUEUED: frozenset({JobStatus.RUNNING, JobStatus.FAILED, JobStatus.CANCELLED}),
     JobStatus.RUNNING: frozenset(
         {
             JobStatus.SUCCEEDED,
