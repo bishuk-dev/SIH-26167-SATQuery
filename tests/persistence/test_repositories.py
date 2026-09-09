@@ -526,3 +526,129 @@ def test_foreign_keys_enforced_after_reopen(repo: MetadataRepository, tmp_path: 
         reopened.create_pair(
             _pair("pair_" + "a" * 32, a, "obs_" + "1" * 32, _ts())
         )
+
+
+# ---------------------------------------------------------------------------
+# canonical exception contract (Task 2 follow-up FIX 1)
+# ---------------------------------------------------------------------------
+
+
+def test_persistence_integrity_error_is_canonical() -> None:
+    import satquery.persistence
+    from satquery.persistence.database import (
+        PersistenceIntegrityError as A,
+    )
+    from satquery.persistence.repositories import (
+        PersistenceIntegrityError as B,
+    )
+
+    assert satquery.persistence.PersistenceIntegrityError is A
+    assert A is B
+
+
+def test_pair_missing_fk_catchable_via_public_export(repo: MetadataRepository) -> None:
+    import satquery.persistence
+
+    with pytest.raises(satquery.persistence.PersistenceIntegrityError):
+        repo.create_pair(
+            _pair("pair_" + "e" * 32, "obs_" + "0" * 32, "obs_" + "1" * 32, _ts())
+        )
+
+
+def test_job_missing_analysis_catchable_via_public_export(
+    repo: MetadataRepository,
+) -> None:
+    import satquery.persistence
+
+    with pytest.raises(satquery.persistence.PersistenceIntegrityError):
+        repo.create_job(_job("job_" + "e" * 32, "ana_" + "0" * 32, _ts()))
+
+
+def test_invalid_event_sequence_catchable_via_public_export(
+    repo: MetadataRepository,
+) -> None:
+    import satquery.persistence
+
+    with pytest.raises(satquery.persistence.PersistenceIntegrityError):
+        repo.append_event(_event("event_" + "e" * 32, "job_" + "0" * 32, 0, _ts()))
+
+
+# ---------------------------------------------------------------------------
+# read/write transaction boundary (Task 2 follow-up FIX 2)
+# ---------------------------------------------------------------------------
+
+
+def test_reader_does_not_reserve_writer_slot(tmp_path: Path) -> None:
+    """WAL concurrency: an open read transaction must not block a writer."""
+
+
+    db_path = tmp_path / "satquery.db"
+    reader_db = Database(db_path)
+    reader_db.migrate()
+    reader = MetadataRepository(reader_db)
+    reader.create_observation(_observation("obs_" + "a" * 32, _ts()))
+
+    writer_db = Database(db_path)
+    writer = MetadataRepository(writer_db)
+
+    with reader_db.read_transaction() as reader_connection:
+        reader_connection.execute("SELECT COUNT(*) FROM observations").fetchone()
+        # while the read transaction is open, a second connection must be
+        # able to commit a write (old BEGIN IMMEDIATE reads blocked this)
+        writer.create_observation(
+            _observation("obs_" + "b" * 32, _ts(1))
+        )
+
+    assert writer.get_observation("obs_" + "b" * 32) is not None
+
+
+# ---------------------------------------------------------------------------
+# timestamp monotonicity (Task 2 follow-up hardening)
+# ---------------------------------------------------------------------------
+
+
+def test_job_updated_at_cannot_move_backwards(repo: MetadataRepository) -> None:
+    analysis = _analysis("ana_" + "a" * 32, _ts())
+    repo.create_analysis(analysis)
+    job = _job("job_" + "a" * 32, analysis.analysis_id, _ts())
+    repo.create_job(job)
+    repo.transition_job(job.job_id, JobStatus.QUEUED, JobStatus.RUNNING, updated_at=_ts(5))
+    # a later transition stamped before the persisted updated_at is stale
+    assert not repo.transition_job(
+        job.job_id, JobStatus.RUNNING, JobStatus.SUCCEEDED, updated_at=_ts(3)
+    )
+    # a properly ordered transition still succeeds afterwards
+    assert repo.transition_job(
+        job.job_id, JobStatus.RUNNING, JobStatus.SUCCEEDED, updated_at=_ts(6)
+    )
+
+
+def test_analysis_updated_at_cannot_move_backwards(repo: MetadataRepository) -> None:
+    record = _analysis("ana_" + "a" * 32, _ts())
+    repo.create_analysis(record)
+    repo.transition_analysis(
+        record.analysis_id, AnalysisStatus.PENDING, AnalysisStatus.RUNNING, updated_at=_ts(5)
+    )
+    assert not repo.transition_analysis(
+        record.analysis_id, AnalysisStatus.RUNNING, AnalysisStatus.SUCCEEDED, updated_at=_ts(1)
+    )
+
+
+def test_record_updated_at_before_created_at_rejected() -> None:
+    with pytest.raises(ValueError):
+        AnalysisRecord(
+            analysis_id="ana_" + "a" * 32,
+            status=AnalysisStatus.PENDING,
+            created_at=_ts(10),
+            updated_at=_ts(5),
+            payload={},
+        )
+    with pytest.raises(ValueError):
+        JobRecord(
+            job_id="job_" + "a" * 32,
+            analysis_id="ana_" + "a" * 32,
+            status=JobStatus.QUEUED,
+            created_at=_ts(10),
+            updated_at=_ts(5),
+            payload={},
+        )

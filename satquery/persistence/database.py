@@ -212,15 +212,35 @@ class Database:
 
     @contextmanager
     def transaction(self) -> Iterator[Connection]:
-        """Yield a connection inside an explicit BEGIN IMMEDIATE transaction.
-
-        Commits on success, rolls back on any exception, and always closes
+        """WRITE transaction: explicit BEGIN IMMEDIATE reserves the writer
+        slot. Commits on success, rolls back on any exception, always closes
         the connection.
         """
 
         connection = self._connect()
         try:
             connection.execute("BEGIN IMMEDIATE")
+            try:
+                yield connection
+                connection.commit()
+            except BaseException:
+                connection.rollback()
+                raise
+        finally:
+            connection.close()
+
+    @contextmanager
+    def read_transaction(self) -> Iterator[Connection]:
+        """READ transaction: deferred BEGIN, no writer reservation.
+
+        Reads must never issue BEGIN IMMEDIATE — under WAL a read snapshot
+        and an independent writer coexist, so holding a read open must not
+        block another connection's write.
+        """
+
+        connection = self._connect()
+        try:
+            connection.execute("BEGIN")
             try:
                 yield connection
                 connection.commit()

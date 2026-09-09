@@ -15,10 +15,14 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Literal
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 
 from satquery.ingestion.models import ContractModel
-from satquery.persistence.database import Database, PersistenceError
+from satquery.persistence.database import (
+    Database,
+    PersistenceError,
+    PersistenceIntegrityError,
+)
 
 # ---------------------------------------------------------------------------
 # errors
@@ -27,10 +31,6 @@ from satquery.persistence.database import Database, PersistenceError
 
 class RecordAlreadyExistsError(PersistenceError):
     """A record with the same primary key already exists."""
-
-
-class PersistenceIntegrityError(PersistenceError):
-    """A database constraint or structural expectation was violated."""
 
 
 class IllegalTransitionError(PersistenceError):
@@ -167,6 +167,14 @@ def _require_utc(value: datetime) -> datetime:
 class _PersistenceModel(ContractModel):
     # only models that declare these fields normalize them; check_fields=False
     # keeps the shared validator applicable across the record family
+    @model_validator(mode="after")
+    def _require_monotonic_timestamps(self) -> "_PersistenceModel":
+        updated = getattr(self, "updated_at", None)
+        created = getattr(self, "created_at", None)
+        if updated is not None and created is not None and updated < created:
+            raise ValueError("updated_at must not precede created_at")
+        return self
+
     @field_validator("created_at", "updated_at", check_fields=False)
     @classmethod
     def _normalize_to_utc(cls, value: datetime) -> datetime:
@@ -306,7 +314,7 @@ class MetadataRepository:
                 raise self._wrap_integrity_error(exc, "observations") from exc
 
     def get_observation(self, observation_id: str) -> ObservationRecord | None:
-        with self._db.transaction() as connection:
+        with self._db.read_transaction() as connection:
             row = connection.execute(
                 "SELECT observation_id, created_at, payload_json FROM observations"
                 " WHERE observation_id = ?",
@@ -319,7 +327,7 @@ class MetadataRepository:
     ) -> tuple[ObservationRecord, ...]:
         self._validate_limit(limit)
         clause, parameters = self._page_clause(cursor, "observations", "observation_id")
-        with self._db.transaction() as connection:
+        with self._db.read_transaction() as connection:
             rows = connection.execute(
                 "SELECT observation_id, created_at, payload_json FROM observations"
                 f" {clause} ORDER BY created_at DESC, observation_id DESC LIMIT ?",
@@ -355,7 +363,7 @@ class MetadataRepository:
                 raise self._wrap_integrity_error(exc, "pairs") from exc
 
     def get_pair(self, pair_id: str) -> PairRecord | None:
-        with self._db.transaction() as connection:
+        with self._db.read_transaction() as connection:
             row = connection.execute(
                 "SELECT pair_id, observation_a_id, observation_b_id, created_at,"
                 " payload_json FROM pairs WHERE pair_id = ?",
@@ -368,7 +376,7 @@ class MetadataRepository:
     ) -> tuple[PairRecord, ...]:
         self._validate_limit(limit)
         clause, parameters = self._page_clause(cursor, "pairs", "pair_id")
-        with self._db.transaction() as connection:
+        with self._db.read_transaction() as connection:
             rows = connection.execute(
                 "SELECT pair_id, observation_a_id, observation_b_id, created_at,"
                 f" payload_json FROM pairs {clause}"
@@ -407,7 +415,7 @@ class MetadataRepository:
                 raise self._wrap_integrity_error(exc, "analyses") from exc
 
     def get_analysis(self, analysis_id: str) -> AnalysisRecord | None:
-        with self._db.transaction() as connection:
+        with self._db.read_transaction() as connection:
             row = connection.execute(
                 "SELECT analysis_id, status, created_at, updated_at, payload_json"
                 " FROM analyses WHERE analysis_id = ?",
@@ -420,7 +428,7 @@ class MetadataRepository:
     ) -> tuple[AnalysisRecord, ...]:
         self._validate_limit(limit)
         clause, parameters = self._page_clause(cursor, "analyses", "analysis_id")
-        with self._db.transaction() as connection:
+        with self._db.read_transaction() as connection:
             rows = connection.execute(
                 "SELECT analysis_id, status, created_at, updated_at, payload_json"
                 f" FROM analyses {clause}"
@@ -455,8 +463,14 @@ class MetadataRepository:
         with self._db.transaction() as connection:
             cursor = connection.execute(
                 "UPDATE analyses SET status = ?, updated_at = ?"
-                " WHERE analysis_id = ? AND status = ?",
-                (target.value, encode_timestamp(updated_at), analysis_id, expected.value),
+                " WHERE analysis_id = ? AND status = ? AND updated_at <= ?",
+                (
+                    target.value,
+                    encode_timestamp(updated_at),
+                    analysis_id,
+                    expected.value,
+                    encode_timestamp(updated_at),
+                ),
             )
             return cursor.rowcount == 1
 
@@ -483,7 +497,7 @@ class MetadataRepository:
                 raise self._wrap_integrity_error(exc, "jobs") from exc
 
     def get_job(self, job_id: str) -> JobRecord | None:
-        with self._db.transaction() as connection:
+        with self._db.read_transaction() as connection:
             row = connection.execute(
                 "SELECT job_id, analysis_id, status, created_at, updated_at,"
                 " payload_json FROM jobs WHERE job_id = ?",
@@ -496,7 +510,7 @@ class MetadataRepository:
     ) -> tuple[JobRecord, ...]:
         self._validate_limit(limit)
         clause, parameters = self._page_clause(cursor, "jobs", "job_id")
-        with self._db.transaction() as connection:
+        with self._db.read_transaction() as connection:
             rows = connection.execute(
                 "SELECT job_id, analysis_id, status, created_at, updated_at,"
                 f" payload_json FROM jobs {clause}"
@@ -532,8 +546,14 @@ class MetadataRepository:
         with self._db.transaction() as connection:
             cursor = connection.execute(
                 "UPDATE jobs SET status = ?, updated_at = ?"
-                " WHERE job_id = ? AND status = ?",
-                (target.value, encode_timestamp(updated_at), job_id, expected.value),
+                " WHERE job_id = ? AND status = ? AND updated_at <= ?",
+                (
+                    target.value,
+                    encode_timestamp(updated_at),
+                    job_id,
+                    expected.value,
+                    encode_timestamp(updated_at),
+                ),
             )
             return cursor.rowcount == 1
 
@@ -588,7 +608,7 @@ class MetadataRepository:
                 raise self._wrap_integrity_error(exc, "execution_events") from exc
 
     def list_events(self, job_id: str) -> tuple[ExecutionEvent, ...]:
-        with self._db.transaction() as connection:
+        with self._db.read_transaction() as connection:
             rows = connection.execute(
                 "SELECT event_id, job_id, sequence, event_type, created_at,"
                 " payload_json FROM execution_events WHERE job_id = ?"
