@@ -2,7 +2,6 @@ import React, { useState, useRef, useEffect, useCallback } from "react";
 import {
   Satellite,
   Layers,
-  Sparkles,
   Share2,
   Download,
   ZoomIn,
@@ -29,6 +28,7 @@ import {
 import { cn } from "@/lib/utils";
 
 interface GeoAnalysisDashboardProps {
+  analysisId?: string;
   uploadedFileName?: string;
   uploadedFileSize?: string;
   initialQuery?: string;
@@ -36,12 +36,14 @@ interface GeoAnalysisDashboardProps {
 }
 
 export default function GeoAnalysisDashboard({
+  analysisId,
   uploadedFileName = "barcelona_port_multisensor.tif",
   uploadedFileSize = "48.2 MB",
   initialQuery = "Assess coastal port infrastructure changes between T0 and T1, and identify unpermitted shoreline backfill.",
   onBack,
 }: GeoAnalysisDashboardProps) {
   // ─── State ──────────────────────────────────────────────────────────────
+  const [isLoading, setIsLoading] = useState(true);
   const [query, setQuery] = useState(initialQuery);
   const [isRerunning, setIsRerunning] = useState(false);
   const [sliderPosition, setSliderPosition] = useState(50); // percentage
@@ -52,6 +54,15 @@ export default function GeoAnalysisDashboard({
   const [measureMode, setMeasureMode] = useState(false);
   const [activeReticle, setActiveReticle] = useState<number | null>(null);
   const [copiedShare, setCopiedShare] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+    }, 1200);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const showSkeleton = isLoading || isRerunning;
 
   // Panels visibility
   const [leftPanelOpen, setLeftPanelOpen] = useState(true);
@@ -179,6 +190,14 @@ export default function GeoAnalysisDashboard({
 
           {/* Raster Context */}
           <div className="hidden md:flex items-center gap-2 text-xs text-neutral-300">
+            {analysisId && (
+              <>
+                <span className="font-mono text-[10px] text-sky-300 bg-sky-500/10 border border-sky-400/20 px-2 py-0.5 rounded-full">
+                  ID: {analysisId}
+                </span>
+                <span className="w-1 h-1 rounded-full bg-white/20" />
+              </>
+            )}
             <span className="text-neutral-500 font-light">Raster:</span>
             <span className="font-mono text-[11px] text-neutral-200 bg-white/5 border border-white/10 px-2.5 py-0.5 rounded-full">
               {uploadedFileName}
@@ -194,8 +213,17 @@ export default function GeoAnalysisDashboard({
         <div className="flex items-center gap-2">
           {/* Status Pill */}
           <div className="hidden sm:flex items-center gap-2 px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-neutral-300 text-xs font-mono">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_6px_#34d399]" />
-            <span>Ready • Co-registered T0/T1</span>
+            {showSkeleton ? (
+              <>
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping shadow-[0_0_6px_#fbbf24]" />
+                <span className="text-amber-300">Co-registering T0/T1...</span>
+              </>
+            ) : (
+              <>
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_6px_#34d399]" />
+                <span>Ready • Co-registered T0/T1</span>
+              </>
+            )}
           </div>
 
           {/* Share Button */}
@@ -293,147 +321,205 @@ export default function GeoAnalysisDashboard({
 
           {/* Scrollable Telemetry Cards */}
           <div className="flex-1 overflow-y-auto p-3.5 space-y-3 custom-scrollbar">
-            {/* Detection Summary Card */}
-            <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3.5 space-y-2.5 shadow-sm">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5">
-                  <Activity className="w-3.5 h-3.5 text-sky-400" />
-                  <span className="text-xs font-medium text-white">
-                    Detection Summary
-                  </span>
+            {showSkeleton ? (
+              <div className="space-y-3 animate-pulse">
+                {/* Detection Summary Skeleton */}
+                <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3.5 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3.5 h-3.5 rounded-full bg-white/20" />
+                      <div className="w-28 h-3.5 rounded bg-white/20" />
+                    </div>
+                    <div className="w-20 h-4 rounded-full bg-white/10" />
+                  </div>
+                  <div className="space-y-1.5 pt-1">
+                    <div className="w-full h-3 rounded bg-white/15" />
+                    <div className="w-4/5 h-3 rounded bg-white/10" />
+                  </div>
+                  <div className="w-full h-1.5 bg-white/10 rounded-full" />
                 </div>
-                <span className="text-[11px] font-mono text-neutral-200 bg-white/10 px-2 py-0.5 rounded-full border border-white/10">
-                  94.2% Confidence
-                </span>
-              </div>
-              <p className="text-xs text-neutral-300 leading-relaxed font-light">
-                Built-up expansion detected in <strong className="text-white font-medium">Zone B-4</strong>. Radar backscatter increased by{" "}
-                <span className="text-sky-300 font-mono font-medium">+4.2 dB</span>, matching crane installations and eastern bulkhead reclamation.
-              </p>
-              <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-gradient-to-r from-blue-500 to-sky-400 rounded-full w-[94.2%]"
-                />
-              </div>
-            </div>
 
-            {/* Evidence Points */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-[11px] font-medium tracking-wider uppercase text-neutral-400 px-1">
-                <span>Detected Evidence Points</span>
-                <span className="text-sky-300 font-mono lowercase">3 verified</span>
-              </div>
+                {/* Evidence Points Skeleton */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between px-1">
+                    <div className="w-32 h-3 rounded bg-white/10" />
+                    <div className="w-14 h-3 rounded bg-white/10" />
+                  </div>
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="p-3 rounded-xl border border-white/10 bg-white/[0.02] space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="w-4 h-4 rounded-full bg-white/15" />
+                          <div className="w-36 h-3.5 rounded bg-white/20" />
+                        </div>
+                        <div className="w-12 h-3 rounded bg-white/10" />
+                      </div>
+                      <div className="flex justify-between pl-6">
+                        <div className="w-24 h-2.5 rounded bg-white/10" />
+                        <div className="w-20 h-2.5 rounded bg-white/10" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
 
-              {/* Point 1 */}
-              <button
-                type="button"
-                onClick={() => focusReticle(1)}
-                className={cn(
-                  "w-full text-left p-3 rounded-xl border transition-all group cursor-pointer",
-                  activeReticle === 1
-                    ? "border-white/30 bg-white/[0.08] shadow-lg shadow-black/40"
-                    : "border-white/10 bg-white/[0.02] hover:bg-white/[0.05] hover:border-white/20"
-                )}
-              >
-                <div className="flex items-center justify-between mb-1">
-                  <div className="flex items-center gap-2">
-                    <span className="w-4 h-4 rounded-full bg-white/10 border border-white/20 text-white font-mono text-[10px] font-medium flex items-center justify-center">
-                      1
-                    </span>
-                    <span className="text-xs font-medium text-white">
-                      Shoreline Bulkhead Backfill
+                {/* Context Note Skeleton */}
+                <div className="p-3 rounded-xl bg-white/[0.02] border border-white/10 flex items-start gap-2.5">
+                  <div className="w-4 h-4 rounded-full bg-white/15 shrink-0 mt-0.5" />
+                  <div className="w-full space-y-1.5">
+                    <div className="w-full h-2.5 rounded bg-white/10" />
+                    <div className="w-3/4 h-2.5 rounded bg-white/10" />
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <>
+                {/* Detection Summary Card */}
+                <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3.5 space-y-2.5 shadow-sm">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <Activity className="w-3.5 h-3.5 text-sky-400" />
+                      <span className="text-xs font-medium text-white">
+                        Detection Summary
+                      </span>
+                    </div>
+                    <span className="text-[11px] font-mono text-neutral-200 bg-white/10 px-2 py-0.5 rounded-full border border-white/10">
+                      94.2% Confidence
                     </span>
                   </div>
-                  <span className="font-mono text-[10px] text-neutral-400 group-hover:text-white flex items-center gap-0.5 group-hover:translate-x-0.5 transition-all">
-                    Inspect <ChevronRight className="w-3 h-3" />
-                  </span>
-                </div>
-                <div className="flex justify-between font-mono text-[11px] text-neutral-400 pl-6">
-                  <span className="text-neutral-300">+34,800 m² reclaimed</span>
-                  <span className="text-sky-300 font-medium">SAR Δ: +3.8 dB</span>
-                </div>
-              </button>
-
-              {/* Point 2 */}
-              <button
-                type="button"
-                onClick={() => focusReticle(2)}
-                className={cn(
-                  "w-full text-left p-3 rounded-xl border transition-all group cursor-pointer",
-                  activeReticle === 2
-                    ? "border-white/30 bg-white/[0.08] shadow-lg shadow-black/40"
-                    : "border-white/10 bg-white/[0.02] hover:bg-white/[0.05] hover:border-white/20"
-                )}
-              >
-                <div className="flex items-center justify-between mb-1">
-                  <div className="flex items-center gap-2">
-                    <span className="w-4 h-4 rounded-full bg-white/10 border border-white/20 text-white font-mono text-[10px] font-medium flex items-center justify-center">
-                      2
-                    </span>
-                    <span className="text-xs font-medium text-white">
-                      Crane &amp; Rail Infrastructure
-                    </span>
+                  <p className="text-xs text-neutral-300 leading-relaxed font-light">
+                    Built-up expansion detected in <strong className="text-white font-medium">Zone B-4</strong>. Radar backscatter increased by{" "}
+                    <span className="text-sky-300 font-mono font-medium">+4.2 dB</span>, matching crane installations and eastern bulkhead reclamation.
+                  </p>
+                  <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-blue-500 to-sky-400 rounded-full w-[94.2%]"
+                    />
                   </div>
-                  <span className="font-mono text-[10px] text-neutral-400 group-hover:text-white flex items-center gap-0.5 group-hover:translate-x-0.5 transition-all">
-                    Inspect <ChevronRight className="w-3 h-3" />
-                  </span>
                 </div>
-                <div className="flex justify-between font-mono text-[11px] text-neutral-400 pl-6">
-                  <span className="text-neutral-300">New Gantry Cranes</span>
-                  <span className="text-neutral-400">Berths 14-16</span>
-                </div>
-              </button>
 
-              {/* Point 3 */}
-              <button
-                type="button"
-                onClick={() => focusReticle(3)}
-                className={cn(
-                  "w-full text-left p-3 rounded-xl border transition-all group cursor-pointer",
-                  activeReticle === 3
-                    ? "border-white/30 bg-white/[0.08] shadow-lg shadow-black/40"
-                    : "border-white/10 bg-white/[0.02] hover:bg-white/[0.05] hover:border-white/20"
-                )}
-              >
-                <div className="flex items-center justify-between mb-1">
-                  <div className="flex items-center gap-2">
-                    <span className="w-4 h-4 rounded-full bg-white/10 border border-white/20 text-white font-mono text-[10px] font-medium flex items-center justify-center">
-                      3
-                    </span>
-                    <span className="text-xs font-medium text-white">
-                      Shipping Fairway Vessel Traffic
-                    </span>
+                {/* Evidence Points */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-[11px] font-medium tracking-wider uppercase text-neutral-400 px-1">
+                    <span>Detected Evidence Points</span>
+                    <span className="text-sky-300 font-mono lowercase">3 verified</span>
                   </div>
-                  <span className="font-mono text-[10px] text-neutral-400 group-hover:text-white flex items-center gap-0.5 group-hover:translate-x-0.5 transition-all">
-                    Inspect <ChevronRight className="w-3 h-3" />
-                  </span>
-                </div>
-                <div className="flex justify-between font-mono text-[11px] text-neutral-400 pl-6">
-                  <span className="text-neutral-300">8 active cargo transits</span>
-                  <span className="text-neutral-400">-14.2m channel</span>
-                </div>
-              </button>
-            </div>
 
-            {/* Tidal / Context Note */}
-            <div className="p-3 rounded-xl bg-white/[0.03] border border-white/10 text-neutral-300 flex items-start gap-2 text-xs font-light">
-              <Info className="w-4 h-4 text-sky-400 shrink-0 mt-0.5" />
-              <p className="text-[11px] leading-relaxed text-neutral-400">
-                Low-tide delta at T0 (-0.42m) compensated via EMODnet bathymetric baseline model. False positive shoreline shifts rejected.
-              </p>
-            </div>
+                  {/* Point 1 */}
+                  <button
+                    type="button"
+                    onClick={() => focusReticle(1)}
+                    className={cn(
+                      "w-full text-left p-3 rounded-xl border transition-all group cursor-pointer",
+                      activeReticle === 1
+                        ? "border-white/30 bg-white/[0.08] shadow-lg shadow-black/40"
+                        : "border-white/10 bg-white/[0.02] hover:bg-white/[0.05] hover:border-white/20"
+                    )}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center gap-2">
+                        <span className="w-4 h-4 rounded-full bg-white/10 border border-white/20 text-white font-mono text-[10px] font-medium flex items-center justify-center">
+                          1
+                        </span>
+                        <span className="text-xs font-medium text-white">
+                          Shoreline Bulkhead Backfill
+                        </span>
+                      </div>
+                      <span className="font-mono text-[10px] text-neutral-400 group-hover:text-white flex items-center gap-0.5 group-hover:translate-x-0.5 transition-all">
+                        Inspect <ChevronRight className="w-3 h-3" />
+                      </span>
+                    </div>
+                    <div className="flex justify-between font-mono text-[11px] text-neutral-400 pl-6">
+                      <span className="text-neutral-300">+34,800 m² reclaimed</span>
+                      <span className="text-sky-300 font-medium">SAR Δ: +3.8 dB</span>
+                    </div>
+                  </button>
+
+                  {/* Point 2 */}
+                  <button
+                    type="button"
+                    onClick={() => focusReticle(2)}
+                    className={cn(
+                      "w-full text-left p-3 rounded-xl border transition-all group cursor-pointer",
+                      activeReticle === 2
+                        ? "border-white/30 bg-white/[0.08] shadow-lg shadow-black/40"
+                        : "border-white/10 bg-white/[0.02] hover:bg-white/[0.05] hover:border-white/20"
+                    )}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center gap-2">
+                        <span className="w-4 h-4 rounded-full bg-white/10 border border-white/20 text-white font-mono text-[10px] font-medium flex items-center justify-center">
+                          2
+                        </span>
+                        <span className="text-xs font-medium text-white">
+                          Crane &amp; Rail Infrastructure
+                        </span>
+                      </div>
+                      <span className="font-mono text-[10px] text-neutral-400 group-hover:text-white flex items-center gap-0.5 group-hover:translate-x-0.5 transition-all">
+                        Inspect <ChevronRight className="w-3 h-3" />
+                      </span>
+                    </div>
+                    <div className="flex justify-between font-mono text-[11px] text-neutral-400 pl-6">
+                      <span className="text-neutral-300">New Gantry Cranes</span>
+                      <span className="text-neutral-400">Berths 14-16</span>
+                    </div>
+                  </button>
+
+                  {/* Point 3 */}
+                  <button
+                    type="button"
+                    onClick={() => focusReticle(3)}
+                    className={cn(
+                      "w-full text-left p-3 rounded-xl border transition-all group cursor-pointer",
+                      activeReticle === 3
+                        ? "border-white/30 bg-white/[0.08] shadow-lg shadow-black/40"
+                        : "border-white/10 bg-white/[0.02] hover:bg-white/[0.05] hover:border-white/20"
+                    )}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center gap-2">
+                        <span className="w-4 h-4 rounded-full bg-white/10 border border-white/20 text-white font-mono text-[10px] font-medium flex items-center justify-center">
+                          3
+                        </span>
+                        <span className="text-xs font-medium text-white">
+                          Shipping Fairway Vessel Traffic
+                        </span>
+                      </div>
+                      <span className="font-mono text-[10px] text-neutral-400 group-hover:text-white flex items-center gap-0.5 group-hover:translate-x-0.5 transition-all">
+                        Inspect <ChevronRight className="w-3 h-3" />
+                      </span>
+                    </div>
+                    <div className="flex justify-between font-mono text-[11px] text-neutral-400 pl-6">
+                      <span className="text-neutral-300">8 active cargo transits</span>
+                      <span className="text-neutral-400">-14.2m channel</span>
+                    </div>
+                  </button>
+                </div>
+
+                {/* Tidal / Context Note */}
+                <div className="p-3 rounded-xl bg-white/[0.03] border border-white/10 text-neutral-300 flex items-start gap-2 text-xs font-light">
+                  <Info className="w-4 h-4 text-sky-400 shrink-0 mt-0.5" />
+                  <p className="text-[11px] leading-relaxed text-neutral-400">
+                    Low-tide delta at T0 (-0.42m) compensated via EMODnet bathymetric baseline model. False positive shoreline shifts rejected.
+                  </p>
+                </div>
+              </>
+            )}
           </div>
 
           {/* Bottom Action (White pill matching home page) */}
           <div className="p-3.5 border-t border-white/10 bg-white/[0.02]">
-            <button
-              type="button"
-              onClick={() => setShowReportModal(true)}
-              className="w-full py-2.5 bg-white text-black hover:bg-neutral-200 font-medium text-xs rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-white/10 active:scale-98 cursor-pointer"
-            >
-              <FileText className="w-3.5 h-3.5" />
-              <span>Generate Change Report</span>
-            </button>
+            {showSkeleton ? (
+              <div className="w-full h-10 rounded-xl bg-white/10 animate-pulse" />
+            ) : (
+              <button
+                type="button"
+                onClick={() => setShowReportModal(true)}
+                className="w-full py-2.5 bg-white text-black hover:bg-neutral-200 font-medium text-xs rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-white/10 active:scale-98 cursor-pointer"
+              >
+                <FileText className="w-3.5 h-3.5" />
+                <span>Generate Change Report</span>
+              </button>
+            )}
           </div>
         </aside>
 
@@ -543,104 +629,134 @@ export default function GeoAnalysisDashboard({
                 </div>
               )}
 
-              {/* ─── RETICLE MARKER 1: Bulkhead Reclamation ─── */}
-              <div
-                className={cn(
-                  "absolute top-[44%] left-[36%] z-25 cursor-pointer transition-all duration-300 group",
-                  activeReticle === 1 && "scale-115"
-                )}
-                onClick={() => focusReticle(1)}
-              >
-                <div className="relative">
-                  <span className="w-6 h-6 rounded-full bg-[rgba(10,10,30,0.85)] backdrop-blur-md border border-white/40 text-white flex items-center justify-center text-xs font-medium shadow-xl hover:scale-110 transition-transform">
-                    1
-                  </span>
-                  {/* Frosted Tooltip Card */}
-                  <div
-                    style={glassPanelStyle}
-                    className={cn(
-                      "absolute left-8 -top-3 w-56 p-3 rounded-2xl border border-white/15 transition-all z-30",
-                      activeReticle === 1 ? "opacity-100 scale-100" : "opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto"
-                    )}
-                  >
-                    <div className="flex items-center justify-between text-white text-xs font-medium mb-1">
-                      <span>Bulkhead Reclamation</span>
-                      <span className="text-[10px] font-mono bg-white/10 px-1.5 py-0.2 rounded-full text-neutral-300">
-                        +34,800m²
-                      </span>
+              {/* Co-registration / Calibration Scanner Overlay when showSkeleton */}
+              {showSkeleton && (
+                <div className="absolute inset-0 z-20 bg-black/40 backdrop-blur-[2px] flex flex-col items-center justify-center pointer-events-none transition-all duration-300">
+                  <div className="relative w-44 h-44 rounded-full border border-sky-400/30 flex items-center justify-center">
+                    <div className="absolute inset-0 rounded-full border border-sky-400/15 animate-ping" />
+                    <div className="w-28 h-28 rounded-full border border-white/20 flex items-center justify-center">
+                      <div className="w-14 h-14 rounded-full border border-sky-400/40 animate-pulse flex items-center justify-center bg-sky-500/10">
+                        <Satellite className="w-6 h-6 text-sky-400 animate-spin" style={{ animationDuration: "3s" }} />
+                      </div>
                     </div>
-                    <p className="text-[11px] text-neutral-300 font-light leading-relaxed">
-                      Unpermitted shoreline infill identified between T0 &amp; T1. Radar backscatter shift +3.8 dB.
-                    </p>
+                    {/* Rotating radar sweep */}
+                    <div className="absolute inset-0 origin-center animate-[spin_2.5s_linear_infinite] bg-gradient-to-tr from-sky-500/20 via-transparent to-transparent rounded-full" />
                   </div>
-                </div>
-              </div>
 
-              {/* ─── RETICLE MARKER 2: Berth Expansion ─── */}
-              <div
-                className={cn(
-                  "absolute top-[26%] left-[62%] z-25 cursor-pointer transition-all duration-300 group",
-                  activeReticle === 2 && "scale-115"
-                )}
-                onClick={() => focusReticle(2)}
-              >
-                <div className="relative">
-                  <span className="w-6 h-6 rounded-full bg-[rgba(10,10,30,0.85)] backdrop-blur-md border border-white/40 text-white flex items-center justify-center text-xs font-medium shadow-xl hover:scale-110 transition-transform">
-                    2
-                  </span>
-                  {/* Frosted Tooltip Card */}
-                  <div
-                    style={glassPanelStyle}
-                    className={cn(
-                      "absolute left-8 -top-3 w-56 p-3 rounded-2xl border border-white/15 transition-all z-30",
-                      activeReticle === 2 ? "opacity-100 scale-100" : "opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto"
-                    )}
-                  >
-                    <div className="flex items-center justify-between text-white text-xs font-medium mb-1">
-                      <span>Berth Expansion</span>
-                      <span className="text-[10px] font-mono bg-white/10 px-1.5 py-0.2 rounded-full text-neutral-300">
-                        +4.2 dB
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-neutral-300 font-light leading-relaxed">
-                      SAR radar double-bounce: newly added rail-mounted gantry cranes.
-                    </p>
+                  <div className="mt-5 px-4 py-2 rounded-full bg-[rgba(10,10,30,0.85)] border border-white/15 backdrop-blur-xl shadow-2xl flex items-center gap-2.5">
+                    <span className="w-2 h-2 rounded-full bg-sky-400 animate-pulse shadow-[0_0_8px_#38bdf8]" />
+                    <span className="text-xs font-mono text-neutral-200">
+                      Co-registering S2 Optical &amp; S1 SAR rasters...
+                    </span>
+                  </div>
+                  <div className="mt-2 text-[11px] font-mono text-neutral-400">
+                    EPSG:32631 • Resampling 10m grid • Sigma-0 Calibration
                   </div>
                 </div>
-              </div>
+              )}
 
-              {/* ─── RETICLE MARKER 3: Fairway Channel ─── */}
-              <div
-                className={cn(
-                  "absolute top-[68%] left-[64%] z-25 cursor-pointer transition-all duration-300 group",
-                  activeReticle === 3 && "scale-115"
-                )}
-                onClick={() => focusReticle(3)}
-              >
-                <div className="relative">
-                  <span className="w-6 h-6 rounded-full bg-[rgba(10,10,30,0.85)] backdrop-blur-md border border-white/40 text-white flex items-center justify-center text-xs font-medium shadow-xl hover:scale-110 transition-transform">
-                    3
-                  </span>
-                  {/* Frosted Tooltip Card */}
+              {!showSkeleton && (
+                <>
+                  {/* ─── RETICLE MARKER 1: Bulkhead Reclamation ─── */}
                   <div
-                    style={glassPanelStyle}
                     className={cn(
-                      "absolute left-8 -top-3 w-56 p-3 rounded-2xl border border-white/15 transition-all z-30",
-                      activeReticle === 3 ? "opacity-100 scale-100" : "opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto"
+                      "absolute top-[44%] left-[36%] z-25 cursor-pointer transition-all duration-300 group",
+                      activeReticle === 1 && "scale-115"
                     )}
+                    onClick={() => focusReticle(1)}
                   >
-                    <div className="flex items-center justify-between text-white text-xs font-medium mb-1">
-                      <span>Fairway Channel</span>
-                      <span className="text-[10px] font-mono bg-white/10 px-1.5 py-0.2 rounded-full text-neutral-300">
-                        8 vessels
+                    <div className="relative">
+                      <span className="w-6 h-6 rounded-full bg-[rgba(10,10,30,0.85)] backdrop-blur-md border border-white/40 text-white flex items-center justify-center text-xs font-medium shadow-xl hover:scale-110 transition-transform">
+                        1
                       </span>
+                      {/* Frosted Tooltip Card */}
+                      <div
+                        style={glassPanelStyle}
+                        className={cn(
+                          "absolute left-8 -top-3 w-56 p-3 rounded-2xl border border-white/15 transition-all z-30",
+                          activeReticle === 1 ? "opacity-100 scale-100" : "opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto"
+                        )}
+                      >
+                        <div className="flex items-center justify-between text-white text-xs font-medium mb-1">
+                          <span>Bulkhead Reclamation</span>
+                          <span className="text-[10px] font-mono bg-white/10 px-1.5 py-0.2 rounded-full text-neutral-300">
+                            +34,800m²
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-neutral-300 font-light leading-relaxed">
+                          Unpermitted shoreline infill identified between T0 &amp; T1. Radar backscatter shift +3.8 dB.
+                        </p>
+                      </div>
                     </div>
-                    <p className="text-[11px] text-neutral-300 font-light leading-relaxed">
-                      Verified acoustic and radar transit signatures at -14.2m channel depth.
-                    </p>
                   </div>
-                </div>
-              </div>
+
+                  {/* ─── RETICLE MARKER 2: Berth Expansion ─── */}
+                  <div
+                    className={cn(
+                      "absolute top-[26%] left-[62%] z-25 cursor-pointer transition-all duration-300 group",
+                      activeReticle === 2 && "scale-115"
+                    )}
+                    onClick={() => focusReticle(2)}
+                  >
+                    <div className="relative">
+                      <span className="w-6 h-6 rounded-full bg-[rgba(10,10,30,0.85)] backdrop-blur-md border border-white/40 text-white flex items-center justify-center text-xs font-medium shadow-xl hover:scale-110 transition-transform">
+                        2
+                      </span>
+                      {/* Frosted Tooltip Card */}
+                      <div
+                        style={glassPanelStyle}
+                        className={cn(
+                          "absolute left-8 -top-3 w-56 p-3 rounded-2xl border border-white/15 transition-all z-30",
+                          activeReticle === 2 ? "opacity-100 scale-100" : "opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto"
+                        )}
+                      >
+                        <div className="flex items-center justify-between text-white text-xs font-medium mb-1">
+                          <span>Berth Expansion</span>
+                          <span className="text-[10px] font-mono bg-white/10 px-1.5 py-0.2 rounded-full text-neutral-300">
+                            +4.2 dB
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-neutral-300 font-light leading-relaxed">
+                          SAR radar double-bounce: newly added rail-mounted gantry cranes.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* ─── RETICLE MARKER 3: Fairway Channel ─── */}
+                  <div
+                    className={cn(
+                      "absolute top-[68%] left-[64%] z-25 cursor-pointer transition-all duration-300 group",
+                      activeReticle === 3 && "scale-115"
+                    )}
+                    onClick={() => focusReticle(3)}
+                  >
+                    <div className="relative">
+                      <span className="w-6 h-6 rounded-full bg-[rgba(10,10,30,0.85)] backdrop-blur-md border border-white/40 text-white flex items-center justify-center text-xs font-medium shadow-xl hover:scale-110 transition-transform">
+                        3
+                      </span>
+                      {/* Frosted Tooltip Card */}
+                      <div
+                        style={glassPanelStyle}
+                        className={cn(
+                          "absolute left-8 -top-3 w-56 p-3 rounded-2xl border border-white/15 transition-all z-30",
+                          activeReticle === 3 ? "opacity-100 scale-100" : "opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto"
+                        )}
+                      >
+                        <div className="flex items-center justify-between text-white text-xs font-medium mb-1">
+                          <span>Fairway Channel</span>
+                          <span className="text-[10px] font-mono bg-white/10 px-1.5 py-0.2 rounded-full text-neutral-300">
+                            8 vessels
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-neutral-300 font-light leading-relaxed">
+                          Verified acoustic and radar transit signatures at -14.2m channel depth.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
 
               {/* Measure tool cursor indicator */}
               {measureMode && (
@@ -831,235 +947,324 @@ export default function GeoAnalysisDashboard({
 
           {/* Scrollable Layers / Details */}
           <div className="flex-1 overflow-y-auto p-3.5 space-y-3 custom-scrollbar">
-            {activeTab === "active" && (
-              <>
-                {/* Optical Baseline Card */}
-                <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3.5 space-y-2 shadow-sm">
+            {showSkeleton ? (
+              <div className="space-y-3 animate-pulse">
+                {/* Optical Baseline Skeleton */}
+                <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3.5 space-y-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-emerald-400" />
-                      <span className="text-xs font-medium text-white">
-                        Optical Baseline (T0)
-                      </span>
+                      <div className="w-2 h-2 rounded-full bg-emerald-400/40" />
+                      <div className="w-32 h-3.5 rounded bg-white/20" />
                     </div>
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-white/10 text-neutral-300">
-                      Apr 2023
-                    </span>
+                    <div className="w-16 h-4 rounded-full bg-white/10" />
                   </div>
-                  <div className="text-xs text-neutral-400 font-light space-y-1">
+                  <div className="space-y-2 pt-1">
                     <div className="flex justify-between">
-                      <span>Source</span>
-                      <span className="text-neutral-200 font-mono text-[11px]">Sentinel-2B MSI</span>
+                      <div className="w-12 h-2.5 rounded bg-white/10" />
+                      <div className="w-24 h-2.5 rounded bg-white/15" />
                     </div>
                     <div className="flex justify-between">
-                      <span>Resolution</span>
-                      <span className="text-neutral-200 font-mono text-[11px]">10m / px (RGB)</span>
+                      <div className="w-16 h-2.5 rounded bg-white/10" />
+                      <div className="w-20 h-2.5 rounded bg-white/15" />
                     </div>
                     <div className="flex justify-between">
-                      <span>Cloud Cover</span>
-                      <span className="text-neutral-200 font-mono text-[11px]">0.4% (Clear)</span>
+                      <div className="w-20 h-2.5 rounded bg-white/10" />
+                      <div className="w-16 h-2.5 rounded bg-white/15" />
                     </div>
                   </div>
                 </div>
 
-                {/* SAR Observation Card */}
-                <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3.5 space-y-2 shadow-sm">
+                {/* SAR Observation Skeleton */}
+                <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3.5 space-y-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-sky-400" />
-                      <span className="text-xs font-medium text-white">
-                        Synthetic Aperture Radar (T1)
-                      </span>
+                      <div className="w-2 h-2 rounded-full bg-sky-400/40" />
+                      <div className="w-36 h-3.5 rounded bg-white/20" />
                     </div>
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-white/10 text-neutral-300">
-                      Mar 2024
-                    </span>
+                    <div className="w-16 h-4 rounded-full bg-white/10" />
                   </div>
-                  <div className="text-xs text-neutral-400 font-light space-y-1">
+                  <div className="space-y-2 pt-1">
                     <div className="flex justify-between">
-                      <span>Sensor</span>
-                      <span className="text-neutral-200 font-mono text-[11px]">Sentinel-1 C-Band</span>
+                      <div className="w-12 h-2.5 rounded bg-white/10" />
+                      <div className="w-24 h-2.5 rounded bg-white/15" />
                     </div>
                     <div className="flex justify-between">
-                      <span>Polarization</span>
-                      <span className="text-neutral-200 font-mono text-[11px]">VV + VH Dual</span>
+                      <div className="w-16 h-2.5 rounded bg-white/10" />
+                      <div className="w-20 h-2.5 rounded bg-white/15" />
                     </div>
                     <div className="flex justify-between">
-                      <span>Backscatter Shift</span>
-                      <span className="text-sky-300 font-mono text-[11px] font-medium">
-                        +4.2 dB Sigma-0
-                      </span>
+                      <div className="w-24 h-2.5 rounded bg-white/10" />
+                      <div className="w-18 h-2.5 rounded bg-white/15" />
                     </div>
                   </div>
                 </div>
 
-                {/* Layer Opacity Slider */}
-                <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3.5 space-y-2.5 shadow-sm">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-medium text-white">Optical Layer Opacity</span>
-                    <span className="text-neutral-300 font-mono text-[11px]">
-                      {opticalOpacity}%
-                    </span>
+                {/* Opacity Slider Skeleton */}
+                <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3.5 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="w-28 h-3 rounded bg-white/20" />
+                    <div className="w-8 h-3 rounded bg-white/15" />
                   </div>
-                  <input
-                    type="range"
-                    min="0"
-                    max="100"
-                    value={opticalOpacity}
-                    onChange={(e) => setOpticalOpacity(Number(e.target.value))}
-                    className="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-white"
-                  />
-
-                  {/* Difference Heatmap Toggle */}
-                  <div className="flex items-center justify-between pt-1 text-xs">
-                    <div className="flex items-center gap-1.5 text-neutral-300 font-light">
-                      <Sliders className="w-3.5 h-3.5 text-amber-400" />
-                      <span>Highlight Change Areas</span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setShowHeatmap((prev) => !prev)}
-                      className={cn(
-                        "w-9 h-5 rounded-full relative transition-colors duration-200 cursor-pointer shadow-inner",
-                        showHeatmap ? "bg-white" : "bg-white/10"
-                      )}
-                    >
-                      <span
-                        className={cn(
-                          "absolute top-0.5 w-4 h-4 rounded-full transition-all duration-200 shadow-sm",
-                          showHeatmap ? "left-4.5 bg-black" : "left-0.5 bg-white"
-                        )}
-                      />
-                    </button>
+                  <div className="w-full h-1.5 rounded-lg bg-white/10" />
+                  <div className="flex items-center justify-between pt-1">
+                    <div className="w-28 h-3 rounded bg-white/10" />
+                    <div className="w-9 h-5 rounded-full bg-white/10" />
                   </div>
                 </div>
 
-                {/* Feature Overlays */}
+                {/* Feature Overlays Skeleton */}
                 <div className="pt-1 space-y-2">
-                  <span className="text-[11px] font-medium tracking-wider uppercase text-neutral-400 px-1">
-                    Feature Overlays
-                  </span>
-                  <div className="space-y-1.5 text-xs">
-                    <label className="flex items-center justify-between py-2 px-3 rounded-xl bg-white/[0.02] hover:bg-white/[0.05] border border-white/5 cursor-pointer transition-all">
-                      <div className="flex items-center gap-2.5">
-                        <input
-                          type="checkbox"
-                          checked={showBoundaries}
-                          onChange={(e) => setShowBoundaries(e.target.checked)}
-                          className="rounded border-white/20 bg-black text-white focus:ring-0 w-3.5 h-3.5"
-                        />
-                        <span className="text-neutral-200 font-light">Terminals &amp; Port Boundary</span>
+                  <div className="w-24 h-3 rounded bg-white/10 px-1" />
+                  <div className="space-y-1.5">
+                    {[1, 2, 3].map((i) => (
+                      <div key={i} className="py-2.5 px-3 rounded-xl bg-white/[0.02] border border-white/5 flex items-center justify-between">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-3.5 h-3.5 rounded bg-white/15" />
+                          <div className="w-32 h-3 rounded bg-white/15" />
+                        </div>
+                        <div className="w-14 h-2.5 rounded bg-white/10" />
                       </div>
-                      <span className="text-neutral-500 font-mono text-[11px]">14 zones</span>
-                    </label>
-
-                    <label className="flex items-center justify-between py-2 px-3 rounded-xl bg-white/[0.02] hover:bg-white/[0.05] border border-white/5 cursor-pointer transition-all">
-                      <div className="flex items-center gap-2.5">
-                        <input
-                          type="checkbox"
-                          checked={showCorridors}
-                          onChange={(e) => setShowCorridors(e.target.checked)}
-                          className="rounded border-white/20 bg-black text-white focus:ring-0 w-3.5 h-3.5"
-                        />
-                        <span className="text-neutral-200 font-light">Navigational Corridors</span>
-                      </div>
-                      <span className="text-neutral-500 font-mono text-[11px]">3 lanes</span>
-                    </label>
-
-                    <label className="flex items-center justify-between py-2 px-3 rounded-xl bg-white/[0.02] hover:bg-white/[0.05] border border-white/5 cursor-pointer transition-all">
-                      <div className="flex items-center gap-2.5">
-                        <input
-                          type="checkbox"
-                          checked={showReclamation}
-                          onChange={(e) => setShowReclamation(e.target.checked)}
-                          className="rounded border-white/20 bg-black text-white focus:ring-0 w-3.5 h-3.5"
-                        />
-                        <span className="text-neutral-200 font-light">Identified Reclamation</span>
-                      </div>
-                      <span className="text-amber-300 font-mono text-[11px] font-medium">+34.8k m²</span>
-                    </label>
+                    ))}
                   </div>
                 </div>
+              </div>
+            ) : (
+              <>
+                {activeTab === "active" && (
+                  <>
+                    {/* Optical Baseline Card */}
+                    <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3.5 space-y-2 shadow-sm">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                          <span className="text-xs font-medium text-white">
+                            Optical Baseline (T0)
+                          </span>
+                        </div>
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-white/10 text-neutral-300">
+                          Apr 2023
+                        </span>
+                      </div>
+                      <div className="text-xs text-neutral-400 font-light space-y-1">
+                        <div className="flex justify-between">
+                          <span>Source</span>
+                          <span className="text-neutral-200 font-mono text-[11px]">Sentinel-2B MSI</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Resolution</span>
+                          <span className="text-neutral-200 font-mono text-[11px]">10m / px (RGB)</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Cloud Cover</span>
+                          <span className="text-neutral-200 font-mono text-[11px]">0.4% (Clear)</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* SAR Observation Card */}
+                    <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3.5 space-y-2 shadow-sm">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-sky-400" />
+                          <span className="text-xs font-medium text-white">
+                            Synthetic Aperture Radar (T1)
+                          </span>
+                        </div>
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-white/10 text-neutral-300">
+                          Mar 2024
+                        </span>
+                      </div>
+                      <div className="text-xs text-neutral-400 font-light space-y-1">
+                        <div className="flex justify-between">
+                          <span>Sensor</span>
+                          <span className="text-neutral-200 font-mono text-[11px]">Sentinel-1 C-Band</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Polarization</span>
+                          <span className="text-neutral-200 font-mono text-[11px]">VV + VH Dual</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Backscatter Shift</span>
+                          <span className="text-sky-300 font-mono text-[11px] font-medium">
+                            +4.2 dB Sigma-0
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Layer Opacity Slider */}
+                    <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3.5 space-y-2.5 shadow-sm">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-medium text-white">Optical Layer Opacity</span>
+                        <span className="text-neutral-300 font-mono text-[11px]">
+                          {opticalOpacity}%
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0"
+                        max="100"
+                        value={opticalOpacity}
+                        onChange={(e) => setOpticalOpacity(Number(e.target.value))}
+                        className="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-white"
+                      />
+
+                      {/* Difference Heatmap Toggle */}
+                      <div className="flex items-center justify-between pt-1 text-xs">
+                        <div className="flex items-center gap-1.5 text-neutral-300 font-light">
+                          <Sliders className="w-3.5 h-3.5 text-amber-400" />
+                          <span>Highlight Change Areas</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setShowHeatmap((prev) => !prev)}
+                          className={cn(
+                            "w-9 h-5 rounded-full relative transition-colors duration-200 cursor-pointer shadow-inner",
+                            showHeatmap ? "bg-white" : "bg-white/10"
+                          )}
+                        >
+                          <span
+                            className={cn(
+                              "absolute top-0.5 w-4 h-4 rounded-full transition-all duration-200 shadow-sm",
+                              showHeatmap ? "left-4.5 bg-black" : "left-0.5 bg-white"
+                            )}
+                          />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Feature Overlays */}
+                    <div className="pt-1 space-y-2">
+                      <span className="text-[11px] font-medium tracking-wider uppercase text-neutral-400 px-1">
+                        Feature Overlays
+                      </span>
+                      <div className="space-y-1.5 text-xs">
+                        <label className="flex items-center justify-between py-2 px-3 rounded-xl bg-white/[0.02] hover:bg-white/[0.05] border border-white/5 cursor-pointer transition-all">
+                          <div className="flex items-center gap-2.5">
+                            <input
+                              type="checkbox"
+                              checked={showBoundaries}
+                              onChange={(e) => setShowBoundaries(e.target.checked)}
+                              className="rounded border-white/20 bg-black text-white focus:ring-0 w-3.5 h-3.5"
+                            />
+                            <span className="text-neutral-200 font-light">Terminals &amp; Port Boundary</span>
+                          </div>
+                          <span className="text-neutral-500 font-mono text-[11px]">14 zones</span>
+                        </label>
+
+                        <label className="flex items-center justify-between py-2 px-3 rounded-xl bg-white/[0.02] hover:bg-white/[0.05] border border-white/5 cursor-pointer transition-all">
+                          <div className="flex items-center gap-2.5">
+                            <input
+                              type="checkbox"
+                              checked={showCorridors}
+                              onChange={(e) => setShowCorridors(e.target.checked)}
+                              className="rounded border-white/20 bg-black text-white focus:ring-0 w-3.5 h-3.5"
+                            />
+                            <span className="text-neutral-200 font-light">Navigational Corridors</span>
+                          </div>
+                          <span className="text-neutral-500 font-mono text-[11px]">3 lanes</span>
+                        </label>
+
+                        <label className="flex items-center justify-between py-2 px-3 rounded-xl bg-white/[0.02] hover:bg-white/[0.05] border border-white/5 cursor-pointer transition-all">
+                          <div className="flex items-center gap-2.5">
+                            <input
+                              type="checkbox"
+                              checked={showReclamation}
+                              onChange={(e) => setShowReclamation(e.target.checked)}
+                              className="rounded border-white/20 bg-black text-white focus:ring-0 w-3.5 h-3.5"
+                            />
+                            <span className="text-neutral-200 font-light">Identified Reclamation</span>
+                          </div>
+                          <span className="text-amber-300 font-mono text-[11px] font-medium">+34.8k m²</span>
+                        </label>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {activeTab === "bands" && (
+                  <div className="space-y-3 text-xs">
+                    <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3.5 space-y-2">
+                      <span className="font-medium text-white">Sentinel-2 Spectral Bands</span>
+                      <div className="space-y-1 text-neutral-300 font-mono text-[11px]">
+                        <div className="flex justify-between py-1 border-b border-white/5">
+                          <span>B02 (Blue 490 nm)</span>
+                          <span className="text-neutral-300">10m</span>
+                        </div>
+                        <div className="flex justify-between py-1 border-b border-white/5">
+                          <span>B03 (Green 560 nm)</span>
+                          <span className="text-neutral-300">10m</span>
+                        </div>
+                        <div className="flex justify-between py-1 border-b border-white/5">
+                          <span>B04 (Red 665 nm)</span>
+                          <span className="text-neutral-300">10m</span>
+                        </div>
+                        <div className="flex justify-between py-1">
+                          <span>B08 (NIR 842 nm)</span>
+                          <span className="text-neutral-300">10m</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3.5 space-y-2">
+                      <span className="font-medium text-white">Sentinel-1 Radar Polarization</span>
+                      <div className="space-y-1 text-neutral-300 font-mono text-[11px]">
+                        <div className="flex justify-between py-1 border-b border-white/5">
+                          <span>VV (Vertical-Vertical)</span>
+                          <span className="text-neutral-300">Calibrated</span>
+                        </div>
+                        <div className="flex justify-between py-1">
+                          <span>VH (Vertical-Horizontal)</span>
+                          <span className="text-neutral-300">Calibrated</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {activeTab === "metadata" && (
+                  <div className="space-y-3 text-xs">
+                    <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3.5 space-y-2">
+                      <span className="font-medium text-white">Geospatial CRS &amp; Coordinates</span>
+                      <div className="space-y-1.5 text-neutral-400 font-mono text-[11px]">
+                        <div className="flex justify-between">
+                          <span>CRS</span>
+                          <span className="text-neutral-200">EPSG:32631</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>UTM Zone</span>
+                          <span className="text-neutral-200">31N (WGS84)</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Bounding Box</span>
+                          <span className="text-neutral-200 text-[10px]">2.14°E, 41.34°N</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Radiometric Unit</span>
+                          <span className="text-sky-300">Sigma-0 (dB)</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </>
-            )}
-
-            {activeTab === "bands" && (
-              <div className="space-y-3 text-xs">
-                <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3.5 space-y-2">
-                  <span className="font-medium text-white">Sentinel-2 Spectral Bands</span>
-                  <div className="space-y-1 text-neutral-300 font-mono text-[11px]">
-                    <div className="flex justify-between py-1 border-b border-white/5">
-                      <span>B02 (Blue 490 nm)</span>
-                      <span className="text-neutral-300">10m</span>
-                    </div>
-                    <div className="flex justify-between py-1 border-b border-white/5">
-                      <span>B03 (Green 560 nm)</span>
-                      <span className="text-neutral-300">10m</span>
-                    </div>
-                    <div className="flex justify-between py-1 border-b border-white/5">
-                      <span>B04 (Red 665 nm)</span>
-                      <span className="text-neutral-300">10m</span>
-                    </div>
-                    <div className="flex justify-between py-1">
-                      <span>B08 (NIR 842 nm)</span>
-                      <span className="text-neutral-300">10m</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3.5 space-y-2">
-                  <span className="font-medium text-white">Sentinel-1 Radar Polarization</span>
-                  <div className="space-y-1 text-neutral-300 font-mono text-[11px]">
-                    <div className="flex justify-between py-1 border-b border-white/5">
-                      <span>VV (Vertical-Vertical)</span>
-                      <span className="text-neutral-300">Calibrated</span>
-                    </div>
-                    <div className="flex justify-between py-1">
-                      <span>VH (Vertical-Horizontal)</span>
-                      <span className="text-neutral-300">Calibrated</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {activeTab === "metadata" && (
-              <div className="space-y-3 text-xs">
-                <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3.5 space-y-2">
-                  <span className="font-medium text-white">Geospatial CRS &amp; Coordinates</span>
-                  <div className="space-y-1.5 text-neutral-400 font-mono text-[11px]">
-                    <div className="flex justify-between">
-                      <span>CRS</span>
-                      <span className="text-neutral-200">EPSG:32631</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>UTM Zone</span>
-                      <span className="text-neutral-200">31N (WGS84)</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Bounding Box</span>
-                      <span className="text-neutral-200 text-[10px]">2.14°E, 41.34°N</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Radiometric Unit</span>
-                      <span className="text-sky-300">Sigma-0 (dB)</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
             )}
           </div>
 
           {/* Right panel bottom button */}
           <div className="p-3.5 border-t border-white/10 bg-white/[0.02]">
-            <button
-              type="button"
-              onClick={() => setShowAddLayerModal(true)}
-              className="w-full py-2.5 bg-white/5 hover:bg-white/10 text-neutral-200 hover:text-white border border-white/10 hover:border-white/20 font-medium text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Add Imagery Layer</span>
-            </button>
+            {showSkeleton ? (
+              <div className="w-full h-10 rounded-xl bg-white/10 animate-pulse" />
+            ) : (
+              <button
+                type="button"
+                onClick={() => setShowAddLayerModal(true)}
+                className="w-full py-2.5 bg-white/5 hover:bg-white/10 text-neutral-200 hover:text-white border border-white/10 hover:border-white/20 font-medium text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Add Imagery Layer</span>
+              </button>
+            )}
           </div>
         </aside>
       </main>
@@ -1076,52 +1281,80 @@ export default function GeoAnalysisDashboard({
         className="h-12 border-t border-white/10 flex items-center justify-between px-4 z-40 shrink-0 text-xs"
       >
         <div className="flex items-center gap-3 text-neutral-400 font-light">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-400" />
-            <span className="text-neutral-200 font-medium">Pipeline Complete</span>
-          </div>
+          {showSkeleton ? (
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping shadow-[0_0_6px_#fbbf24]" />
+              <span className="text-amber-300 font-medium">Processing Pipeline...</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-400" />
+              <span className="text-neutral-200 font-medium">Pipeline Complete</span>
+            </div>
+          )}
 
           <span className="text-white/20 hidden sm:inline">•</span>
 
           <div className="hidden sm:flex items-center gap-1 font-mono text-[11px]">
             <span>Center:</span>
-            <span className="text-neutral-200">41°21'N 02°09'E</span>
+            {showSkeleton ? (
+              <span className="inline-block w-24 h-3.5 rounded bg-white/10 animate-pulse" />
+            ) : (
+              <span className="text-neutral-200">41°21'N 02°09'E</span>
+            )}
           </div>
 
           <span className="text-white/20 hidden md:inline">•</span>
 
           <div className="hidden md:flex items-center gap-1 font-mono text-[11px]">
             <span>Projection:</span>
-            <span className="text-neutral-200">UTM 31N (WGS84)</span>
+            {showSkeleton ? (
+              <span className="inline-block w-28 h-3.5 rounded bg-white/10 animate-pulse" />
+            ) : (
+              <span className="text-neutral-200">UTM 31N (WGS84)</span>
+            )}
           </div>
 
           <span className="text-white/20 hidden lg:inline">•</span>
 
           <div className="hidden lg:flex items-center gap-1 font-mono text-[11px]">
             <span>Latency:</span>
-            <span className="text-emerald-400 font-semibold">842ms</span>
+            {showSkeleton ? (
+              <span className="inline-block w-14 h-3.5 rounded bg-white/10 animate-pulse" />
+            ) : (
+              <span className="text-emerald-400 font-semibold">842ms</span>
+            )}
           </div>
         </div>
 
         {/* Modal Triggers */}
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setShowLogModal(true)}
-            className="px-3 py-1 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 text-neutral-300 hover:text-white text-xs transition-colors flex items-center gap-1.5 cursor-pointer"
-          >
-            <History className="w-3.5 h-3.5" />
-            <span>Run Log</span>
-          </button>
+          {showSkeleton ? (
+            <>
+              <div className="w-20 h-7 rounded-full bg-white/10 animate-pulse" />
+              <div className="w-24 h-7 rounded-full bg-white/10 animate-pulse" />
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={() => setShowLogModal(true)}
+                className="px-3 py-1 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 text-neutral-300 hover:text-white text-xs transition-colors flex items-center gap-1.5 cursor-pointer"
+              >
+                <History className="w-3.5 h-3.5" />
+                <span>Run Log</span>
+              </button>
 
-          <button
-            type="button"
-            onClick={() => setShowHistogramsModal(true)}
-            className="px-3 py-1 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 text-neutral-300 hover:text-white text-xs transition-colors flex items-center gap-1.5 cursor-pointer"
-          >
-            <BarChart3 className="w-3.5 h-3.5" />
-            <span>Histograms</span>
-          </button>
+              <button
+                type="button"
+                onClick={() => setShowHistogramsModal(true)}
+                className="px-3 py-1 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 text-neutral-300 hover:text-white text-xs transition-colors flex items-center gap-1.5 cursor-pointer"
+              >
+                <BarChart3 className="w-3.5 h-3.5" />
+                <span>Histograms</span>
+              </button>
+            </>
+          )}
         </div>
       </footer>
 
@@ -1140,7 +1373,7 @@ export default function GeoAnalysisDashboard({
               <div className="flex items-center gap-2">
                 <FileText className="w-5 h-5 text-sky-400" />
                 <h3 className="text-base font-semibold text-white">
-                  SatQuery Change Detection Verification Report
+                  SatQuery Change Detection Verification Report {analysisId ? `• ${analysisId}` : ""}
                 </h3>
               </div>
               <button
