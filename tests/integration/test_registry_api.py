@@ -14,6 +14,7 @@ def test_registry_api_projects_safe_tool_metadata(tmp_path) -> None:
         assert {item["tool_id"] for item in body["items"]} == {
             "sar_temporal_change_v1",
             "mask_agreement_v1",
+            "compute_mask_area_v1",
         }
         assert all("implementation" not in item for item in body["items"])
         assert all("path" not in item for item in body["items"])

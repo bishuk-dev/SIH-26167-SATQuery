@@ -176,10 +176,39 @@ def test_unknown_sar_semantics_requests_input():
         [sar, observation(observation_id="obs_2")],
         pair(),
         None,
-        [capability("temporal_difference")],
+        [capability("deterministic_sar_temporal_change")],
     )
     assert result.outcome == "REQUEST_INPUT"
     assert "UNKNOWN_SAR_POLARIZATION" in {issue.code for issue in result.failures}
+
+
+def test_unknown_temporal_order_never_passes_from_unknown_query_direction():
+    result = validator.validate(
+        intent(
+            task_family="CHANGE_LOCALIZE",
+            target_semantic="sar",
+            requested_measurement=None,
+            temporal_direction="UNKNOWN",
+        ),
+        [observation(), observation(observation_id="obs_2")],
+        pair(order_known=False),
+        None,
+        [capability("deterministic_sar_temporal_change")],
+    )
+    assert result.outcome == "REQUEST_INPUT"
+    assert "TEMPORAL_ORDER_UNKNOWN" in {issue.code for issue in result.failures}
+
+
+def test_sar_area_requires_both_change_and_area_capabilities():
+    result = validator.validate(
+        intent(task_family="CHANGE_MEASURE", target_semantic="sar", requested_measurement="area"),
+        [observation(), observation(observation_id="obs_2")],
+        pair(),
+        None,
+        [capability("deterministic_sar_temporal_change")],
+    )
+    assert result.outcome == "ABSTAIN"
+    assert "MODEL_UNAVAILABLE" in {issue.code for issue in result.failures}
 
 
 def test_non_overlapping_temporal_pair_rejects():

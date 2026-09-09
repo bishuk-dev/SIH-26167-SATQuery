@@ -54,3 +54,22 @@ tools:
       type: agreement
       deterministic: true
       interpretation: agreement_not_accuracy
+
+  compute_mask_area_v1:
+    title: Deterministic mask area measurement
+    kind: deterministic_measurement
+    executor: mask_area
+    implementation: satquery.analytics.measurement.measure_mask_area
+    description: >-
+      Measures positive pixels from a verified binary mask using CRS-safe
+      projected or geographic area calculation.
+    inputs:
+      - name: mask
+        kind: mask
+    parameters:
+      unit:
+        type: enum
+        values: [m2, ha, km2]
+    evidence:
+      type: measurement
+      deterministic: true

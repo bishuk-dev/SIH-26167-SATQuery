@@ -179,6 +179,14 @@ tools:
     assert load_tool_registry(first).registry_hash == load_tool_registry(second).registry_hash
 
 
+def test_mask_area_tool_is_registered_to_a_code_owned_executor() -> None:
+    registry = load_tool_registry()
+    tool = registry.get("compute_mask_area_v1")
+    assert tool is not None
+    assert tool.executor is ToolExecutor.MASK_AREA
+    assert tool.implementation == "satquery.analytics.measurement.measure_mask_area"
+
+
 def test_runtime_capability_requires_registration_and_readiness() -> None:
     registry = load_tool_registry()
     capability = build_runtime_capabilities(

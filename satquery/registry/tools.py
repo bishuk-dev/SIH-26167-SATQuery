@@ -38,6 +38,7 @@ _EXECUTOR_IMPLEMENTATIONS: dict[ToolExecutor, str] = {
     ToolExecutor.MASK_AGREEMENT: (
         "satquery.analytics.reconciliation.diagnostic_mask_agreement"
     ),
+    ToolExecutor.MASK_AREA: "satquery.analytics.measurement.measure_mask_area",
 }
 _UNSAFE_PARAMETER_NAMES = {"command", "code", "url", "path"}
 _PARAMETER_TYPES = {

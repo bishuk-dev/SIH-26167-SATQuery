@@ -26,6 +26,7 @@ class ToolExecutor(StrEnum):
 
     SAR_TEMPORAL_CHANGE = "sar_temporal_change"
     MASK_AGREEMENT = "mask_agreement"
+    MASK_AREA = "mask_area"
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_MODEL_REGISTRY = PROJECT_ROOT / "models" / "registry.yaml"

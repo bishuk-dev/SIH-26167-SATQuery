@@ -118,11 +118,12 @@ def _sar_change(intent: QueryIntent, inputs: Mapping[str, Any]) -> tuple[_StepSp
 
 def _sar_change_then_area(intent: QueryIntent, inputs: Mapping[str, Any]) -> tuple[_StepSpec, ...]:
     steps = _sar_change(intent, inputs)
+    area_unit = inputs.get("area_unit", "ha")
     return steps + (
         _StepSpec(
             tool_id="compute_mask_area_v1",
             input_bindings={"mask": "step_sar_temporal_change_v1"},
-            parameters={},
+            parameters={"unit": area_unit},
             depends_on=("step_sar_temporal_change_v1",),
         ),
     )

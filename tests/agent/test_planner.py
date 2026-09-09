@@ -66,6 +66,20 @@ def test_denied_feasibility_returns_no_steps() -> None:
     assert plan.steps == ()
 
 
+def test_sar_area_plan_ends_in_registered_mask_measurement() -> None:
+    plan = BoundedPlanner(load_tool_registry()).plan(
+        _intent(task_family="CHANGE_MEASURE", requested_measurement="area"),
+        _feasibility(),
+        {**_inputs(), "area_unit": "ha"},
+    )
+    assert [step.tool_id for step in plan.steps] == [
+        "sar_temporal_change_v1",
+        "compute_mask_area_v1",
+    ]
+    assert plan.steps[-1].parameters == {"unit": "ha"}
+    assert plan.steps[-1].depends_on == ("step_sar_temporal_change_v1",)
+
+
 def test_execution_plan_rejects_cycles_and_more_than_eight_steps() -> None:
     with pytest.raises(ValidationError, match="acyclic"):
         ExecutionPlan.model_validate(

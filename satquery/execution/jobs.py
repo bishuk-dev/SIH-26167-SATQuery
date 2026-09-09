@@ -51,18 +51,22 @@ class JobRunner:
         return datetime.now(timezone.utc)
 
     def _append_event(self, job_id: str, event_type: ExecutionEventType | str, payload: dict) -> None:
-        events = self.repository.list_events(job_id)
-        value = event_type.value if isinstance(event_type, ExecutionEventType) else event_type
-        self.repository.append_event(
-            ExecutionEvent(
-                event_id=f"event_{uuid4().hex}",
-                job_id=job_id,
-                sequence=len(events),
-                event_type=value,
-                created_at=self._now(),
-                payload=payload,
+        # Sequence allocation and insertion must be one runner-serialized
+        # operation because engine callbacks and API cancellation can emit
+        # events concurrently for the same job.
+        with self._lock:
+            events = self.repository.list_events(job_id)
+            value = event_type.value if isinstance(event_type, ExecutionEventType) else event_type
+            self.repository.append_event(
+                ExecutionEvent(
+                    event_id=f"event_{uuid4().hex}",
+                    job_id=job_id,
+                    sequence=len(events),
+                    event_type=value,
+                    created_at=self._now(),
+                    payload=payload,
+                )
             )
-        )
 
     def submit(self, analysis_id: str, plan: ExecutionPlan) -> JobRecord:
         job_id = f"job_{uuid4().hex}"
@@ -98,24 +102,31 @@ class JobRunner:
         job = self.repository.get_job(job_id)
         if job is None:
             raise KeyError(job_id)
-        now = self._now()
-        if job.status is JobStatus.QUEUED:
-            changed = self.repository.transition_job(
-                job_id, JobStatus.QUEUED, JobStatus.CANCELLED, updated_at=now
-            )
-            if changed:
-                self._append_event(job_id, ExecutionEventType.CANCELLED, {})
-        elif job.status is JobStatus.RUNNING:
-            changed = self.repository.transition_job(
-                job_id, JobStatus.RUNNING, JobStatus.CANCEL_REQUESTED, updated_at=now
-            )
-            if changed:
-                with self._lock:
-                    self._cancel_events.setdefault(job_id, Event()).set()
-                self._append_event(job_id, ExecutionEventType.CANCEL_REQUESTED, {})
-        else:
-            raise ValueError("job is already terminal")
-        return self.repository.get_job(job_id) or job
+        while True:
+            now = self._now()
+            if job.status is JobStatus.QUEUED:
+                if self.repository.transition_job(
+                    job_id, JobStatus.QUEUED, JobStatus.CANCELLED, updated_at=now
+                ):
+                    self._append_event(job_id, ExecutionEventType.CANCELLED, {})
+                    return self.repository.get_job(job_id) or job
+            elif job.status is JobStatus.RUNNING:
+                if self.repository.transition_job(
+                    job_id, JobStatus.RUNNING, JobStatus.CANCEL_REQUESTED, updated_at=now
+                ):
+                    with self._lock:
+                        self._cancel_events.setdefault(job_id, Event()).set()
+                    self._append_event(job_id, ExecutionEventType.CANCEL_REQUESTED, {})
+                    return self.repository.get_job(job_id) or job
+            else:
+                raise ValueError("job is already terminal")
+            # A concurrent worker changed the state between the read and CAS.
+            # Re-read and either cancel the new RUNNING state or report the
+            # terminal conflict instead of returning a stale success.
+            refreshed = self.repository.get_job(job_id)
+            if refreshed is None:
+                raise KeyError(job_id)
+            job = refreshed
 
     def start(self) -> None:
         with self._lock:

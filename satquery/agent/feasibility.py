@@ -92,10 +92,15 @@ def _required_capability_ids(intent: QueryIntent) -> tuple[str, ...]:
         return ("multisensor_land_cover_joint",)
     if intent.requested_measurement in {"ndvi", "ndwi", "mndwi"}:
         return (f"spectral_index_{intent.requested_measurement}",)
+    if family in {"CHANGE_VQA", "CHANGE_LOCALIZE", "CHANGE_MEASURE"}:
+        if intent.target_semantic == "sar":
+            required = ["deterministic_sar_temporal_change"]
+            if intent.requested_measurement == "area":
+                required.append("mask_area_measurement")
+            return tuple(required)
+        return ("temporal_difference",)
     if intent.requested_measurement == "area":
         return ("mask_area_measurement",)
-    if family in {"CHANGE_VQA", "CHANGE_LOCALIZE", "CHANGE_MEASURE"}:
-        return ("temporal_difference",)
     return ()
 
 
@@ -226,7 +231,7 @@ class FeasibilityValidator:
     ) -> FeasibilityCheck:
         if intent.task_family not in _TEMPORAL_TASKS or pair is None:
             return _check("temporal_order", passed=True)
-        if pair.temporal.order_known or intent.temporal_direction == "UNKNOWN":
+        if pair.temporal.order_known:
             return _check("temporal_order", passed=True)
         return _check(
             "temporal_order",
@@ -347,10 +352,12 @@ class FeasibilityValidator:
     def _check_capabilities(
         required_ids: Sequence[str], capabilities: Sequence[_Capability]
     ) -> FeasibilityCheck:
-        if not required_ids or not capabilities:
+        if not required_ids:
             return _check("capabilities", passed=True)
         matching = [item for item in capabilities if item.capability_id in required_ids]
-        if matching and all(item.status in _AVAILABLE_STATES for item in matching):
+        if len(matching) == len(required_ids) and all(
+            item.status in _AVAILABLE_STATES for item in matching
+        ):
             return _check("capabilities", passed=True)
         return _check(
             "capabilities",
