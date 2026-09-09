@@ -14,6 +14,8 @@ import {
   Activity,
   Waves,
   Radio,
+  Satellite,
+  X,
 } from "lucide-react";
 
 // Lazy-load Earth so Three.js doesn't block initial render
@@ -47,9 +49,25 @@ function useAutoResizeTextarea({ minHeight, maxHeight }: AutoResizeProps) {
   return { textareaRef, adjustHeight };
 }
 
+export interface AnalysisRequest {
+  query: string;
+  file: {
+    name: string;
+    size: string;
+  };
+}
+
+interface RuixenMoonChatProps {
+  onStartAnalysis?: (request: AnalysisRequest) => void;
+}
+
 /* ─── Main component ───────────────────────────────────────────────────── */
-export default function RuixenMoonChat() {
+export default function RuixenMoonChat({ onStartAnalysis }: RuixenMoonChatProps) {
   const [message, setMessage] = useState("");
+  const [uploadedFile, setUploadedFile] = useState<{ name: string; size: string } | null>(null);
+  const [isDraggingFile, setIsDraggingFile] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const { textareaRef, adjustHeight } = useAutoResizeTextarea({
     minHeight: 48,
     maxHeight: 150,
@@ -64,8 +82,37 @@ export default function RuixenMoonChat() {
     adjustHeight();
   }, [message, adjustHeight]);
 
+  const handleSubmit = () => {
+    if (!message.trim()) return;
+    const fileToSubmit = uploadedFile || {
+      name: "barcelona_port_multisensor.tif",
+      size: "48.2 MB",
+    };
+    onStartAnalysis?.({
+      query: message.trim(),
+      file: fileToSubmit,
+    });
+  };
+
   return (
     <div className="relative w-full h-screen overflow-hidden flex flex-col items-center bg-[#050510]">
+      {/* Hidden file input for .tif upload */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        accept=".tif,.tiff,.geotiff,image/tiff"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) {
+            const sizeMb = (file.size / (1024 * 1024)).toFixed(1);
+            setUploadedFile({
+              name: file.name,
+              size: `${sizeMb} MB`,
+            });
+          }
+        }}
+      />
 
       {/* Subtle star-field radial gradient bg */}
       <div
@@ -85,7 +132,6 @@ export default function RuixenMoonChat() {
         className={cn(
           "absolute top-4 right-4 z-50",
           "p-2.5 rounded-full",
-          
           "hover:scale-105",
           "transition-all duration-200 cursor-pointer"
         )}
@@ -99,10 +145,6 @@ export default function RuixenMoonChat() {
       <div
         className="absolute pointer-events-none"
         style={{
-          /*
-           * Full-width Earth — the sphere diameter equals 100vw so
-           * it touches both left and right screen edges.
-           */
           bottom: "-66vw",
           left: "50%",
           transform: "translateX(-50%)",
@@ -137,7 +179,7 @@ export default function RuixenMoonChat() {
         style={{ zIndex: 10 }}
       >
         <div className="text-center select-none">
-          <h1 className="text-5xl font-bold text-white tracking-tight drop-shadow-lg">
+          <h1 className="text-5xl font-bold text-white tracking-tight drop-shadow-lg font-display">
             Sat Query
           </h1>
           <p className="mt-3 text-neutral-300 text-base font-light tracking-wide">
@@ -153,15 +195,63 @@ export default function RuixenMoonChat() {
       >
         {/* Frosted-glass chat input */}
         <div
-          className="relative rounded-2xl border border-white/10 shadow-2xl"
+          onDragOver={(e) => {
+            e.preventDefault();
+            setIsDraggingFile(true);
+          }}
+          onDragLeave={() => setIsDraggingFile(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setIsDraggingFile(false);
+            const file = e.dataTransfer.files?.[0];
+            if (file) {
+              const sizeMb = (file.size / (1024 * 1024)).toFixed(1);
+              setUploadedFile({
+                name: file.name,
+                size: `${sizeMb} MB`,
+              });
+            }
+          }}
+          className={cn(
+            "relative rounded-2xl border transition-all duration-200 shadow-2xl",
+            isDraggingFile
+              ? "border-sky-400/80 ring-2 ring-sky-400/30 bg-sky-950/40"
+              : "border-white/10"
+          )}
           style={{
-            background: "rgba(10, 10, 30, 0.55)",
+            background: isDraggingFile ? undefined : "rgba(10, 10, 30, 0.55)",
             backdropFilter: "blur(20px)",
             WebkitBackdropFilter: "blur(20px)",
             boxShadow:
               "0 0 0 1px rgba(255,255,255,0.06), 0 20px 60px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.08)",
           }}
         >
+          {/* Uploaded File Chip Indicator */}
+          {uploadedFile && (
+            <div className="flex items-center gap-2 px-3 py-1.5 mx-3 mt-3 rounded-xl bg-sky-500/15 border border-sky-400/30 text-sky-300 text-xs shadow-sm animate-in fade-in duration-200">
+              <div className="p-1 rounded bg-sky-400/20 text-sky-400">
+                <Satellite className="w-3.5 h-3.5" />
+              </div>
+              <span className="font-mono font-medium truncate max-w-[280px]">
+                {uploadedFile.name}
+              </span>
+              <span className="text-[11px] text-neutral-400 font-mono">
+                ({uploadedFile.size})
+              </span>
+              <span className="px-1.5 py-0.5 rounded bg-sky-500/20 text-[9px] font-mono text-sky-300 font-bold tracking-wider uppercase">
+                GeoTIFF Ready
+              </span>
+              <button
+                type="button"
+                onClick={() => setUploadedFile(null)}
+                className="ml-auto p-1 text-neutral-400 hover:text-white rounded hover:bg-white/10 transition-colors"
+                title="Remove attached file"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+
           <Textarea
             ref={textareaRef}
             value={message}
@@ -169,10 +259,16 @@ export default function RuixenMoonChat() {
               setMessage(e.target.value);
               adjustHeight();
             }}
-            placeholder="Ask anything about your imagery..."
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                handleSubmit();
+              }
+            }}
+            placeholder="Ask anything about your imagery... (Press Enter to analyze)"
             className={cn(
               "w-full px-5 py-4 resize-none border-none bg-transparent",
-              "text-white text-sm leading-relaxed",
+              "text-white text-sm leading-relaxed font-sans",
               "focus-visible:ring-0 focus-visible:ring-offset-0",
               "placeholder:text-neutral-500 min-h-[52px]"
             )}
@@ -187,32 +283,55 @@ export default function RuixenMoonChat() {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="text-neutral-400 hover:text-white hover:bg-white/10 rounded-lg w-8 h-8"
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="text-neutral-400 hover:text-white hover:bg-white/10 rounded-lg w-8 h-8 cursor-pointer"
                 >
                   <Paperclip className="w-4 h-4" />
                 </Button>
                 {/* Tooltip */}
-                <div className={cn(
-                  "absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2.5 py-1.5",
-                  "rounded-md text-xs font-medium whitespace-nowrap pointer-events-none",
-                  "bg-neutral-800 text-neutral-200 border border-neutral-700",
-                  "opacity-0 group-hover:opacity-100 scale-95 group-hover:scale-100",
-                  "transition-all duration-150 ease-out",
-                  "shadow-lg shadow-black/40 z-50"
-                )}>
+                <div
+                  className={cn(
+                    "absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2.5 py-1.5",
+                    "rounded-md text-xs font-medium whitespace-nowrap pointer-events-none",
+                    "bg-neutral-800 text-neutral-200 border border-neutral-700",
+                    "opacity-0 group-hover:opacity-100 scale-95 group-hover:scale-100",
+                    "transition-all duration-150 ease-out",
+                    "shadow-lg shadow-black/40 z-50"
+                  )}
+                >
                   Upload a .tif file
                   {/* Arrow */}
                   <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-neutral-800" />
                 </div>
               </div>
+
+              {/* Quick Sample File Button */}
+              {!uploadedFile && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    setUploadedFile({
+                      name: "barcelona_port_multisensor.tif",
+                      size: "48.2 MB",
+                    })
+                  }
+                  className="text-[11px] font-mono text-sky-400 hover:text-sky-300 px-2.5 py-1 rounded-lg bg-sky-500/10 hover:bg-sky-500/20 border border-sky-400/20 transition-all cursor-pointer flex items-center gap-1.5"
+                >
+                  <Satellite className="w-3 h-3 text-sky-400" />
+                  <span>Use Sample .TIF</span>
+                </button>
+              )}
             </div>
 
             <Button
+              type="button"
+              onClick={handleSubmit}
               disabled={!message.trim()}
               className={cn(
-                "flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200",
+                "flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer",
                 message.trim()
-                  ? "bg-white text-black hover:bg-neutral-200 shadow-lg shadow-white/20"
+                  ? "bg-white text-black hover:bg-neutral-200 shadow-lg shadow-white/20 active:scale-95"
                   : "bg-white/10 text-neutral-500 cursor-not-allowed"
               )}
             >
