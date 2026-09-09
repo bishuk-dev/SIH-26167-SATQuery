@@ -9,7 +9,7 @@ This plan translates the roadmap in `README.md` into implementation gates. The r
 | Phase 1 — Core Geospatial Platform | COMPLETE | Phase 0 / Phase 1A–1D |
 | Phase 2 — Single-Image Vision Intelligence | COMPLETE | Phase 2A–2C / Phase 3A–3B |
 | Phase 3 — Multisensor Intelligence | COMPLETE | Phase 4A–4F / Phase 5A |
-| Phase 4 — Temporal + Deterministic Remote-Sensing Analytics | NEXT | — |
+| Phase 4 — Temporal + Deterministic Remote-Sensing Analytics | BLOCKED | — |
 | Phase 5 — SatQuery Agent + Evidence Engine | PLANNED | — |
 | Phase 6 — Product Integration | PLANNED | — |
 | Phase 7 — Demo + Robustness Hardening | PLANNED | — |
@@ -81,6 +81,14 @@ Implementation gates:
 4. **One adaptation experiment:** add a reproducible, parameter-efficient adaptation path on the frozen scene-grouped subset. Keep training logic in `ml/`, register the checkpoint/config, CPU-smoke-test locally, and use a thin Kaggle GPU runner for meaningful training.
 5. **Evidence and evaluation:** emit modality-attributed structured evidence and report identical-task optical-only versus SAR-only results, cross-region degradation, runtime, and VRAM. Add corrupted- and missing-modality controls now so Phase 5 cannot claim fusion merely because two inputs are accepted.
 6. **Phase 4 exit gate:** freeze the dataset manifest, preprocessing profiles, model/checkpoint provenance, and unimodal baselines. Begin Phase 5 fusion only when both branches execute independently and their limitations are documented.
+
+## Phase 4 — Temporal + Deterministic Remote-Sensing Analytics
+
+**Status: BLOCKED.** The closeout is frozen in [experiments/phase4_temporal_analytics/PHASE_4_CLOSEOUT.json](../experiments/phase4_temporal_analytics/PHASE_4_CLOSEOUT.json); every referenced artifact is hash-verified by `tests/phase4/test_phase4_closeout.py`.
+
+Measured locally: P4-E01 deterministic verification lanes A–C (semantic-index formulas, common-grid preparation including deliberate equal-shape misalignment, and CRS-safe area measurement with exact pixel-count reconstruction) are `MEASURED`; deterministic SAR temporal change (dB difference / linear log-ratio, unknown radiometric semantics fail closed) and diagnostic-only mask agreement/compatibility are implemented and tested.
+
+Blocked: P4-E02 (ChangerEx), P4-E03 (Chg2Cap), and P4-E04 (STURM) primary reproductions cannot run because their LEVIR-CD, LEVIR-CC, and STURM-Flood/STURM contracts remain `BLOCKED` on checkpoint bytes, license audits, and pinned runtimes. No learned specialist is promoted, no benchmark metric is claimed, and no external run was launched; the Kaggle runner refuses canonical execution for these lanes via `canonical_launch_allowed: false` while permitting dry-run preparation. Phase 4 becomes `COMPLETE` only after the three primary reproductions pass.
 
 ## Foundation decisions
 

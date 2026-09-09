@@ -1,0 +1,101 @@
+{
+  "schema_version": 1,
+  "experiment_id": "PHASE_4",
+  "title": "Temporal + Deterministic Remote-Sensing Analytics",
+  "status": "BLOCKED",
+  "git_sha": "660466161cb187208a63111698fd11a14f3412bc",
+  "audited_at": "2026-02-14",
+  "artifacts": {
+    "experiments/phase4_temporal_analytics/p4_e01/manifest.json": "6a0b0b962272129a58c61bd6c88c2540a6d3f455eb8e6a45d365f06648e41f73",
+    "experiments/phase4_temporal_analytics/model_contracts.yaml": "eca4ac709c455ae4009f70528f7ba560b610eb069e661d379665c6404c062f38",
+    "experiments/phase4_temporal_analytics/dataset_contracts.yaml": "cf68ff68cf16c061578df9064ea8428c20da5b825fc8e9d8ef69a30c25fa5585",
+    "experiments/phase4_temporal_analytics/experiment_plan.yaml": "3966b0a3eb134a6791d4b9ff84f53205490155245116d0319d6a58e50b84562c",
+    "satquery/registry/tools.yaml": "1c23c4bed804c5d1b864f5cac28cf5934f66c5e34a7d6f7b7ff145ca63085f8c",
+    "models/registry.yaml": "60daaec39cf53b0faadd983e854c9b2f716f4c3846fb2758f1fc84d99f580113",
+    "satquery/registry/preprocessing.yaml": "4a0f03a9e69bc2170444286cc5f9313878f48da8d149010902bbe54c5fb4e189"
+  },
+  "lanes": {
+    "p4_e01_lane_a_formulas": {
+      "status": "MEASURED",
+      "check_count": 5,
+      "evidence_artifact": "experiments/phase4_temporal_analytics/p4_e01/manifest.json",
+      "provenance": "deterministic_synthetic_fixtures"
+    },
+    "p4_e01_lane_b_grids": {
+      "status": "MEASURED",
+      "check_count": 4,
+      "evidence_artifact": "experiments/phase4_temporal_analytics/p4_e01/manifest.json",
+      "provenance": "deterministic_synthetic_fixtures"
+    },
+    "p4_e01_lane_c_measurement": {
+      "status": "MEASURED",
+      "check_count": 2,
+      "evidence_artifact": "experiments/phase4_temporal_analytics/p4_e01/manifest.json",
+      "provenance": "deterministic_synthetic_fixtures"
+    },
+    "p4_e01_lane_d_oscd": {
+      "status": "BLOCKED",
+      "blockers": [
+        "OSCD dataset contract BLOCKED",
+        "no defensible deterministic generic change method frozen; NDVI-difference thresholding is not generic change detection"
+      ]
+    },
+    "p4_e02_changerex": {
+      "status": "BLOCKED",
+      "blockers": [
+        "LEVIR-CD dataset contract BLOCKED",
+        "ChangerEx model contract BLOCKED_PENDING_LOCAL_CHECKPOINT_BYTES_AND_RUNTIME_LOCK"
+      ]
+    },
+    "p4_e03_chg2cap": {
+      "status": "BLOCKED",
+      "blockers": [
+        "LEVIR-CC dataset contract BLOCKED",
+        "Chg2Cap model contract BLOCKED (checkpoint provenance and license audit pending)"
+      ]
+    },
+    "p4_e04_sturm": {
+      "status": "BLOCKED",
+      "blockers": [
+        "STURM-Flood dataset contract BLOCKED",
+        "STURM model contract BLOCKED (archive/weight hashes and TensorFlow/Keras runtime lock pending)",
+        "STURM composite radiometric scaling unverified; Sen1Floods11 transfer is BLOCKED_INPUT_CONTRACT"
+      ]
+    }
+  },
+  "deterministic_capabilities_added": [
+    "sar_temporal_change_v1 (backscatter_db difference / backscatter_linear safe log-ratio; unknown radiometric semantics fail closed)",
+    "mask_agreement_v1 / diagnostic mask agreement (IoU, agreement_not_accuracy)",
+    "mask compatibility assessment (grid, phenomenon, time semantics, value semantics)",
+    "deterministic spectral indices (NDVI/NDWI/MNDWI), common-grid preparation, CRS-safe area measurement (implemented in Tasks 3-4, verified by P4-E01 lanes A-C)"
+  ],
+  "promotions": {
+    "promoted_model_ids": [],
+    "rejected_or_deferred": [
+      "changerex_r18_levircd",
+      "chg2cap",
+      "sturm"
+    ],
+    "reason": "no learned specialist reached primary reproduction; none may be promoted"
+  },
+  "external_execution": {
+    "canonical_runs_launched": 0,
+    "reason": "all learned-specialist contracts BLOCKED; only dry-run preparation entries registered",
+    "runner_gate": "canonical_launch_allowed=false refuses canonical execution"
+  },
+  "sealed_test_status": "no learned-specialist evaluation ran; no test partition was accessed",
+  "no_training_decision": "no Phase 4 training runs were executed; training was out of scope for the deterministic core",
+  "limitations": {
+    "cartosat_risat_non_generalization": "no Cartosat/RISAT transfer claim is made; no measured evidence exists",
+    "rscama": "excluded_from_phase4_runtime",
+    "sen1floods11": "BLOCKED_INPUT_CONTRACT (STURM composite radiometric scaling unverified); not evaluated",
+    "s2looking": "optional robustness lane not run; primary lanes unaffected",
+    "agreement_is_diagnostic_only": "IoU agreement maps to no ALLOW/WARN/ABSTAIN policy in Phase 4"
+  },
+  "blockers_to_complete": [
+    "LEVIR-CD + ChangerEx contract PASS, then P4-E02 primary reproduction",
+    "LEVIR-CC + Chg2Cap contract PASS (license audit + checkpoint bytes), then P4-E03 primary reproduction",
+    "STURM + STURM-Flood contract PASS (archive hashes + TF/Keras runtime lock), then P4-E04 primary reproduction",
+    "optional: defensible deterministic OSCD change method + OSCD contract PASS for Lane D"
+  ]
+}
