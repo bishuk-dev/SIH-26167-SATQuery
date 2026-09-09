@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import os
+from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import FastAPI, Request
@@ -31,6 +33,7 @@ from apps.api.app.routes.v1_observations import (
 )
 from apps.api.app.routes.v1_pairs import router as v1_pairs_router
 from apps.api.app.routes.v1_registry import router as v1_registry_router
+from apps.api.app.routes.v1_jobs import router as v1_jobs_router
 from apps.api.app.routes.v1_system import router as v1_system_router
 from apps.api.app.routes.vqa import invalid_vqa_request_response
 from apps.api.app.routes.vqa import router as vqa_router
@@ -44,6 +47,8 @@ from satquery.ingestion import (
     RasterInspector,
     RasterSafetyLimits,
 )
+from satquery.artifacts import ArtifactStore
+from satquery.execution import ExecutionEngine, JobRunner
 from satquery.persistence import Database, MetadataRepository
 from satquery.registry import (
     load_model_registry,
@@ -78,7 +83,19 @@ def create_app(
     runtime_capabilities = load_runtime_capabilities(
         tool_registry, model_registry=model_registry
     )
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        app.state.observation_repository.mark_running_jobs_interrupted(
+            updated_at=datetime.now(timezone.utc)
+        )
+        app.state.job_runner.start()
+        try:
+            yield
+        finally:
+            app.state.job_runner.stop(timeout_seconds=5.0)
+
     application = FastAPI(
+        lifespan=lifespan,
         title=openapi_metadata.API_TITLE,
         summary=openapi_metadata.API_SUMMARY,
         description=openapi_metadata.API_DESCRIPTION,
@@ -93,6 +110,19 @@ def create_app(
     application.state.tool_registry = tool_registry
     application.state.model_registry = model_registry
     application.state.runtime_capabilities = runtime_capabilities
+    artifact_store = ArtifactStore(store.data_root)
+    execution_engine = ExecutionEngine(
+        {}, artifact_store=artifact_store, tool_registry=tool_registry,
+        timeout_seconds=float(os.environ.get("SATQUERY_TOOL_TIMEOUT_SECONDS", "300")),
+    )
+    application.state.artifact_store = artifact_store
+    application.state.execution_engine = execution_engine
+    application.state.job_runner = JobRunner(
+        repository,
+        execution_engine,
+        max_queued_jobs=int(os.environ.get("SATQUERY_MAX_QUEUED_JOBS", "32")),
+        worker_count=int(os.environ.get("SATQUERY_JOB_WORKERS", "1")),
+    )
     application.state.observation_ingestion_service = ObservationIngestionService(
         inspector=RasterInspector(safety_limits),
         store=store,
@@ -117,6 +147,7 @@ def create_app(
     application.include_router(v1_observations_router)
     application.include_router(v1_pairs_router)
     application.include_router(v1_registry_router)
+    application.include_router(v1_jobs_router)
 
     add_request_id_middleware(application)
     install_v1_error_handlers(application)
