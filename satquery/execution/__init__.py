@@ -27,6 +27,7 @@ __all__ = [
     "JobCancelledError",
     "JobQueueFullError",
     "JobRunner",
+    "ModelBusyError",
     "PlanStep",
     "StagedArtifact",
     "ToolAdapter",
@@ -51,7 +52,7 @@ def __getattr__(name: str):
     if name in {"AnalysisCache", "CacheKeyError", "build_cache_key"}:
         from satquery.execution.cache import AnalysisCache, CacheKeyError, build_cache_key
         return locals()[name]
-    if name in {"JobQueueFullError", "JobRunner"}:
-        from satquery.execution.jobs import JobQueueFullError, JobRunner
+    if name in {"JobQueueFullError", "JobRunner", "ModelBusyError"}:
+        from satquery.execution.jobs import JobQueueFullError, JobRunner, ModelBusyError
         return locals()[name]
     raise AttributeError(name)

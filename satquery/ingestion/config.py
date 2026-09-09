@@ -40,11 +40,21 @@ class RasterSafetyLimits(BaseModel):
             return parsed
 
         defaults = cls()
-        max_mebibytes = read_positive_int(
-            "MAX_UPLOAD_SIZE_MB", defaults.max_file_size_bytes // MEBIBYTE
-        )
+        raw_bytes = values.get("MAX_UPLOAD_SIZE_BYTES")
+        if raw_bytes is not None and raw_bytes.strip():
+            try:
+                max_file_size_bytes = int(raw_bytes)
+            except ValueError as exc:
+                raise ValueError("MAX_UPLOAD_SIZE_BYTES must be a positive integer") from exc
+            if max_file_size_bytes <= 0:
+                raise ValueError("MAX_UPLOAD_SIZE_BYTES must be a positive integer")
+        else:
+            max_mebibytes = read_positive_int(
+                "MAX_UPLOAD_SIZE_MB", defaults.max_file_size_bytes // MEBIBYTE
+            )
+            max_file_size_bytes = max_mebibytes * MEBIBYTE
         return cls(
-            max_file_size_bytes=max_mebibytes * MEBIBYTE,
+            max_file_size_bytes=max_file_size_bytes,
             max_width=read_positive_int("MAX_RASTER_WIDTH", defaults.max_width),
             max_height=read_positive_int("MAX_RASTER_HEIGHT", defaults.max_height),
             max_pixel_count=read_positive_int(

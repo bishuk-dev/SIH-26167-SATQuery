@@ -22,7 +22,7 @@ from satquery.agent.interpreter import DeterministicQueryInterpreter
 from satquery.agent.models import FeasibilityResult, QueryIntent
 from satquery.agent.planner import BoundedPlanner, ExecutionPlan, PlannerError
 from satquery.execution import ExecutionPlan as RuntimeExecutionPlan
-from satquery.execution import JobQueueFullError, PlanStep as RuntimePlanStep
+from satquery.execution import JobQueueFullError, ModelBusyError, PlanStep as RuntimePlanStep
 from satquery.geo import PairValidator
 from satquery.geo.models import PairCompatibility
 from satquery.persistence import (
@@ -381,6 +381,15 @@ def submit_query_v1(
             )
         idempotency_key_hash = _hash_text(idempotency_key)
         request_hash = _hash_text(canonical_json(payload.model_dump(mode="json")))
+    if idempotency_key_hash is None and not request.app.state.job_runner.has_queue_capacity():
+        return _failure(
+            request,
+            code="RESOURCE_BUSY",
+            message="The analysis job could not be queued because the local worker queue is full.",
+            outcome=FailureOutcomeV1.ABSTAIN,
+            status_code=429,
+            details={},
+        )
     observations, pair, observation_ids = _load_inputs(request, payload)
     intent = DeterministicQueryInterpreter().interpret(payload.query)
     feasibility = FeasibilityValidator().validate(
@@ -482,6 +491,16 @@ def submit_query_v1(
             request,
             code="RESOURCE_BUSY",
             message="The analysis job could not be queued because the local worker queue is full.",
+            outcome=FailureOutcomeV1.ABSTAIN,
+            status_code=429,
+            details={"analysis_id": analysis_id, "job_id": job_id},
+        )
+    except ModelBusyError:
+        _mark_submission_failed(request.app.state.observation_repository, analysis_id, job_id)
+        return _failure(
+            request,
+            code="MODEL_BUSY",
+            message="The registered model is temporarily busy.",
             outcome=FailureOutcomeV1.ABSTAIN,
             status_code=503,
             details={"analysis_id": analysis_id, "job_id": job_id},

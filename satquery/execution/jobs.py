@@ -40,6 +40,10 @@ class JobQueueFullError(RuntimeError):
     """The bounded local queue has no capacity."""
 
 
+class ModelBusyError(RuntimeError):
+    """A registered model cannot accept another concurrent execution."""
+
+
 # Terminal job states. Every state here except INTERRUPTED is always followed
 # by a matching terminal execution event (JOB_SUCCEEDED / JOB_FAILED /
 # JOB_CANCELLED) appended by the runner after the status transition.
@@ -117,6 +121,7 @@ class JobRunner:
             raise ValueError("queue and worker counts must be positive")
         self.repository = repository
         self.engine = engine
+        self.max_queued_jobs = max_queued_jobs
         self._queue: queue.Queue[str] = queue.Queue(maxsize=max_queued_jobs)
         self._worker_count = worker_count
         self._workers: list[Thread] = []
@@ -190,6 +195,11 @@ class JobRunner:
 
     def get(self, job_id: str) -> JobRecord | None:
         return self.repository.get_job(job_id)
+
+    def has_queue_capacity(self) -> bool:
+        """Return whether a new job can enter the bounded queue."""
+
+        return not self._queue.full()
 
     def events_after(self, job_id: str, after_sequence: int) -> tuple[ExecutionEvent, ...]:
         """Persisted events with sequence strictly greater than ``after_sequence``.
@@ -405,5 +415,6 @@ __all__ = [
     "TERMINAL_EVENT_TYPES",
     "TERMINAL_JOB_STATUSES",
     "JobQueueFullError",
+    "ModelBusyError",
     "JobRunner",
 ]

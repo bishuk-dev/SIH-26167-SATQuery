@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, PlainTextResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -42,6 +43,7 @@ from apps.api.app.routes.v1_system import router as v1_system_router
 from apps.api.app.routes.vqa import invalid_vqa_request_response
 from apps.api.app.routes.vqa import router as vqa_router
 from apps.api.app.schemas_v1 import FailureOutcomeV1
+from apps.api.app.security import SecuritySettings, auth_dependencies, security_middleware
 from apps.api.app.services.observations import ObservationIngestionService
 from satquery.inference.config import GroundingRuntimeSettings, VqaRuntimeSettings
 from satquery.inference.grounding import GroundingBackend, TextGuidedGroundingService
@@ -75,9 +77,11 @@ def create_app(
     vqa_backend: VqaBackend | None = None,
     grounding_settings: GroundingRuntimeSettings | None = None,
     grounding_backend: GroundingBackend | None = None,
+    security_settings: SecuritySettings | None = None,
 ) -> FastAPI:
     safety_limits = limits or RasterSafetyLimits.from_env()
     display_settings = visualization_settings or VisualizationSettings.from_env()
+    api_security = security_settings or SecuritySettings.from_env()
     storage_root = Path(data_root or os.environ.get("DATA_ROOT", "./data"))
     store = FilesystemObservationStore(storage_root)
     database = Database(store.data_root / "satquery.db")
@@ -111,6 +115,7 @@ def create_app(
         redoc_url=openapi_metadata.REDOC_URL,
         openapi_url=openapi_metadata.OPENAPI_URL,
     )
+    application.state.security_settings = api_security
     application.state.observation_repository = repository
     application.state.observation_store = store
     application.state.tool_registry = tool_registry
@@ -129,7 +134,7 @@ def create_app(
     application.state.job_runner = JobRunner(
         repository,
         execution_engine,
-        max_queued_jobs=int(os.environ.get("SATQUERY_MAX_QUEUED_JOBS", "32")),
+        max_queued_jobs=api_security.max_queue_size,
         worker_count=int(os.environ.get("SATQUERY_JOB_WORKERS", "1")),
     )
     application.state.observation_ingestion_service = ObservationIngestionService(
@@ -152,16 +157,28 @@ def create_app(
     application.include_router(tiles_router)
     application.include_router(vqa_router)
     application.include_router(grounding_router)
-    application.include_router(v1_system_router)
-    application.include_router(v1_observations_router)
-    application.include_router(v1_pairs_router)
-    application.include_router(v1_registry_router)
-    application.include_router(v1_jobs_router)
-    application.include_router(v1_artifacts_router)
-    application.include_router(v1_query_router)
-    application.include_router(v1_analyses_router)
-    application.include_router(v1_reports_router)
+    v1_dependencies = auth_dependencies(api_security)
+    application.include_router(v1_system_router, dependencies=v1_dependencies)
+    application.include_router(v1_observations_router, dependencies=v1_dependencies)
+    application.include_router(v1_pairs_router, dependencies=v1_dependencies)
+    application.include_router(v1_registry_router, dependencies=v1_dependencies)
+    application.include_router(v1_jobs_router, dependencies=v1_dependencies)
+    application.include_router(v1_artifacts_router, dependencies=v1_dependencies)
+    application.include_router(v1_query_router, dependencies=v1_dependencies)
+    application.include_router(v1_analyses_router, dependencies=v1_dependencies)
+    application.include_router(v1_reports_router, dependencies=v1_dependencies)
 
+    if api_security.cors_origins:
+        application.add_middleware(
+            CORSMiddleware,
+            allow_origins=list(api_security.cors_origins),
+            allow_credentials=api_security.cors_allow_credentials,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
+    application.middleware("http")(
+        lambda request, call_next: security_middleware(request, call_next, api_security)
+    )
     add_request_id_middleware(application)
     install_v1_error_handlers(application)
 
@@ -222,10 +239,12 @@ def install_v1_error_handlers(application: FastAPI) -> None:
         if _is_v1(request):
             request_id = request_id_from(request)
             code = {
+                401: "UNAUTHORIZED",
                 404: "NOT_FOUND",
                 405: "METHOD_NOT_ALLOWED",
             }.get(error.status_code, f"HTTP_{error.status_code}")
             message = {
+                401: "Authentication is required for this API.",
                 404: "The requested API resource was not found.",
                 405: "The HTTP method is not allowed on this resource.",
             }.get(error.status_code, "The request could not be processed.")
