@@ -13,6 +13,7 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 
 from apps.api.app.errors import failure_response, request_id_from
+from apps.api.app.openapi import error_responses
 from apps.api.app.schemas_v1 import (
     FailureOutcomeV1,
     PairCreateRequest,
@@ -245,6 +246,9 @@ def _decode_cursor(value: str | None) -> PageCursor | None:
     "/validate",
     response_model=PairValidationResponse,
     operation_id="validate_pair_v1",
+    summary="Validate two observations as a supported pair.",
+    description="Checks spatial, temporal, modality, and grid compatibility without persisting the pair.",
+    responses=error_responses(401, 404, 422),
 )
 def validate_pair_v1(
     request: Request, payload: PairCreateRequest
@@ -261,6 +265,12 @@ def validate_pair_v1(
     status_code=201,
     response_model=PairValidationResponse,
     operation_id="create_pair_v1",
+    summary="Create a validated observation pair.",
+    description="Validates and persists a pair snapshot for later analysis planning.",
+    responses={
+        201: {"description": "Pair validated and persisted."},
+        **error_responses(401, 404, 409, 422),
+    },
 )
 def create_pair_v1(
     request: Request, payload: PairCreateRequest
@@ -301,7 +311,14 @@ def create_pair_v1(
     return response
 
 
-@router.get("", response_model=PairPage, operation_id="list_pairs_v1")
+@router.get(
+    "",
+    response_model=PairPage,
+    operation_id="list_pairs_v1",
+    summary="List validated observation pairs.",
+    description="Returns keyset-paginated persisted pair validation snapshots.",
+    responses=error_responses(401, 422),
+)
 def list_pairs_v1(
     request: Request,
     cursor: str | None = None,
@@ -322,7 +339,12 @@ def list_pairs_v1(
 
 
 @router.get(
-    "/{pair_id}", response_model=PairValidationResponse, operation_id="get_pair_v1"
+    "/{pair_id}",
+    response_model=PairValidationResponse,
+    operation_id="get_pair_v1",
+    summary="Inspect one validated observation pair.",
+    description="Returns the immutable validation snapshot for a server-issued pair ID.",
+    responses=error_responses(401, 404),
 )
 def get_pair_v1(request: Request, pair_id: str) -> PairValidationResponse:
     repository: MetadataRepository = request.app.state.observation_repository

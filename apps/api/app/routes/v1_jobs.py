@@ -12,6 +12,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
+from apps.api.app.openapi import error_responses
 from apps.api.app.schemas import ApiModel
 from satquery.execution.jobs import TERMINAL_EVENT_TYPES, TERMINAL_JOB_STATUSES
 from satquery.persistence import ExecutionEvent, JobRecord, JobStatus
@@ -49,7 +50,14 @@ def _project(record: JobRecord) -> JobV1:
     )
 
 
-@router.get("/{job_id}", response_model=JobV1, operation_id="get_job_v1")
+@router.get(
+    "/{job_id}",
+    response_model=JobV1,
+    operation_id="get_job_v1",
+    summary="Inspect one durable execution job.",
+    description="Returns the persisted lifecycle state for a server-issued job ID.",
+    responses=error_responses(401, 404),
+)
 def get_job_v1(request: Request, job_id: str) -> JobV1:
     record = request.app.state.job_runner.get(job_id)
     if record is None:
@@ -57,7 +65,19 @@ def get_job_v1(request: Request, job_id: str) -> JobV1:
     return _project(record)
 
 
-@router.get("/{job_id}/events", operation_id="stream_job_events_v1")
+@router.get(
+    "/{job_id}/events",
+    operation_id="stream_job_events_v1",
+    summary="Stream durable job progress events.",
+    description="Returns replayable Server-Sent Events from the persisted execution trace.",
+    responses={
+        200: {
+            "description": "A replayable Server-Sent Events stream.",
+            "content": {"text/event-stream": {"schema": {"type": "string"}}},
+        },
+        **error_responses(401, 404, 422),
+    },
+)
 async def stream_job_events_v1(request: Request, job_id: str) -> StreamingResponse:
     runner = request.app.state.job_runner
     if runner.get(job_id) is None:
@@ -126,7 +146,17 @@ async def _job_event_stream(
         await asyncio.sleep(SSE_POLL_SECONDS)
 
 
-@router.post("/{job_id}/cancel", response_model=JobCancelV1, operation_id="cancel_job_v1")
+@router.post(
+    "/{job_id}/cancel",
+    response_model=JobCancelV1,
+    operation_id="cancel_job_v1",
+    summary="Request cancellation of one execution job.",
+    description="Requests cancellation and returns the persisted job state.",
+    responses={
+        200: {"description": "Cancellation request accepted or already reflected."},
+        **error_responses(401, 404, 409, 422, 503),
+    },
+)
 def cancel_job_v1(request: Request, job_id: str) -> JobCancelV1:
     runner = request.app.state.job_runner
     try:

@@ -6,6 +6,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
 
+from apps.api.app.openapi import error_responses
 from apps.api.app.schemas import ApiModel
 
 router = APIRouter()
@@ -112,6 +113,7 @@ def _model_projection(registry_id: str, registration: Any) -> dict[str, Any]:
     operation_id="list_tools_v1",
     summary="List registered deterministic tools.",
     description="Returns bounded tool metadata without executable implementation paths.",
+    responses=error_responses(401),
 )
 def list_tools_v1(request: Request) -> ToolCollectionV1:
     registry = request.app.state.tool_registry
@@ -128,6 +130,7 @@ def list_tools_v1(request: Request) -> ToolCollectionV1:
     operation_id="get_tool_v1",
     summary="Get one registered deterministic tool.",
     description="Returns a safe projection of one code-owned tool registration.",
+    responses=error_responses(401, 404),
 )
 def get_tool_v1(request: Request, tool_id: str) -> dict[str, Any]:
     registry = request.app.state.tool_registry
@@ -143,6 +146,7 @@ def get_tool_v1(request: Request, tool_id: str) -> dict[str, Any]:
     operation_id="list_models_v1",
     summary="List registered models.",
     description="Returns safe model metadata without checkpoint paths or files.",
+    responses=error_responses(401),
 )
 def list_models_v1(request: Request) -> ModelCollectionV1:
     registry = request.app.state.model_registry
@@ -161,6 +165,7 @@ def list_models_v1(request: Request) -> ModelCollectionV1:
     operation_id="get_model_v1",
     summary="Get one registered model.",
     description="Returns safe metadata for one registered model.",
+    responses=error_responses(401, 404),
 )
 def get_model_v1(request: Request, model_id: str) -> dict[str, Any]:
     registry = request.app.state.model_registry
@@ -180,6 +185,7 @@ def get_model_v1(request: Request, model_id: str) -> dict[str, Any]:
         "Reports frozen capability inventory and dynamic readiness. Blocked or "
         "unpromoted specialists are never exposed as available."
     ),
+    responses=error_responses(401),
 )
 def list_capabilities_v1(request: Request) -> CapabilityCollectionV1:
     registry = request.app.state.tool_registry

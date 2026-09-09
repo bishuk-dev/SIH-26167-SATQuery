@@ -18,6 +18,7 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 
 from apps.api.app.errors import failure_response, request_id_from
+from apps.api.app.openapi import error_responses
 from apps.api.app.routes.v1_observations import _decode_cursor, _encode_cursor
 from apps.api.app.schemas_v1 import (
     AnalysisArtifactV1,
@@ -120,7 +121,14 @@ def _artifact_projection(request: Request, analysis_id: str) -> list[AnalysisArt
     return items
 
 
-@router.get("", response_model=AnalysisPageV1, operation_id="list_analyses_v1")
+@router.get(
+    "",
+    response_model=AnalysisPageV1,
+    operation_id="list_analyses_v1",
+    summary="List persisted analyses.",
+    description="Returns keyset-paginated analysis history with optional filters.",
+    responses=error_responses(401, 422),
+)
 def list_analyses_v1(
     request: Request,
     cursor: str | None = None,
@@ -182,7 +190,14 @@ def list_analyses_v1(
     )
 
 
-@router.get("/{analysis_id}", response_model=AnalysisDetailV1, operation_id="get_analysis_v1")
+@router.get(
+    "/{analysis_id}",
+    response_model=AnalysisDetailV1,
+    operation_id="get_analysis_v1",
+    summary="Inspect one analysis.",
+    description="Returns the persisted analysis status, inputs, and frozen registry hashes.",
+    responses=error_responses(401, 404),
+)
 def get_analysis_v1(request: Request, analysis_id: str) -> AnalysisDetailV1:
     repository: MetadataRepository = request.app.state.observation_repository
     record = _get_analysis_or_404(repository, analysis_id)
@@ -200,6 +215,9 @@ def get_analysis_v1(request: Request, analysis_id: str) -> AnalysisDetailV1:
     "/{analysis_id}/evidence",
     response_model=AnalysisEvidenceV1,
     operation_id="get_analysis_evidence_v1",
+    summary="List evidence attached to an analysis.",
+    description="Returns path-free evidence projections and typed evidence edges.",
+    responses=error_responses(401, 404),
 )
 def get_analysis_evidence_v1(request: Request, analysis_id: str) -> AnalysisEvidenceV1:
     repository: MetadataRepository = request.app.state.observation_repository
@@ -239,6 +257,9 @@ def get_analysis_evidence_v1(request: Request, analysis_id: str) -> AnalysisEvid
     "/{analysis_id}/trace",
     response_model=AnalysisTraceV1,
     operation_id="get_analysis_trace_v1",
+    summary="List the execution trace for an analysis.",
+    description="Returns ordered persisted execution events without internal paths or stack traces.",
+    responses=error_responses(401, 404),
 )
 def get_analysis_trace_v1(request: Request, analysis_id: str) -> AnalysisTraceV1:
     repository: MetadataRepository = request.app.state.observation_repository
@@ -269,6 +290,9 @@ def get_analysis_trace_v1(request: Request, analysis_id: str) -> AnalysisTraceV1
     "/{analysis_id}/artifacts",
     response_model=AnalysisArtifactsV1,
     operation_id="get_analysis_artifacts_v1",
+    summary="List artifacts published by an analysis.",
+    description="Returns immutable public artifact identifiers and verified hashes.",
+    responses=error_responses(401, 404),
 )
 def get_analysis_artifacts_v1(request: Request, analysis_id: str) -> AnalysisArtifactsV1:
     repository: MetadataRepository = request.app.state.observation_repository
@@ -280,6 +304,9 @@ def get_analysis_artifacts_v1(request: Request, analysis_id: str) -> AnalysisArt
     "/{analysis_id}/reproducibility",
     response_model=AnalysisReproducibilityV1,
     operation_id="get_analysis_reproducibility_v1",
+    summary="Inspect analysis reproducibility identities.",
+    description="Returns frozen input hashes, plan steps, registry hash, and published artifacts.",
+    responses=error_responses(401, 404),
 )
 def get_analysis_reproducibility_v1(
     request: Request, analysis_id: str
@@ -323,6 +350,10 @@ def get_analysis_reproducibility_v1(
         "WORKFLOW_VERSION_UNAVAILABLE when any original tool registration is "
         "no longer loadable. The original analysis is never overwritten."
     ),
+    responses={
+        202: {"description": "The frozen analysis plan was accepted for rerun."},
+        **error_responses(401, 404, 409, 429, 500, 503),
+    },
 )
 def rerun_analysis_v1(request: Request, analysis_id: str) -> AnalysisRerunResponseV1 | JSONResponse:
     repository: MetadataRepository = request.app.state.observation_repository

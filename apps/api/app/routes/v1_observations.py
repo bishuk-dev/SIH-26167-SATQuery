@@ -12,6 +12,7 @@ from fastapi import APIRouter, File, HTTPException, Query, Request, UploadFile
 from fastapi.responses import JSONResponse
 
 from apps.api.app.errors import failure_response, request_id_from
+from apps.api.app.openapi import error_responses
 from apps.api.app.routes.observations import _failure_detail as legacy_failure_detail
 from apps.api.app.schemas import (
     ApiModel,
@@ -131,6 +132,16 @@ def _to_response(record: ObservationRecord) -> ObservationUploadResponse:
     "",
     status_code=201,
     response_model=ObservationUploadResponse,
+    operation_id="create_observation_v1",
+    summary="Register an immutable raster observation.",
+    description=(
+        "Uploads and inspects one GeoTIFF observation, preserving source and "
+        "visualization metadata in the server-side store."
+    ),
+    responses={
+        201: {"description": "Observation registered and ready."},
+        **error_responses(400, 401, 413, 415, 422, 500),
+    },
 )
 async def create_observation_v1(
     request: Request,
@@ -166,7 +177,14 @@ def v1_ingestion_error_response(
     )
 
 
-@router.get("", response_model=ObservationPage)
+@router.get(
+    "",
+    response_model=ObservationPage,
+    operation_id="list_observations_v1",
+    summary="List registered observations.",
+    description="Returns keyset-paginated immutable observation projections.",
+    responses=error_responses(401, 422),
+)
 def list_observations_v1(
     request: Request,
     cursor: str | None = None,
@@ -189,7 +207,14 @@ def list_observations_v1(
     )
 
 
-@router.get("/{observation_id}", response_model=ObservationUploadResponse)
+@router.get(
+    "/{observation_id}",
+    response_model=ObservationUploadResponse,
+    operation_id="get_observation_v1",
+    summary="Inspect one registered observation.",
+    description="Returns the safe metadata projection for a server-issued observation ID.",
+    responses=error_responses(401, 404),
+)
 def get_observation_v1(
     request: Request, observation_id: str
 ) -> ObservationUploadResponse:
@@ -200,7 +225,14 @@ def get_observation_v1(
     return _to_response(record)
 
 
-@router.get("/{observation_id}/metadata", response_model=ObservationMetadataResponse)
+@router.get(
+    "/{observation_id}/metadata",
+    response_model=ObservationMetadataResponse,
+    operation_id="get_observation_metadata_v1",
+    summary="Inspect observation sensor and geospatial metadata.",
+    description="Returns raster, sensor, geospatial, temporal, and provenance metadata.",
+    responses=error_responses(401, 404),
+)
 def get_observation_metadata_v1(
     request: Request, observation_id: str
 ) -> ObservationMetadataResponse:
@@ -214,7 +246,14 @@ def get_observation_metadata_v1(
     )
 
 
-@router.get("/{observation_id}/assets", response_model=ObservationAssets)
+@router.get(
+    "/{observation_id}/assets",
+    response_model=ObservationAssets,
+    operation_id="list_observation_assets_v1",
+    summary="List public assets for one observation.",
+    description="Returns immutable public asset identifiers without local filesystem paths.",
+    responses=error_responses(401, 404),
+)
 def get_observation_assets_v1(
     request: Request, observation_id: str
 ) -> ObservationAssets:
@@ -223,7 +262,14 @@ def get_observation_assets_v1(
     return ObservationAssets(items=(projection.asset, projection.visualization))
 
 
-@router.delete("/{observation_id}")
+@router.delete(
+    "/{observation_id}",
+    status_code=405,
+    operation_id="delete_observation_v1",
+    summary="Reject deletion of an immutable observation.",
+    description="Source observations are immutable; this endpoint always returns 405.",
+    responses=error_responses(401, 405),
+)
 def delete_observation_v1(observation_id: str) -> None:
     """Source observations are immutable and cannot be deleted."""
 

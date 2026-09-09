@@ -25,7 +25,7 @@ from satquery.visualization.exceptions import (
     VisualizationResourceLimitError,
 )
 
-router = APIRouter(prefix="/api/observations", tags=["observations"])
+router = APIRouter(prefix="/api/observations", tags=["Legacy"])
 
 
 def get_ingestion_service(request: Request) -> ObservationIngestionService:
@@ -36,6 +36,11 @@ def get_ingestion_service(request: Request) -> ObservationIngestionService:
     "",
     status_code=201,
     response_model=ObservationUploadResponse,
+    operation_id="create_observation_legacy",
+    summary="Register an observation (legacy).",
+    description="Deprecated compatibility route; use POST /api/v1/observations.",
+    tags=["Legacy"],
+    deprecated=True,
     responses={
         400: {"model": ErrorResponse},
         413: {"model": ErrorResponse},

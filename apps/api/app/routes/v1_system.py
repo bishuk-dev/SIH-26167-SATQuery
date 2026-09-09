@@ -7,7 +7,7 @@ from typing import Any
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
-from apps.api.app.openapi import API_VERSION
+from apps.api.app.openapi import API_VERSION, error_responses
 from apps.api.app.schemas import ApiModel
 from satquery.observability import readiness_payload
 
@@ -51,6 +51,8 @@ class SystemLimitsV1(ApiModel):
     operation_id="get_system_version_v1",
     response_model=SystemVersionV1,
     summary="Report the canonical API version and Phase 5 mode.",
+    description="Returns the immutable API and capability-mode identifiers.",
+    responses=error_responses(401),
 )
 def get_system_version_v1() -> SystemVersionV1:
     return SystemVersionV1(
@@ -71,6 +73,7 @@ def get_system_version_v1() -> SystemVersionV1:
         "inspection, or database access. Dependency readiness is reported "
         "separately once implemented."
     ),
+    responses=error_responses(401),
 )
 def get_liveness() -> LivenessV1:
     return LivenessV1(status="alive")
@@ -80,7 +83,7 @@ def get_liveness() -> LivenessV1:
     "/health/ready",
     operation_id="get_readiness",
     response_model=ReadinessV1,
-    responses={503: {"model": ReadinessV1}},
+    responses={503: {"model": ReadinessV1, "description": "One or more dependencies are not ready."}, **error_responses(401)},
     summary="Report dependency readiness without loading model checkpoints.",
     description=(
         "Checks SQLite, writable storage, loaded registries, queue capacity, "
@@ -99,6 +102,8 @@ def get_readiness(request: Request) -> ReadinessV1 | JSONResponse:
     operation_id="get_system_status_v1",
     response_model=SystemStatusV1,
     summary="Report dependency and capability status.",
+    description="Returns current storage, registry, queue, and model readiness.",
+    responses=error_responses(401),
 )
 def get_system_status_v1(request: Request) -> SystemStatusV1:
     return SystemStatusV1.model_validate(readiness_payload(request.app))
@@ -138,6 +143,8 @@ def _limits_payload(request: Request) -> dict[str, Any]:
     operation_id="get_system_limits_v1",
     response_model=SystemLimitsV1,
     summary="Report configured resource limits.",
+    description="Returns configured safety, visualization, query, and queue limits.",
+    responses=error_responses(401),
 )
 def get_system_limits_v1(request: Request) -> SystemLimitsV1:
     return SystemLimitsV1.model_validate(_limits_payload(request))
@@ -148,6 +155,9 @@ def get_system_limits_v1(request: Request) -> SystemLimitsV1:
     operation_id="get_limits",
     response_model=SystemLimitsV1,
     summary="Report configured resource limits.",
+    description="Deprecated compatibility alias; use /api/v1/system/limits.",
+    tags=["Legacy"],
+    deprecated=True,
 )
 def get_limits(request: Request) -> SystemLimitsV1:
     return SystemLimitsV1.model_validate(_limits_payload(request))

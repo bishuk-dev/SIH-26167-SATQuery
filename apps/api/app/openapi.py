@@ -9,6 +9,10 @@ routes use them.
 
 from __future__ import annotations
 
+from typing import Any
+
+from apps.api.app.schemas_v1 import ApiErrorV1
+
 API_TITLE = "SatQuery API"
 API_VERSION = "0.1.0"
 API_SUMMARY = (
@@ -30,6 +34,50 @@ GIS outputs; language-model text never creates scientific evidence.
 DOCS_URL = "/docs"
 REDOC_URL = "/redoc"
 OPENAPI_URL = "/openapi.json"
+
+# FastAPI's built-in documentation UIs remain package-free and use their
+# documented CDN assets. These options improve interactive use without
+# affecting the offline OpenAPI JSON contract.
+SWAGGER_UI_PARAMETERS: dict[str, Any] = {
+    "displayRequestDuration": True,
+    "filter": True,
+    "persistAuthorization": True,
+    "tryItOutEnabled": True,
+}
+
+_ERROR_DESCRIPTIONS = {
+    400: "The request is malformed or contains an invalid parameter.",
+    401: "Authentication is required when API-key security is enabled.",
+    404: "The requested resource was not found.",
+    409: "The request conflicts with current resource state.",
+    413: "The request exceeds a configured resource limit.",
+    415: "The uploaded media type is unsupported.",
+    422: "The request failed validation or scientific feasibility checks.",
+    429: "The service cannot accept the request because capacity is exhausted.",
+    500: "The server could not complete the request.",
+    501: "The requested capability is not implemented or enabled.",
+    503: "A required dependency is unavailable or temporarily busy.",
+}
+
+
+def error_responses(*statuses: int) -> dict[int, dict[str, Any]]:
+    """Return structured v1 error responses for a route decorator.
+
+    Keeping this mapping in one module prevents one route from accidentally
+    documenting FastAPI's internal validation model while the runtime emits
+    the frozen ``ApiErrorV1`` envelope.
+    """
+
+    return {
+        status: {
+            "model": ApiErrorV1,
+            "description": _ERROR_DESCRIPTIONS.get(
+                status, "The request could not be processed."
+            ),
+        }
+        for status in statuses
+    }
+
 
 # Ordered tag catalogue for the frozen route families. Route families
 # without implemented routes simply do not appear in the schema yet.

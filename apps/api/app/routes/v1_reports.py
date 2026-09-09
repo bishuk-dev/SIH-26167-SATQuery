@@ -11,7 +11,8 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 
 from apps.api.app.errors import failure_response, request_id_from
-from apps.api.app.schemas_v1 import FailureOutcomeV1
+from apps.api.app.openapi import error_responses
+from apps.api.app.schemas_v1 import ApiErrorV1, FailureOutcomeV1
 from satquery.reporting import AnalysisReport, render_html
 
 router = APIRouter(prefix="/api/v1/reports", tags=["Reports"])
@@ -29,6 +30,8 @@ def _report_or_404(request: Request, analysis_id: str) -> AnalysisReport:
     response_model=AnalysisReport,
     operation_id="get_analysis_report_v1",
     summary="Return the deterministic JSON report for one analysis.",
+    description="Builds a path-free JSON report from persisted analysis and evidence records.",
+    responses=error_responses(401, 404),
 )
 def get_analysis_report_v1(request: Request, analysis_id: str) -> AnalysisReport:
     return _report_or_404(request, analysis_id)
@@ -39,6 +42,11 @@ def get_analysis_report_v1(request: Request, analysis_id: str) -> AnalysisReport
     operation_id="render_analysis_report_html_v1",
     response_class=HTMLResponse,
     summary="Render the deterministic HTML report for one analysis.",
+    description="Renders the same persisted report as deterministic escaped HTML.",
+    responses={
+        200: {"description": "The deterministic HTML report."},
+        **error_responses(401, 404),
+    },
 )
 def render_analysis_report_html_v1(request: Request, analysis_id: str) -> HTMLResponse:
     report = _report_or_404(request, analysis_id)
@@ -47,12 +55,17 @@ def render_analysis_report_html_v1(request: Request, analysis_id: str) -> HTMLRe
 
 @router.get(
     "/{analysis_id}/pdf",
+    status_code=501,
     operation_id="get_analysis_report_pdf_v1",
     summary="PDF reports are disabled.",
     description=(
         "PDF rendering is disabled until a separately audited renderer is "
         "approved; no PDF is ever produced."
     ),
+    responses={
+        501: {"model": ApiErrorV1, "description": "PDF rendering is disabled."},
+        **error_responses(401, 404),
+    },
 )
 def get_analysis_report_pdf_v1(request: Request, analysis_id: str) -> JSONResponse:
     _report_or_404(request, analysis_id)

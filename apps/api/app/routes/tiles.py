@@ -13,12 +13,17 @@ from satquery.visualization.exceptions import (
 )
 from satquery.visualization.tiles import RasterTileService
 
-router = APIRouter(tags=["tiles"])
+router = APIRouter(tags=["Legacy"])
 
 
 @router.get(
     "/tiles/{asset_id}/{z}/{x}/{y}.png",
     response_class=Response,
+    operation_id="raster_tile_legacy",
+    summary="Render a raster tile (legacy).",
+    description="Deprecated compatibility route; use the versioned artifact tile alias.",
+    tags=["Legacy"],
+    deprecated=True,
     responses={
         400: {"model": ErrorResponse},
         404: {"model": ErrorResponse},

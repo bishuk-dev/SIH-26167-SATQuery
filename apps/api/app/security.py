@@ -223,7 +223,10 @@ def api_key_dependency(settings: SecuritySettings) -> Any:
 
 
 def auth_dependencies(settings: SecuritySettings) -> list[Any]:
-    return [Depends(api_key_dependency(settings))] if settings.api_key is not None else []
+    # Use Security at the router boundary so FastAPI emits the API-key
+    # requirement in OpenAPI. With no configured key, returning no dependency
+    # keeps both runtime and schema security-free.
+    return [Security(api_key_dependency(settings))] if settings.api_key is not None else []
 
 
 __all__ = [

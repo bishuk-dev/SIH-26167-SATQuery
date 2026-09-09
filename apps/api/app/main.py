@@ -118,6 +118,7 @@ def create_app(
         docs_url=openapi_metadata.DOCS_URL,
         redoc_url=openapi_metadata.REDOC_URL,
         openapi_url=openapi_metadata.OPENAPI_URL,
+        swagger_ui_parameters=openapi_metadata.SWAGGER_UI_PARAMETERS,
     )
     application.state.security_settings = api_security
     application.state.observation_repository = repository

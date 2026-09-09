@@ -17,7 +17,7 @@ from satquery.inference.exceptions import (
 from satquery.inference.grounding import TextGuidedGroundingService
 from satquery.ingestion.exceptions import ObservationNotFoundError
 
-router = APIRouter(prefix="/api/grounding", tags=["grounding"])
+router = APIRouter(prefix="/api/grounding", tags=["Legacy"])
 
 
 class GroundingRequest(ApiModel):
@@ -37,6 +37,11 @@ class GroundingRequest(ApiModel):
     "",
     response_model=GroundingEvidence,
     response_model_exclude_none=True,
+    operation_id="text_guided_grounding_legacy",
+    summary="Ground an object query (legacy).",
+    description="Deprecated compatibility route; use the canonical versioned query API.",
+    tags=["Legacy"],
+    deprecated=True,
     responses={
         404: {"model": ErrorResponse},
         422: {"model": ErrorResponse},

@@ -14,6 +14,7 @@ from fastapi.responses import JSONResponse
 from pydantic import Field
 
 from apps.api.app.errors import failure_response, request_id_from
+from apps.api.app.openapi import error_responses
 from apps.api.app.routes.v1_observations import registration_from_record
 from apps.api.app.schemas import ApiModel
 from apps.api.app.schemas_v1 import FailureOutcomeV1
@@ -41,6 +42,20 @@ _IDEMPOTENCY_KEY_PATTERN = re.compile(r"^[A-Za-z0-9._-]{16,128}$")
 
 
 class QueryPlanRequest(ApiModel):
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "query": "What changed between these observations?",
+                    "observation_ids": [
+                        "obs_00000000000000000000000000000001",
+                        "obs_00000000000000000000000000000002",
+                    ],
+                }
+            ]
+        }
+    }
+
     query: str = Field(min_length=1, max_length=4096)
     observation_ids: tuple[str, ...] = Field(default=(), min_length=0, max_length=2)
     pair_id: str | None = Field(default=None, pattern=r"^pair_[0-9a-f]{32}$")
@@ -300,6 +315,7 @@ def _mark_submission_failed(repository: MetadataRepository, analysis_id: str, jo
         "and returns a registry-constrained dry-run plan. The route never "
         "persists or executes a plan."
     ),
+    responses=error_responses(401, 404, 413, 422, 503),
 )
 def plan_query_v1(
     request: Request, payload: QueryPlanRequest
@@ -359,6 +375,10 @@ def plan_query_v1(
         "plan is derived only from server-side registries and server-issued "
         "observation identifiers; query text never selects executable tools."
     ),
+    responses={
+        202: {"description": "Analysis accepted and queued for execution."},
+        **error_responses(400, 401, 404, 409, 413, 422, 429, 500, 503),
+    },
 )
 def submit_query_v1(
     request: Request,

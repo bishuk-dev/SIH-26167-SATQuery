@@ -14,7 +14,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Any
 
-from pydantic import Field, model_validator
+from pydantic import ConfigDict, Field, model_validator
 
 from satquery.geo.models import ModalityPairType
 
@@ -32,6 +32,20 @@ class FailureOutcomeV1(str, Enum):
 
 
 class FailureDetailV1(ApiModel):
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "code": "INVALID_REQUEST",
+                    "message": "The request body failed validation.",
+                    "outcome": "REJECT",
+                    "details": {},
+                    "request_id": "req_00000000000000000000000000000000",
+                }
+            ]
+        }
+    )
+
     code: str = Field(min_length=1)
     message: str = Field(min_length=1)
     outcome: FailureOutcomeV1
@@ -40,6 +54,22 @@ class FailureDetailV1(ApiModel):
 
 
 class ApiErrorV1(ApiModel):
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "error": {
+                        "code": "INVALID_REQUEST",
+                        "message": "The request body failed validation.",
+                        "outcome": "REJECT",
+                        "details": {},
+                        "request_id": "req_00000000000000000000000000000000",
+                    }
+                }
+            ]
+        }
+    )
+
     error: FailureDetailV1
 
 
@@ -53,6 +83,18 @@ class PairTypeV1(str, Enum):
 
 
 class PairCreateRequest(ApiModel):
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "observation_a": "obs_00000000000000000000000000000001",
+                    "observation_b": "obs_00000000000000000000000000000002",
+                    "pair_type": "temporal",
+                }
+            ]
+        }
+    )
+
     observation_a: str = Field(pattern=r"^obs_[0-9a-f]{32}$")
     observation_b: str = Field(pattern=r"^obs_[0-9a-f]{32}$")
     pair_type: PairTypeV1
