@@ -25,6 +25,10 @@ from apps.api.app.routes.grounding import (
     router as grounding_router,
 )
 from apps.api.app.routes.tiles import router as tiles_router
+from apps.api.app.routes.v1_observations import (
+    index_existing_observations,
+    router as v1_observations_router,
+)
 from apps.api.app.routes.v1_system import router as v1_system_router
 from apps.api.app.routes.vqa import invalid_vqa_request_response
 from apps.api.app.routes.vqa import router as vqa_router
@@ -38,6 +42,7 @@ from satquery.ingestion import (
     RasterInspector,
     RasterSafetyLimits,
 )
+from satquery.persistence import Database, MetadataRepository
 from satquery.visualization.config import VisualizationSettings
 from satquery.visualization.derivatives import VisualizationDerivativeGenerator
 from satquery.visualization.tiles import RasterTileService
@@ -57,6 +62,10 @@ def create_app(
     display_settings = visualization_settings or VisualizationSettings.from_env()
     storage_root = Path(data_root or os.environ.get("DATA_ROOT", "./data"))
     store = FilesystemObservationStore(storage_root)
+    database = Database(store.data_root / "satquery.db")
+    database.migrate()
+    repository = MetadataRepository(database)
+    index_existing_observations(store, repository)
     application = FastAPI(
         title=openapi_metadata.API_TITLE,
         summary=openapi_metadata.API_SUMMARY,
@@ -67,6 +76,8 @@ def create_app(
         redoc_url=openapi_metadata.REDOC_URL,
         openapi_url=openapi_metadata.OPENAPI_URL,
     )
+    application.state.observation_repository = repository
+    application.state.observation_store = store
     application.state.observation_ingestion_service = ObservationIngestionService(
         inspector=RasterInspector(safety_limits),
         store=store,
@@ -88,6 +99,7 @@ def create_app(
     application.include_router(vqa_router)
     application.include_router(grounding_router)
     application.include_router(v1_system_router)
+    application.include_router(v1_observations_router)
 
     add_request_id_middleware(application)
     install_v1_error_handlers(application)
