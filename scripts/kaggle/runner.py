@@ -461,15 +461,14 @@ def _download_artifacts(
     experiment: dict[str, Any],
     output_dir: Path,
     allow_dirty: bool,
+    provenance: dict[str, Any] | None = None,
 ) -> None:
     """
-    Download ONLY the configured result_files from a completed Kaggle kernel.
-
-    Uses `kaggle kernels output --file-pattern <regex>` so only matching files
-    are transferred.  The full /kaggle/working tree (cloned repo, .git packs,
-    hundreds of MB of source) is never downloaded.
-
-    Raises SystemExit if any configured result file is absent after download.
+    Download ONLY the configured result_files from a completed Kaggle kernel,
+    retrieve them by exact structured path (never by basename search), stage
+    and validate the full set, then publish atomically. A failed retrieval
+    never overwrites previous results and leaves a structured failure
+    artifact under <output_dir>/failures/.
     """
     kernel_id = f"{username}/{kernel_slug}"
     result_files: list[str] = experiment.get("result_files", [])
@@ -514,43 +513,37 @@ def _download_artifacts(
                 "(often a Windows encoding issue — checking whether files arrived)"
             )
 
-        # Kaggle CLI mirrors the remote path structure under tmp_path.
-        # Notebook artifacts live at:
-        #   /kaggle/working/satquery-output/<remote_output_dir>/<file>
-        # Downloaded mirror:
-        #   <tmp>/satquery-output/<remote_output_dir>/<file>
-        # We also accept a flat layout in case the CLI version differs.
-        results_dest = output_dir / "results"
-        results_dest.mkdir(parents=True, exist_ok=True)
-
+        # Exact-path retrieval: the only accepted location for each result
+        # file is the experiment's own remote output directory. Basename
+        # matches elsewhere (other experiments, repo files, caches) never
+        # count; ambiguity and absence both fail closed.
+        base = tmp_path / "satquery-output" / remote_output_dir
         missing: list[str] = []
-        copied: list[Path] = []
-
         for rf in result_files:
-            fname = Path(rf).name
-
-            # 1. Expected structured path
-            candidate = tmp_path / "satquery-output" / remote_output_dir / rf
-            if candidate.exists():
-                dest = results_dest / fname
-                shutil.copy2(candidate, dest)
-                copied.append(dest)
-                continue
-
-            # 2. Flat fallback — search whole download tree by basename
-            hits = [p for p in tmp_path.rglob(fname) if p.is_file()]
-            if hits:
-                dest = results_dest / fname
-                shutil.copy2(hits[0], dest)
-                copied.append(dest)
-                continue
-
-            missing.append(rf)
+            if not (base / rf).is_file():
+                missing.append(rf)
 
         if missing:
+            output_dir.mkdir(parents=True, exist_ok=True)
+            failures_dir = output_dir / "failures"
+            failures_dir.mkdir(exist_ok=True)
+            failure_record = {
+                "kernel_slug": kernel_slug,
+                "remote_output_dir": remote_output_dir,
+                "missing_files": missing,
+                "retrieved_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            }
+            failure_path = (
+                failures_dir
+                / f"{time.strftime('%Y%m%dT%H%M%SZ', time.gmtime())}_{kernel_slug}.json"
+            )
+            failure_path.write_text(json.dumps(failure_record, indent=2))
             msg_lines = [
-                "❌  Missing result files after download:",
+                "❌  Missing result files after download (exact-path retrieval):",
                 *[f"    - {m}" for m in missing],
+                "",
+                f"    Failure artifact: {failure_path}",
+                "    Previous results were NOT modified.",
                 "",
                 "    Check that:",
                 f"    • remote_output_dir in experiments.yaml matches '{remote_output_dir}'",
@@ -561,15 +554,51 @@ def _download_artifacts(
             print("\n".join(msg_lines), file=sys.stderr)
             sys.exit(1)
 
-        # Annotate dirty runs
+        # Stage the complete result set beside the destination, then publish.
+        # ponytail: publish is move-old-away + rename-in, not a single atomic
+        # syscall; a crash between the two renames is recoverable from
+        # results.previous-<ts>.
+        output_dir.mkdir(parents=True, exist_ok=True)
+        staging = output_dir / f".staging-{kernel_slug}"
+        if staging.exists():
+            shutil.rmtree(staging)
+        results_dest = staging / "results"
+        results_dest.mkdir(parents=True)
+
+        for rf in result_files:
+            shutil.copy2(base / rf, results_dest / Path(rf).name)
+
         if allow_dirty:
             (results_dest / ".dirty_worktree").write_text(
                 "Results from a dirty working tree run — not a reproducible artifact.\n"
             )
 
-        print(f"\n📦  Copied {len(copied)} artifact(s) → {results_dest.relative_to(REPO_ROOT, walk_up=True)}/")
+        marker = {
+            "kernel_slug": kernel_slug,
+            "remote_output_dir": remote_output_dir,
+            "result_files": result_files,
+            "retrieved_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "dirty_worktree": allow_dirty,
+        }
+        if provenance:
+            marker.update(provenance)
+        (results_dest / "run_provenance.json").write_text(
+            json.dumps(marker, indent=2)
+        )
+
+        final_results = output_dir / "results"
+        if final_results.exists():
+            previous = output_dir / f"results.previous-{time.strftime('%Y%m%dT%H%M%SZ', time.gmtime())}"
+            os.replace(final_results, previous)
+            shutil.rmtree(previous, ignore_errors=True)
+        os.replace(staging / "results", final_results)
+        shutil.rmtree(staging, ignore_errors=True)
+
+        copied = sorted(final_results.iterdir())
+        print(f"\n📦  Published {len(result_files)} artifact(s) → {final_results.relative_to(REPO_ROOT, walk_up=True)}/")
         for p in copied:
-            print(f"    {p.name}  ({p.stat().st_size:,} bytes)")
+            if p.is_file():
+                print(f"    {p.name}  ({p.stat().st_size:,} bytes)")
 
 
 # ---------------------------------------------------------------------------
@@ -636,6 +665,20 @@ def cmd_download(args: argparse.Namespace) -> None:
 
 
 def cmd_run(args: argparse.Namespace) -> None:
+    # 0. Experiment config and canonical launch gate — before any external call.
+    #    Dry-run preparation stays permitted for contract-blocked lanes; only
+    #    canonical execution is refused.
+    exp          = _get_experiment(args.experiment)
+    if exp.get("canonical_launch_allowed") is False and not args.dry_run:
+        _die(
+            f"Experiment {exp['_name']!r} has canonical_launch_allowed: false "
+            "(model/dataset contract is still BLOCKED).\n"
+            "Dry-run preparation is permitted, but canonical execution must not "
+            "be launched until the contract is PASS.\n"
+            "Use:  python scripts/kaggle/runner.py run "
+            f"{exp['_name']} --dry-run"
+        )
+
     # 1. Checks
     cli_version = _check_kaggle_cli()
     print(f"🔧  Kaggle CLI: {cli_version}")
@@ -657,8 +700,7 @@ def cmd_run(args: argparse.Namespace) -> None:
             repo_url += ".git"
     print(f"🔗  Repo URL: {repo_url}")
 
-    # 2. Load experiment config
-    exp          = _get_experiment(args.experiment)
+    # 2. Load experiment config (already loaded above)
     exp_name     = exp["_name"]
     nb_path      = REPO_ROOT / exp["notebook"]
     slug         = exp["kernel_slug"]
@@ -743,6 +785,7 @@ def cmd_run(args: argparse.Namespace) -> None:
         experiment=exp,
         output_dir=output_dir,
         allow_dirty=args.allow_dirty,
+        provenance={"git_sha": git_sha, "experiment": exp_name},
     )
 
     print("\n✅  Done.")
@@ -839,6 +882,13 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def main() -> None:
+    # the runner prints emoji status markers; Windows cp1252 consoles crash
+    # on them unless our own streams are UTF-8 (children already get this
+    # through PYTHONIOENCODING in _run)
+    for stream in (sys.stdout, sys.stderr):
+        if stream.encoding and stream.encoding.lower().replace("-", "") != "utf8":
+            stream.reconfigure(encoding="utf-8", errors="replace")
+
     parser = _build_parser()
     args = parser.parse_args()
 

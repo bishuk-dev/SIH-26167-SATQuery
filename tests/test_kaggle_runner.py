@@ -7,6 +7,7 @@ No network calls, no CLI invocations, no Kaggle credentials required.
 
 from __future__ import annotations
 
+import argparse
 import json
 import re
 import shutil
@@ -713,3 +714,247 @@ class TestDownloadArtifacts:
             runner._download_artifacts(
                 "u", "s", experiment, tmp_path / "out", allow_dirty=False
             )
+
+# ---------------------------------------------------------------------------
+# Phase 4 canonical experiments — registration, launch gate, exact paths,
+# atomic staging (Phase 4 plan Task 11)
+# ---------------------------------------------------------------------------
+
+P4_EXPERIMENTS = [
+    "p4-e01-deterministic",
+    "p4-e02-changerex",
+    "p4-e03-chg2cap",
+    "p4-e04-sturm",
+]
+
+
+class TestPhase4ExperimentRegistration:
+    def test_four_phase4_experiments_are_registered(self) -> None:
+        registry = runner._load_registry()
+        for name in P4_EXPERIMENTS:
+            assert name in registry, f"missing Phase 4 experiment: {name}"
+
+    def test_slugs_and_remote_dirs_are_globally_unique(self) -> None:
+        registry = runner._load_registry()
+        slugs: list[str] = []
+        remote_dirs: list[str] = []
+        for entry in registry.values():
+            slugs.append(entry["kernel_slug"])
+            remote_dirs.append(entry["remote_output_dir"])
+        assert len(slugs) == len(set(slugs)), "kernel slug reuse"
+        assert len(remote_dirs) == len(set(remote_dirs)), "remote_output_dir reuse"
+
+    def test_no_historical_phase4_slug_reuse(self) -> None:
+        historical = {
+            "satquery-phase4-materialize-s1",
+            "satquery-phase4-materialize-s2",
+            "satquery-phase4d-native-raster-audit",
+            "satquery-phase4e-bifold-s1-validation",
+            "satquery-phase4e-bifold-s2-validation",
+            "satquery-phase4f-bifold-s2-head-adaptation",
+        }
+        registry = runner._load_registry()
+        for name in P4_EXPERIMENTS:
+            assert registry[name]["kernel_slug"] not in historical
+
+    def test_p4_e01_is_cpu_and_launchable(self) -> None:
+        entry = runner._load_registry()["p4-e01-deterministic"]
+        assert entry["gpu"] is False
+        assert entry.get("canonical_launch_allowed") is True
+
+    def test_learned_specialists_are_registered_blocked(self) -> None:
+        registry = runner._load_registry()
+        for name in ("p4-e02-changerex", "p4-e03-chg2cap", "p4-e04-sturm"):
+            entry = registry[name]
+            assert entry.get("canonical_launch_allowed") is False, name
+            assert entry.get("runtime_need"), name
+
+    def test_phase4_notebooks_exist_and_do_not_hand_author_metrics(self) -> None:
+        registry = runner._load_registry()
+        for name in P4_EXPERIMENTS:
+            nb_path = runner.REPO_ROOT / registry[name]["notebook"]
+            assert nb_path.exists(), name
+            nb = json.loads(nb_path.read_text(encoding="utf-8"))
+            for cell in nb["cells"]:
+                source = "".join(cell.get("source", []))
+                # no hand-authored scientific metric-looking literals
+                assert not re.search(r'"(precision|recall|f1|iou)":\s*0\.\d', source), name
+
+
+class TestCanonicalLaunchGate:
+    @staticmethod
+    def _namespace(output_dir: Path, dry_run: bool) -> mock.Namespace:
+        return argparse.Namespace(
+            experiment="x",
+            allow_dirty=False,
+            dry_run=dry_run,
+            no_download=True,
+            poll_interval=1,
+            output_dir=str(output_dir),
+        )
+
+    def _patched_checks(self, exp: dict):
+        return (
+            mock.patch.object(runner, "_get_experiment", return_value=exp),
+            mock.patch.object(runner, "_check_kaggle_cli", return_value="3.0"),
+            mock.patch.object(runner, "_check_kaggle_auth", return_value="u"),
+            mock.patch.object(
+                runner, "_check_git_clean", return_value="b" * 40
+            ),
+        )
+
+    def test_blocked_experiment_refuses_to_run(self, tmp_path: Path, capsys) -> None:
+        exp = {
+            "_name": "p4-e02-changerex",
+            "notebook": "notebooks/kaggle_phase4_e02.ipynb",
+            "kernel_slug": "satquery-phase4-e02-changerex",
+            "experiment_dir": "experiments/phase4_temporal_analytics",
+            "remote_output_dir": "phase4-e02-changerex",
+            "result_files": ["metrics.json"],
+            "canonical_launch_allowed": False,
+        }
+        patches = self._patched_checks(exp)
+        with patches[0], patches[1], patches[2], patches[3]:
+            with pytest.raises(SystemExit):
+                runner.cmd_run(self._namespace(tmp_path, dry_run=True))
+        assert "canonical_launch_allowed" in capsys.readouterr().err
+
+    def test_allowed_experiment_passes_the_gate(self, tmp_path: Path) -> None:
+        """A launchable experiment must get past the gate (dry-run, no push)."""
+        exp = {
+            "_name": "p4-e01-deterministic",
+            "notebook": "notebooks/kaggle_phase4_e01.ipynb",
+            "kernel_slug": "satquery-phase4-e01-deterministic",
+            "experiment_dir": "experiments/phase4_temporal_analytics/p4_e01",
+            "remote_output_dir": "phase4-e01-deterministic",
+            "result_files": ["manifest.json"],
+            "canonical_launch_allowed": True,
+        }
+        with mock.patch.object(
+            runner,
+            "_run",
+            side_effect=lambda cmd, **kw: mock.MagicMock(returncode=0, stdout=""),
+        ):
+            patches = self._patched_checks(exp)
+            with patches[0], patches[1], patches[2], patches[3]:
+                runner.cmd_run(self._namespace(tmp_path, dry_run=True))
+        # dry-run wrote push prep but pushed nothing
+        push_dir = runner.PUSH_WORK_DIR / "satquery-phase4-e01-deterministic"
+        assert (push_dir / "kernel-metadata.json").exists()
+
+
+class TestExactPathRetrieval:
+    """Exact remote result path retrieval; basename search must not rescue."""
+
+    def test_basename_match_at_wrong_path_fails_closed(self, tmp_path: Path) -> None:
+        remote_out = "phase4-e01-deterministic"
+        experiment = {
+            "remote_output_dir": remote_out,
+            "result_files": ["manifest.json"],
+        }
+        out_dir = tmp_path / "out"
+        out_dir.mkdir()
+
+        def fake_run(cmd, **_kwargs):
+            dest = Path(cmd[cmd.index("-p") + 1])
+            # file exists in a DIFFERENT remote dir — basename matches, path does not
+            wrong = dest / "satquery-output" / "some-other-experiment"
+            wrong.mkdir(parents=True)
+            (wrong / "manifest.json").write_text("{}")
+            return mock.MagicMock(returncode=0)
+
+        with mock.patch.object(runner, "_run", side_effect=fake_run):
+            with pytest.raises(SystemExit):
+                runner._download_artifacts(
+                    "u", "s", experiment, out_dir, allow_dirty=False
+                )
+        assert not (out_dir / "results").exists()
+
+
+class TestAtomicStaging:
+    """Results are staged, validated, then published; failures never overwrite."""
+
+    @staticmethod
+    def _experiment(remote_out: str) -> dict:
+        return {
+            "remote_output_dir": remote_out,
+            "result_files": ["metrics.json", "rows.jsonl"],
+        }
+
+    @staticmethod
+    def _fake_download(dl_dir: Path, remote_out: str, files: list[str]):
+        def fake_run(cmd, **_kwargs):
+            dest = Path(cmd[cmd.index("-p") + 1])
+            sub = dest / "satquery-output" / remote_out
+            sub.mkdir(parents=True, exist_ok=True)
+            for f in files:
+                (sub / f).write_text(f"content {f}")
+            return mock.MagicMock(returncode=0)
+
+        return fake_run
+
+    def test_success_writes_run_provenance(self, tmp_path: Path) -> None:
+        remote_out = "phase4-e01-deterministic"
+        out_dir = tmp_path / "out"
+        out_dir.mkdir()
+        with mock.patch.object(
+            runner,
+            "_run",
+            side_effect=self._fake_download(
+                tmp_path / "dl", remote_out, ["metrics.json", "rows.jsonl"]
+            ),
+        ):
+            runner._download_artifacts(
+                "u", "s", self._experiment(remote_out), out_dir,
+                allow_dirty=False,
+                provenance={"git_sha": "c" * 40, "kernel_slug": "satquery-x"},
+            )
+        results = out_dir / "results"
+        assert (results / "metrics.json").exists()
+        assert (results / "rows.jsonl").exists()
+        marker = json.loads((results / "run_provenance.json").read_text())
+        assert marker["git_sha"] == "c" * 40
+        assert marker["kernel_slug"] == "satquery-x"
+
+    def test_failed_run_leaves_previous_results_intact(self, tmp_path: Path) -> None:
+        remote_out = "phase4-e01-deterministic"
+        out_dir = tmp_path / "out"
+        results = out_dir / "results"
+        results.mkdir(parents=True)
+        (results / "metrics.json").write_text("previous")
+        (results / "run_provenance.json").write_text(json.dumps({"git_sha": "old"}))
+
+        # new download provides only one of two configured files
+        with mock.patch.object(
+            runner,
+            "_run",
+            side_effect=self._fake_download(tmp_path / "dl", remote_out, ["metrics.json"]),
+        ):
+            with pytest.raises(SystemExit):
+                runner._download_artifacts(
+                    "u", "s", self._experiment(remote_out), out_dir, allow_dirty=False
+                )
+        # previous results untouched and still look like the old run
+        assert (results / "metrics.json").read_text() == "previous"
+        assert json.loads((results / "run_provenance.json").read_text())["git_sha"] == "old"
+        # no partial new files leaked into results
+        assert not (results / "rows.jsonl").exists()
+
+    def test_failure_artifacts_are_distinguishable(self, tmp_path: Path) -> None:
+        remote_out = "phase4-e01-deterministic"
+        out_dir = tmp_path / "out"
+        out_dir.mkdir()
+        with mock.patch.object(
+            runner,
+            "_run",
+            side_effect=self._fake_download(tmp_path / "dl", remote_out, ["metrics.json"]),
+        ):
+            with pytest.raises(SystemExit):
+                runner._download_artifacts(
+                    "u", "s", self._experiment(remote_out), out_dir, allow_dirty=False
+                )
+        failures = list((out_dir / "failures").glob("*.json"))
+        assert failures, "failed retrieval must leave a structured failure artifact"
+        payload = json.loads(failures[0].read_text())
+        assert payload["missing_files"] == ["rows.jsonl"]
+        assert payload["kernel_slug"] == "s"

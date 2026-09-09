@@ -167,3 +167,60 @@ phase5a-bifold-joint-validation:
     - technobishu/satquery-phase4-materialize-s2
   gpu: true
   internet: true
+
+# ---------------------------------------------------------------------------
+# Canonical Phase 4 experiments (P4-E01..P4-E04). Historical Phase 4A-5A
+# entries above keep their own slugs; these never reuse them.
+# canonical_launch_allowed: false refuses canonical execution (runner fails
+# closed) while the model/dataset contract is BLOCKED; --dry-run still works.
+# ---------------------------------------------------------------------------
+
+p4-e01-deterministic:
+  notebook: notebooks/kaggle_phase4_e01.ipynb
+  kernel_slug: satquery-phase4-e01-deterministic
+  experiment_dir: experiments/phase4_temporal_analytics/p4_e01
+  remote_output_dir: phase4-e01-deterministic
+  result_files:
+    - manifest.json
+  gpu: false
+  internet: true
+  canonical_launch_allowed: true
+
+p4-e02-changerex:
+  notebook: notebooks/kaggle_phase4_e02.ipynb
+  kernel_slug: satquery-phase4-e02-changerex
+  experiment_dir: experiments/phase4_temporal_analytics/p4_e02
+  remote_output_dir: phase4-e02-changerex
+  result_files:
+    - reproduction_metrics.json
+  gpu: true
+  internet: true
+  canonical_launch_allowed: false
+  runtime_need: open_cd_pytorch_pinned_revision
+  blocked_reason: LEVIR-CD and ChangerEx contracts are BLOCKED (checkpoint bytes and runtime lock pending)
+
+p4-e03-chg2cap:
+  notebook: notebooks/kaggle_phase4_e03.ipynb
+  kernel_slug: satquery-phase4-e03-chg2cap
+  experiment_dir: experiments/phase4_temporal_analytics/p4_e03
+  remote_output_dir: phase4-e03-chg2cap
+  result_files:
+    - caption_metrics.json
+  gpu: true
+  internet: true
+  canonical_launch_allowed: false
+  runtime_need: isolated_audited_chg2cap_environment
+  blocked_reason: LEVIR-CC and Chg2Cap contracts are BLOCKED (license audit and checkpoint provenance pending)
+
+p4-e04-sturm:
+  notebook: notebooks/kaggle_phase4_e04.ipynb
+  kernel_slug: satquery-phase4-e04-sturm
+  experiment_dir: experiments/phase4_temporal_analytics/p4_e04
+  remote_output_dir: phase4-e04-sturm
+  result_files:
+    - sturm_metrics.json
+  gpu: true
+  internet: true
+  canonical_launch_allowed: false
+  runtime_need: isolated_tensorflow_keras_sturm_environment
+  blocked_reason: STURM and STURM-Flood contracts are BLOCKED (archive hashes and radiometric scaling verification pending)

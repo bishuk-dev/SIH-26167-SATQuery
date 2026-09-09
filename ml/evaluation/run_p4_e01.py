@@ -138,11 +138,92 @@ def _write_geotiff(
 
 
 def _fixture_observation(path: Path, observation_id: str) -> ObservationState:
-    # ObservationState built directly from the fixture file so that the
-    # registered SHA-256 and grid metadata are exactly what alignment sees.
-    from tests.analytics.test_temporal import _observation  # type: ignore[attr-defined]
+    """Register a fixture GeoTIFF as an ObservationState with exact file metadata."""
 
-    return _observation(path, observation_id)
+    from datetime import datetime, timezone
+
+    from satquery.ingestion.models import (
+        BandMetadata,
+        GeoBounds,
+        GeoMetadata,
+        MetadataQuality,
+        Modality,
+        ObservationProvenance,
+        RasterMetadata,
+        SensorMetadata,
+        SourceAsset,
+        TemporalMetadata,
+        ValidityMetadata,
+    )
+
+    with rasterio.open(path) as dataset:
+        crs = dataset.crs
+        transform = dataset.transform
+        bounds = dataset.bounds
+        count = dataset.count
+        nodata = dataset.nodata
+        dtypes = tuple(dataset.dtypes)
+        width = dataset.width
+        height = dataset.height
+
+    return ObservationState(
+        observation_id=observation_id,
+        source_asset=SourceAsset(
+            asset_id=observation_id + "-asset",
+            original_name=path.name,
+            path=str(path),
+            sha256=_sha256(path),
+        ),
+        raster=RasterMetadata(
+            driver="GTiff",
+            width=width,
+            height=height,
+            band_count=count,
+            dtypes=dtypes,
+            nodata=tuple(nodata) if isinstance(nodata, (list, tuple)) else (nodata,) * count,
+        ),
+        sensor=SensorMetadata(
+            modality=Modality.MULTISPECTRAL,
+            sensor_name="P4E01Fixture",
+            bands=tuple(
+                BandMetadata(index=i, description=f"band_{i}", dtype="float32")
+                for i in range(1, count + 1)
+            ),
+        ),
+        geo=GeoMetadata(
+            crs=str(crs) if crs else None,
+            transform={
+                "a": transform.a,
+                "b": transform.b,
+                "c": transform.c,
+                "d": transform.d,
+                "e": transform.e,
+                "f": transform.f,
+            },
+            bounds=GeoBounds(
+                left=bounds.left,
+                bottom=bounds.bottom,
+                right=bounds.right,
+                top=bounds.top,
+            ),
+            native_gsd_x=abs(transform.a) or None,
+            native_gsd_y=abs(transform.e) or None,
+            units="m" if crs and "326" in str(crs) else "degree",
+        ),
+        temporal=TemporalMetadata(
+            acquisition_time=datetime(2020, 1, 1, tzinfo=timezone.utc)
+        ),
+        validity=ValidityMetadata(
+            has_crs=crs is not None,
+            has_transform=True,
+            has_nodata=nodata is not None,
+            metadata_quality=MetadataQuality.HIGH,
+        ),
+        provenance=ObservationProvenance(
+            created_at=datetime(2020, 1, 1, tzinfo=timezone.utc),
+            ingestion_version="p4_e01_fixtures",
+        ),
+    )
 
 
 def run_lane_b(output_dir: Path) -> dict[str, object]:
