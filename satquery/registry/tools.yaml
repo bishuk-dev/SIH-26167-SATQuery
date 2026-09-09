@@ -3,6 +3,8 @@ tools:
   sar_temporal_change_v1:
     title: Deterministic SAR temporal change
     kind: deterministic_analytics
+    executor: sar_temporal_change
+    implementation: satquery.analytics.sar.sar_temporal_change
     description: >-
       Absolute-change score between two co-observed SAR arrays under an
       explicitly contracted radiometric domain and semantic polarizations.
@@ -22,9 +24,11 @@ tools:
         type: enum_list
         values: [VV, VH, HH, HV]
         min_items: 1
+        max_items: 4
       threshold:
         type: number
         minimum: 0
+        maximum: 1000000
     evidence:
       type: change_mask
       deterministic: true
@@ -33,6 +37,8 @@ tools:
   mask_agreement_v1:
     title: Diagnostic mask agreement (IoU)
     kind: deterministic_analytics
+    executor: mask_agreement
+    implementation: satquery.analytics.reconciliation.diagnostic_mask_agreement
     description: >-
       Intersection/union/IoU between two binary masks over valid pixels.
       Agreement is diagnostic only and maps to no decision policy.

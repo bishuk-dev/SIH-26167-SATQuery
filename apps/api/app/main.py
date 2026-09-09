@@ -30,6 +30,7 @@ from apps.api.app.routes.v1_observations import (
     router as v1_observations_router,
 )
 from apps.api.app.routes.v1_pairs import router as v1_pairs_router
+from apps.api.app.routes.v1_registry import router as v1_registry_router
 from apps.api.app.routes.v1_system import router as v1_system_router
 from apps.api.app.routes.vqa import invalid_vqa_request_response
 from apps.api.app.routes.vqa import router as vqa_router
@@ -44,6 +45,11 @@ from satquery.ingestion import (
     RasterSafetyLimits,
 )
 from satquery.persistence import Database, MetadataRepository
+from satquery.registry import (
+    load_model_registry,
+    load_runtime_capabilities,
+    load_tool_registry,
+)
 from satquery.visualization.config import VisualizationSettings
 from satquery.visualization.derivatives import VisualizationDerivativeGenerator
 from satquery.visualization.tiles import RasterTileService
@@ -67,6 +73,11 @@ def create_app(
     database.migrate()
     repository = MetadataRepository(database)
     index_existing_observations(store, repository)
+    tool_registry = load_tool_registry()
+    model_registry = load_model_registry()
+    runtime_capabilities = load_runtime_capabilities(
+        tool_registry, model_registry=model_registry
+    )
     application = FastAPI(
         title=openapi_metadata.API_TITLE,
         summary=openapi_metadata.API_SUMMARY,
@@ -79,6 +90,9 @@ def create_app(
     )
     application.state.observation_repository = repository
     application.state.observation_store = store
+    application.state.tool_registry = tool_registry
+    application.state.model_registry = model_registry
+    application.state.runtime_capabilities = runtime_capabilities
     application.state.observation_ingestion_service = ObservationIngestionService(
         inspector=RasterInspector(safety_limits),
         store=store,
@@ -102,6 +116,7 @@ def create_app(
     application.include_router(v1_system_router)
     application.include_router(v1_observations_router)
     application.include_router(v1_pairs_router)
+    application.include_router(v1_registry_router)
 
     add_request_id_middleware(application)
     install_v1_error_handlers(application)

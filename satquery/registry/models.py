@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import Enum, StrEnum
 from pathlib import Path
 from typing import Annotated, Literal
 
@@ -19,6 +19,13 @@ class SarPolarization(str, Enum):
     VH = "VH"
     HH = "HH"
     HV = "HV"
+
+
+class ToolExecutor(StrEnum):
+    """Code-owned executor identifiers accepted by the runtime registry."""
+
+    SAR_TEMPORAL_CHANGE = "sar_temporal_change"
+    MASK_AGREEMENT = "mask_agreement"
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_MODEL_REGISTRY = PROJECT_ROOT / "models" / "registry.yaml"
