@@ -40,6 +40,26 @@ class JobQueueFullError(RuntimeError):
     """The bounded local queue has no capacity."""
 
 
+# Terminal job states. Every state here except INTERRUPTED is always followed
+# by a matching terminal execution event (JOB_SUCCEEDED / JOB_FAILED /
+# JOB_CANCELLED) appended by the runner after the status transition.
+TERMINAL_JOB_STATUSES: frozenset[JobStatus] = frozenset(
+    {
+        JobStatus.SUCCEEDED,
+        JobStatus.FAILED,
+        JobStatus.CANCELLED,
+        JobStatus.INTERRUPTED,
+    }
+)
+TERMINAL_EVENT_TYPES: frozenset[str] = frozenset(
+    {
+        ExecutionEventType.SUCCEEDED.value,
+        ExecutionEventType.FAILED.value,
+        ExecutionEventType.CANCELLED.value,
+    }
+)
+
+
 def _graph_from_results(
     results: tuple[ToolResult, ...], *, input_ids: tuple[str, ...]
 ) -> EvidenceGraph:
@@ -170,6 +190,19 @@ class JobRunner:
 
     def get(self, job_id: str) -> JobRecord | None:
         return self.repository.get_job(job_id)
+
+    def events_after(self, job_id: str, after_sequence: int) -> tuple[ExecutionEvent, ...]:
+        """Persisted events with sequence strictly greater than ``after_sequence``.
+
+        SSE resume reads from SQLite so reconnect/restart works without an
+        in-memory broker.
+        """
+
+        return tuple(
+            event
+            for event in self.repository.list_events(job_id)
+            if event.sequence > after_sequence
+        )
 
     def request_cancel(self, job_id: str) -> JobRecord:
         job = self.repository.get_job(job_id)
@@ -368,4 +401,9 @@ class JobRunner:
         )
 
 
-__all__ = ["JobQueueFullError", "JobRunner"]
+__all__ = [
+    "TERMINAL_EVENT_TYPES",
+    "TERMINAL_JOB_STATUSES",
+    "JobQueueFullError",
+    "JobRunner",
+]
