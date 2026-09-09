@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import hashlib
+import json
+import re
 from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Header, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import Field
 
@@ -33,6 +35,9 @@ from satquery.persistence import (
 from satquery.persistence.repositories import canonical_json, encode_timestamp
 
 router = APIRouter(prefix="/api/v1/query", tags=["Query"])
+
+# client idempotency keys are bounded, URL-safe tokens; only their SHA-256 is stored
+_IDEMPOTENCY_KEY_PATTERN = re.compile(r"^[A-Za-z0-9._-]{16,128}$")
 
 
 class QueryPlanRequest(ApiModel):
@@ -174,8 +179,46 @@ def _persist_submission(
     observation_ids: tuple[str, ...],
     pair_id: str | None,
     plan: ExecutionPlan,
-) -> None:
+    idempotency_key_hash: str | None = None,
+    request_hash: str | None = None,
+) -> dict[str, Any] | None:
+    """Atomically persist the submission transaction.
+
+    With an idempotency key, the key check, the idempotency record, and the
+    analysis/job rows commit together. Returns ``{"conflict": ...}`` when the
+    key was already used with a different body, a ``{"replay": ...}`` payload
+    when the same key/body pair is resubmitted, and None for a fresh
+    submission. GET routes are never idempotency-guarded.
+    """
+
     with repository._db.transaction() as connection:
+        if idempotency_key_hash is not None:
+            existing = connection.execute(
+                "SELECT request_hash, analysis_id FROM idempotency_keys WHERE key_hash = ?",
+                (idempotency_key_hash,),
+            ).fetchone()
+            if existing is not None:
+                if existing["request_hash"] != request_hash:
+                    return {"conflict": True}
+                analysis_row = connection.execute(
+                    "SELECT status, payload_json FROM analyses WHERE analysis_id = ?",
+                    (existing["analysis_id"],),
+                ).fetchone()
+                job_row = connection.execute(
+                    "SELECT job_id, status FROM jobs WHERE analysis_id = ?",
+                    (existing["analysis_id"],),
+                ).fetchone()
+                if analysis_row is None or job_row is None:
+                    # record without its submission would be corrupt; fail closed
+                    return {"conflict": True}
+                return {
+                    "replay": {
+                        "analysis_id": existing["analysis_id"],
+                        "job_id": job_row["job_id"],
+                        "status": job_row["status"],
+                        "payload": json.loads(analysis_row["payload_json"]),
+                    }
+                }
         connection.execute(
             "INSERT INTO analyses(analysis_id, status, created_at, updated_at, payload_json)"
             " VALUES (?, ?, ?, ?, ?)",
@@ -225,6 +268,18 @@ def _persist_submission(
                 canonical_json(job.payload),
             ),
         )
+        if idempotency_key_hash is not None:
+            connection.execute(
+                "INSERT INTO idempotency_keys(key_hash, request_hash, analysis_id, created_at)"
+                " VALUES (?, ?, ?, ?)",
+                (
+                    idempotency_key_hash,
+                    request_hash,
+                    analysis.analysis_id,
+                    encode_timestamp(analysis.created_at),
+                ),
+            )
+    return None
 
 
 def _mark_submission_failed(repository: MetadataRepository, analysis_id: str, job_id: str) -> None:
@@ -306,8 +361,26 @@ def plan_query_v1(
     ),
 )
 def submit_query_v1(
-    request: Request, payload: QueryPlanRequest
+    request: Request,
+    payload: QueryPlanRequest,
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
 ) -> QuerySubmissionResponse | JSONResponse:
+    idempotency_key_hash: str | None = None
+    request_hash: str | None = None
+    if idempotency_key is not None:
+        if not _IDEMPOTENCY_KEY_PATTERN.fullmatch(idempotency_key):
+            return _failure(
+                request,
+                code="INVALID_IDEMPOTENCY_KEY",
+                message=(
+                    "The Idempotency-Key header must be 16-128 URL-safe characters."
+                ),
+                outcome=FailureOutcomeV1.REJECT,
+                status_code=400,
+                details={},
+            )
+        idempotency_key_hash = _hash_text(idempotency_key)
+        request_hash = _hash_text(canonical_json(payload.model_dump(mode="json")))
     observations, pair, observation_ids = _load_inputs(request, payload)
     intent = DeterministicQueryInterpreter().interpret(payload.query)
     feasibility = FeasibilityValidator().validate(
@@ -367,14 +440,40 @@ def submit_query_v1(
         updated_at=now,
         payload=job_payload,
     )
-    _persist_submission(
+    outcome = _persist_submission(
         request.app.state.observation_repository,
         analysis=analysis,
         job=job,
         observation_ids=observation_ids,
         pair_id=payload.pair_id,
         plan=plan,
+        idempotency_key_hash=idempotency_key_hash,
+        request_hash=request_hash,
     )
+    if outcome is not None and outcome.get("conflict"):
+        return _failure(
+            request,
+            code="IDEMPOTENCY_CONFLICT",
+            message=(
+                "This Idempotency-Key was already used with a different request body."
+            ),
+            outcome=FailureOutcomeV1.REJECT,
+            status_code=409,
+            details={},
+        )
+    if outcome is not None and "replay" in outcome:
+        replay = outcome["replay"]
+        payload_json = replay["payload"]
+        return JSONResponse(
+            status_code=200,
+            content=QuerySubmissionResponse(
+                analysis_id=replay["analysis_id"],
+                job_id=replay["job_id"],
+                status=JobStatus(replay["status"]),
+                plan_hash=payload_json["plan_hash"],
+                registry_hash=payload_json["registry_hash"],
+            ).model_dump(mode="json"),
+        )
     try:
         request.app.state.job_runner.enqueue_existing(job_id)
     except JobQueueFullError:

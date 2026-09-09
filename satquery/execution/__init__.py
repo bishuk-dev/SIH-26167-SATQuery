@@ -15,6 +15,7 @@ from satquery.execution.models import (
 )
 
 __all__ = [
+    "AnalysisCache",
     "ArtifactMetadata",
     "ArtifactOutput",
     "ArtifactRecord",
@@ -33,6 +34,7 @@ __all__ = [
     "ToolExecutionError",
     "ToolResult",
     "UnknownToolError",
+    "build_cache_key",
 ]
 
 
@@ -45,6 +47,9 @@ def __getattr__(name: str):
             ToolExecutionError,
             UnknownToolError,
         )
+        return locals()[name]
+    if name in {"AnalysisCache", "CacheKeyError", "build_cache_key"}:
+        from satquery.execution.cache import AnalysisCache, CacheKeyError, build_cache_key
         return locals()[name]
     if name in {"JobQueueFullError", "JobRunner"}:
         from satquery.execution.jobs import JobQueueFullError, JobRunner
