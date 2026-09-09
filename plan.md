@@ -1,26 +1,37 @@
 # Phase 4 Clean Rebuild Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` (recommended) or `superpowers:executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** Execute this plan strictly task-by-task. If your environment provides a plan-execution/subagent skill, use it; otherwise follow the checklist directly. Never advance past a human-review or scientific gate automatically. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build reproducible temporal remote-sensing specialists for deterministic multispectral analysis, high-resolution optical change masks, change captions, and SAR flood/change evidence without allowing prose to manufacture spatial or numeric claims.
 
 **Architecture:** Keep four independent scientific paths: deterministic multispectral processing, ChangerEx structural-change segmentation, Chg2Cap change captioning, and STURM Sentinel-1 flood segmentation plus deterministic SAR change. Each path emits typed evidence. Shared verification checks temporal order, grids, sensor contracts, provenance, masks, and measurements before any evidence is reconciled or explained.
 
-**Tech Stack:** Python 3.11+, NumPy, Rasterio, Affine, Pydantic 2, PyTorch, existing Kaggle runner, and only audit-approved model-specific dependencies.
+**Tech Stack:** Python 3.11+, NumPy, Rasterio, Affine, Pydantic 2, PyTorch for existing/optical specialists, the existing Kaggle runner, and only audit-approved model-specific dependencies. STURM remains an isolated TensorFlow/Keras specialist if the authoritative runtime contract requires it; do not convert it to PyTorch merely for stack uniformity.
 
 **Spec:** User-approved Phase 4 clean-rebuild brief, captured in “Approved Phase 4 design” below.
+
+**Current canonical state (2026-09-09):**
+- Phase 3 is frozen.
+- Task 1 audit commit: `a7b9317`.
+- Corrected Task 1 re-audit commit: `339be0b`.
+- `339be0b` changes only the four audit files under `experiments/phase4_temporal_analytics/`.
+- The previous premature scaffold is preserved on `archive/phase4-scaffold-with-reaudit`.
+- Task 2 is the next authorized task. No Task 3+ work may be started automatically.
 
 ## Global Constraints
 
 - Preserve all frozen historical artifacts under `experiments/phase2*`, `experiments/phase3*`, and `experiments/phase4_bigearthnet_multisensor/`; never rewrite them to fit this rebuild.
 - Treat this work as canonical Phase 4. Historical Phase 4A–4F and Phase 5A remain canonical Phase 3 evidence.
-- Current branch `phase4-clean-rebuild` already has unrelated staged SHA-256 refactors. Isolate or commit those separately before Task 1. Never include them in the audit-only commit.
-- Begin implementation from a clean worktree created with `superpowers:using-git-worktrees`. Record exact starting Git SHA.
+- Work only from a clean `phase4-clean-rebuild` worktree and record the exact starting Git SHA before each canonical task or external run.
 - First implementation-series commit after this planning document contains audit artifacts only. No runtime code, registry entry, dependency, notebook, or benchmark result belongs in that commit.
 - Preferred datasets/models remain candidates until audit status is `PASS`. A failed license, provenance, checkpoint, preprocessing, or dependency audit changes status to `BLOCKED`; it never gets guessed around.
+- Task 2 may validate `BLOCKED` contracts, but specialist runtime tasks may not execute until their required primary dataset/model contracts are `PASS`.
+- Optional robustness/holdout blockers must not block an otherwise valid primary lane: S2Looking is non-gating for P4-E02; Sen1Floods11 is conditional/non-gating for the STURM primary reproduction.
+- `PASS` means the contract is structurally ready for reproduction, not that the model is already promoted to production.
 - Use original papers, official repositories, DOI/Zenodo records, or publisher dataset cards as provenance authority. Kaggle and Hugging Face mirrors are transport only unless maintained by the publisher.
 - Do not accept DeepWiki, ResearchGate, Kaggle descriptions, or an ephemeral Hugging Face pull-request ref as sole authority for metrics, licenses, revisions, or preprocessing.
-- Compute SHA-256 locally for every downloaded checkpoint and source archive. Record publisher MD5 only as an additional transport check, never as the sole SatQuery identity.
+- Keep source-code license, checkpoint provenance/license, dataset-package license, and upstream imagery terms as separate fields; one never implies another.
+- Compute SHA-256 locally for every downloaded checkpoint and stable source archive. Record publisher MD5/SHA only as an additional transport check when provided; a publisher hash is not mandatory when the publisher does not provide one, but a locally verified SHA-256 is mandatory before canonical scientific use.
 - Never commit source imagery, model weights, unpacked external repositories, credentials, caches, or large generated artifacts.
 - Never train before reproducing the official pretrained baseline on validation data.
 - Never tune preprocessing, thresholds, prompts, tiling, or postprocessing using sealed test or robustness results.
@@ -45,10 +56,10 @@
 |---|---|---|---|
 | Multispectral temporal analytics | OSCD plus explicitly selected Sentinel-2 L2A pairs | Deterministic Rasterio/NumPy operations | Primary |
 | High-resolution structural change mask | LEVIR-CD | Open-CD ChangerEx-R18 | Primary |
-| High-resolution robustness | S2Looking | Frozen ChangerEx-R18, unchanged | Robustness gate |
+| High-resolution robustness | S2Looking | Frozen ChangerEx-R18, unchanged | Optional non-gating robustness source |
 | Learned change description | LEVIR-CC | Chg2Cap | Primary |
 | SAR flood/water extent | STURM-Flood | Official Sentinel-1 U-Net | Primary |
-| SAR independent validation | Sen1Floods11 | Frozen STURM model plus deterministic SAR evidence | Secondary holdout |
+| SAR independent validation | Sen1Floods11 | Frozen STURM model plus deterministic SAR evidence | Conditional external holdout |
 | Modified Sen1Floods11 | None | None | Removed from core Phase 4 |
 | RSCaMa | LEVIR-CC | None in core plan | Optional challenger after closeout only |
 
@@ -76,9 +87,9 @@ caption evidence
 ### Experiment identities
 
 - `P4-E01`: deterministic multispectral and temporal engine on OSCD; operational demonstration on real Sentinel-2 L2A.
-- `P4-E02`: ChangerEx-R18 structural-change validation on LEVIR-CD; unchanged robustness evaluation on S2Looking.
+- `P4-E02`: ChangerEx-R18 structural-change validation on LEVIR-CD; unchanged S2Looking robustness evaluation only if the S2Looking license/input contract reaches `PASS`.
 - `P4-E03`: Chg2Cap validation on LEVIR-CC.
-- `P4-E04`: STURM Sentinel-1 U-Net validation on STURM-Flood; unchanged external evaluation on Sen1Floods11; deterministic SAR agreement audit.
+- `P4-E04`: STURM Sentinel-1 U-Net validation on STURM-Flood; unchanged Sen1Floods11 external evaluation only if transfer preprocessing/input semantics are proven compatible; deterministic SAR agreement is diagnostic only.
 
 ### Promotion rule
 
@@ -86,11 +97,12 @@ A specialist enters `models/registry.yaml` only after all are true:
 
 1. official source and license are verified;
 2. exact source revision is immutable;
-3. checkpoint bytes, size, SHA-256, and publisher hash are verified;
+3. checkpoint bytes, nonzero size, and locally computed SHA-256 are verified; publisher hash is also verified when one exists;
 4. preprocessing and output semantics are verified from authoritative source/code;
 5. local contract/smoke tests pass;
 6. official pretrained validation is reproduced or discrepancy is documented and accepted;
-7. domain limits and failure outcomes are explicit.
+7. domain limits and failure outcomes are explicit;
+8. source-code license, checkpoint provenance/license, dataset-package license, and imagery terms are independently acceptable for the intended use.
 
 ---
 
@@ -159,310 +171,175 @@ A specialist enters `models/registry.yaml` only after all are true:
 
 ---
 
-### Task 0: Isolate Existing Work and Freeze Baseline
+### Task 0: Baseline Isolation — COMPLETE
 
-**Files:** None.
+**Status:** Complete before the current canonical history. Do not rerun unless the owner explicitly starts another clean rebuild.
 
-**Interfaces:**
-- Consumes: current `phase4-clean-rebuild` worktree.
-- Produces: clean isolated worktree and baseline verification record in shell history.
-
-- [ ] **Step 1: Inspect existing staged work**
-
-```bash
-git status --short
-git diff --cached --stat
-git diff --cached
-git log --oneline -10
-```
-
-Expected: staged SHA-256 refactors are visible. Do not reset, amend, or mix them into Phase 4 audit.
-
-- [ ] **Step 2: Ask owner to commit or stash unrelated work if still present**
-
-Do not choose on the owner's behalf. After owner action, require:
-
-```bash
-git status --short
-```
-
-Expected: clean output.
-
-- [ ] **Step 3: Create isolated worktree**
-
-Use `superpowers:using-git-worktrees`, then record:
-
-```bash
-git rev-parse HEAD
-git branch --show-current
-git status --short
-```
-
-Expected: exact start SHA, `phase4-clean-rebuild` or owner-approved child branch, clean status.
-
-- [ ] **Step 4: Run baseline checks**
-
-```bash
-python -m pytest
-git diff --check
-```
-
-Expected: all current tests pass; any pre-existing warning is recorded without reclassifying failure.
+Current canonical branch is clean and the previous scaffold is preserved separately.
 
 ---
 
-### Task 1: Audit Dataset and Model Contracts — First Commit Only
+### Task 1: Authoritative Dataset and Model Audit — COMPLETE / HUMAN-APPROVED
 
-**Files:**
-- Create: `experiments/phase4_temporal_analytics/README.md`
-- Create: `experiments/phase4_temporal_analytics/dataset_contracts.yaml`
-- Create: `experiments/phase4_temporal_analytics/model_contracts.yaml`
-- Create: `experiments/phase4_temporal_analytics/experiment_plan.yaml`
+**Canonical commits:**
+- `a7b9317` — initial Task 1 source-contract audit.
+- `339be0b` — authoritative re-audit; exactly four audit files changed.
 
-**Interfaces:**
-- Consumes: authoritative sources listed by the approved design.
-- Produces: human-readable, machine-parseable audit records with `PASS` or `BLOCKED` status. Later tasks consume only `PASS` records.
+**Authoritative Task 1 files:**
+- `experiments/phase4_temporal_analytics/README.md`
+- `experiments/phase4_temporal_analytics/dataset_contracts.yaml`
+- `experiments/phase4_temporal_analytics/model_contracts.yaml`
+- `experiments/phase4_temporal_analytics/experiment_plan.yaml`
 
-- [ ] **Step 1: Audit each dataset from authoritative sources**
+These files are now the source of truth. Do not reconstruct their schema from this plan.
 
-For OSCD, Sentinel-2 L2A, LEVIR-CD, S2Looking, LEVIR-CC, STURM-Flood, and Sen1Floods11, record this exact schema:
+Important frozen outcomes:
+- ChangerEx/LEVIR-CD is the strongest primary promotion path, but remains `BLOCKED` until local archive/checkpoint byte verification and remaining dependency/source details are closed.
+- Chg2Cap/LEVIR-CC remains `BLOCKED` until checkpoint byte identity/provenance/license and imagery-use constraints are acceptable.
+- STURM/STURM-Flood remains `BLOCKED` until local bytes, exact Sentinel-1 radiometric/scaling behavior, and TensorFlow/Keras runtime details are verified.
+- Sen1Floods11 is a conditional external lane; incompatible/unknown transfer preprocessing produces `BLOCKED_INPUT_CONTRACT`.
+- S2Looking is optional/non-gating; unresolved licensing must never block the LEVIR-CD primary P4-E02 reproduction.
+- OSCD native layout must not be assumed; its deterministic benchmark lane remains conditional on authorized source access/materialization.
+- Agreement IoU is diagnostic only in Phase 4. Numeric ALLOW/WARN/ABSTAIN thresholds are forbidden.
+- No Phase 4 closeout artifact exists before Task 13.
 
-```yaml
-id: oscd
-status: PASS|BLOCKED
-authority:
-  title: "..."
-  landing_url: "https://..."
-  repository_url: "https://..."
-  doi: "..."                 # null only when authority publishes no DOI
-  version: "..."
-license:
-  dataset_license: "..."
-  imagery_terms: "..."
-  redistribution_allowed: true|false
-transport:
-  url: "https://..."
-  mirror_role: official|transport_only
-  expected_files: []
-  expected_size_bytes: 0
-  publisher_hashes: {}
-  locally_verified_sha256: null
-contract:
-  modalities: []
-  sensors: []
-  bands_or_polarizations: []
-  radiometric_domain: "..."
-  spatial_resolution_m: "..."
-  pair_order: T1_then_T2
-  registration_claim: "..."
-  labels: "..."
-  label_limitations: []
-splits:
-  authority_defined: true|false
-  grouping_unit: temporal_pair
-  train: "..."
-  validation: "..."
-  test: "..."
-  test_sealed: true
-references:
-  - url: "https://..."
-    supports: "..."
-blockers: []
-```
-
-Rules:
-
-- OSCD labels validate generic/urban structural change, not water or vegetation semantics.
-- Sentinel-2 L2A pairs are operational demonstrations, not benchmark substitutes.
-- S2Looking is a frozen robustness source. Never tune from it.
-- Sen1Floods11 is an unchanged external source. Never tune thresholds from it.
-- Modified Sen1Floods11 is recorded as `excluded_from_core`; do not download it.
-
-- [ ] **Step 2: Audit each model and checkpoint**
-
-For ChangerEx-R18, Chg2Cap, STURM Sentinel-1 U-Net, and optional RSCaMa, record:
-
-```yaml
-id: changerex_r18_levircd
-status: PASS|BLOCKED
-role: primary|optional_challenger
-source:
-  repository_url: "https://..."
-  revision: "40_hex_git_commit"
-  license: "..."
-checkpoint:
-  authority_url: "https://..."
-  filename: "..."
-  size_bytes: 0
-  publisher_hashes: {}
-  locally_verified_sha256: "64_hex_or_null"
-contract:
-  task: "..."
-  training_domain: "..."
-  sensor_domain: []
-  band_order: []
-  radiometric_domain: "..."
-  input_shape: []
-  normalization: "..."
-  temporal_order: T1_then_T2
-  output_semantics: "..."
-  threshold_or_decoder: "..."
-dependencies:
-  python: "..."
-  pytorch: "..."
-  packages: []
-  operating_system: []
-official_evaluation:
-  dataset: "..."
-  split: "..."
-  command: "..."
-  metrics: {}
-blockers: []
-```
-
-Verify rather than assume:
-
-- ChangerEx candidate filename, `136880383` bytes, and SHA-256 `da3f569306dadd1fac5b64abc2a3d484571cd0ecf6410e1f152275cfe49a3618`.
-- Whether `refs/pr/1` resolves to immutable official checkpoint provenance. If not, block promotion.
-- Chg2Cap exact official checkpoint, source revision, feature extractor weights, vocabulary, decoder, and metric implementation.
-- STURM archive publisher MD5 `14a046d9d7965f2a3c511acb1bbca57b`; download bytes once, verify MD5, compute SHA-256, inspect archive safely, and identify actual weight file.
-- RSCaMa remains `optional_challenger` and `not_authorized_for_core_execution` even if its audit passes.
-
-- [ ] **Step 3: Freeze experiment contracts**
-
-Each `P4-E0x` record must define:
-
-```yaml
-experiment_id: P4-E01
-hypothesis: "..."
-datasets: []
-model_or_tools: []
-sample_selection:
-  seed: 0
-  grouping_unit: temporal_pair
-  development_split: validation
-  robustness_split: null
-  sealed_splits: [test]
-preprocessing_profile_ids: []
-metrics: []
-sanities: []
-output_files: []
-pass_condition: "..."
-stop_conditions: []
-```
-
-Required metrics/sanities:
-
-- `P4-E01`: valid-pixel index error, change precision/recall/F1/IoU, T1+T1, T2+T1, deliberate misalignment, area fixture error.
-- `P4-E02`: precision/recall/F1/IoU, official split identity, T1+T1 false-positive rate, reversed-pair behavior, LEVIR-to-S2Looking absolute/relative degradation, latency, peak VRAM.
-- `P4-E03`: BLEU-4, METEOR, ROUGE-L, CIDEr, caption row count, T1+T1 sanity, reversed-pair directional audit, latency, peak VRAM.
-- `P4-E04`: flood precision/recall/F1/IoU, STURM-to-Sen1Floods11 degradation, T1+T1 false-positive rate for deterministic change, learned/deterministic agreement IoU, abstention count, latency, peak VRAM.
-
-- [ ] **Step 4: Review audit status before code**
-
-```bash
-python - <<'PY'
-from pathlib import Path
-import yaml
-root = Path("experiments/phase4_temporal_analytics")
-for name in ("dataset_contracts.yaml", "model_contracts.yaml", "experiment_plan.yaml"):
-    value = yaml.safe_load((root / name).read_text(encoding="utf-8"))
-    assert isinstance(value, dict), name
-print("phase4 audit YAML valid")
-PY
-rg -n "unknown_to_fill|replace_me|FIXME" experiments/phase4_temporal_analytics
-```
-
-Expected: YAML valid; `rg` finds nothing. Legitimate unresolved facts use `status: BLOCKED` plus explicit blockers, not placeholders.
-
-- [ ] **Step 5: Commit audit artifacts only**
-
-```bash
-git status --short
-git add experiments/phase4_temporal_analytics/README.md \
-  experiments/phase4_temporal_analytics/dataset_contracts.yaml \
-  experiments/phase4_temporal_analytics/model_contracts.yaml \
-  experiments/phase4_temporal_analytics/experiment_plan.yaml
-git diff --cached --name-only
-git commit -m "docs: freeze phase 4 source contracts"
-```
-
-Expected staged names: exactly four audit files. Stop after this commit for human review. Any primary model marked `BLOCKED` prevents its implementation task.
+**Do not rerun Task 1 automatically.** Any later fact resolution is a small, reviewable audit amendment and must not silently turn guessed fields into `PASS`.
 
 ---
 
 ### Task 2: Validate Audit and Registry Contracts
 
-**Files:**
-- Create: `ml/evaluation/phase4_contracts.py`
-- Create: `tests/ml/test_phase4_contracts.py`
-- Modify: `satquery/registry/models.py`
+**Authorized scope only:**
+- Create `ml/evaluation/phase4_contracts.py`
+- Create `tests/ml/test_phase4_contracts.py`
+- Modify `satquery/registry/models.py`
+
+**Do not create:** runtime specialists, preprocessing profiles, model registry entries, notebooks, Kaggle entries, analytics, reconciliation, closeout models, or `PHASE_4_CLOSEOUT.json`.
 
 **Interfaces:**
-- Produces: `load_phase4_contracts(root: Path) -> Phase4ContractSet`.
-- Produces: typed `ChangeDetectionRegistration`, `ChangeCaptionRegistration`, and `FloodSegmentationRegistration`.
-- Consumes: exact revisions/hashes/profile fields from Task 1.
+- `load_phase4_contracts(root: Path) -> Phase4ContractSet`
+- typed `ChangeDetectionRegistration`, `ChangeCaptionRegistration`, `FloodSegmentationRegistration`
 
-- [ ] **Step 1: Write failing audit-contract tests**
+- [ ] **Step 1: Write RED tests against the real `339be0b` audit schema**
 
-```python
-def test_primary_contracts_cannot_pass_without_sha256_and_license(tmp_path):
-    audit = write_contract(tmp_path, status="PASS", license=None, sha256=None)
-    with pytest.raises(ValueError):
-        load_phase4_contracts(audit.parent)
+Required behavioral coverage:
+1. current audit loads successfully;
+2. `BLOCKED` + non-empty blockers is valid and non-runnable;
+3. `BLOCKED` without blockers fails;
+4. `PASS` model with missing/malformed SHA-256 fails;
+5. `PASS` model with missing authoritative source/license/checkpoint identity fails;
+6. source-code license does not substitute for unresolved checkpoint provenance/license;
+7. dataset-package license does not erase upstream imagery restrictions;
+8. unknown fields/statuses fail;
+9. robustness source cannot become development/tuning source;
+10. external holdout cannot become development/tuning source;
+11. `excluded_from_core` cannot become runnable;
+12. sealed test cannot become development split;
+13. missing referenced dataset/model IDs fail;
+14. optional challenger remains non-core by default;
+15. blocked S2Looking does not invalidate the LEVIR-CD primary P4-E02 structure;
+16. blocked/conditional Sen1Floods11 does not invalidate the STURM primary P4-E04 structure;
+17. Phase 4 agreement policy containing numeric decision thresholds fails;
+18. P4-E03 requires BLEU-4, METEOR, ROUGE-L, CIDEr declarations;
+19. loading contracts performs no registry mutation;
+20. Task-2 loader expects only the three audit YAMLs, not a closeout file.
 
+- [ ] **Step 2: Implement strict Pydantic audit loader**
 
-def test_blocked_contract_is_valid_but_not_runnable(tmp_path):
-    contracts = load_phase4_contracts(write_blocked_contract_set(tmp_path))
-    assert not contracts.models["chg2cap_levircc"].runnable
-```
+Rules:
+- `extra="forbid"` (or equivalent) throughout scientific records.
+- Preserve `BLOCKED` as a valid scientific state.
+- Derive `runnable`/`promotable`; never trust YAML-supplied booleans for them.
+- `BLOCKED` → non-runnable/non-promotable.
+- `PASS` means structurally eligible for later reproduction, not already production-promoted.
+- Validate cross-references between experiments, datasets, models/tools where IDs exist.
+- Do not redesign free-text relationships merely to satisfy type checking.
+- Preserve license separation exactly as audited.
+- Preserve non-gating optional/conditional lanes.
+- No closeout classes/functions in Task 2.
 
-- [ ] **Step 2: Verify RED**
+- [ ] **Step 3: Add temporal registry schemas without entries**
 
-```bash
-python -m pytest tests/ml/test_phase4_contracts.py -v
-```
-
-Expected: import/function failure because module does not exist.
-
-- [ ] **Step 3: Implement minimal strict loader**
-
-Implement frozen Pydantic records. Enforce:
-
-- no unknown fields;
-- `PASS` primary records require authority, license, revision, size, SHA-256, semantics, preprocessing, and split policy;
-- `BLOCKED` records require at least one blocker;
-- test split is sealed;
-- robustness sources cannot be development sources;
-- model records reference existing dataset/profile IDs.
-
-- [ ] **Step 4: Add temporal registry union tests, then schemas**
-
-```python
-def test_temporal_registry_rejects_missing_domain_contract(tmp_path):
-    path = write_temporal_registry(tmp_path, training_domain=None)
-    with pytest.raises(ValidationError):
-        load_model_registry(path)
-```
-
-Add only fields proven by Task 1. Keep task discriminators explicit:
-
+Add explicit task discriminators:
 ```python
 Literal["structural_change_segmentation"]
 Literal["change_captioning"]
 Literal["flood_segmentation"]
 ```
 
-Do not add model entries yet. Registry promotion occurs after Tasks 6, 7, and 9 reproduce baselines.
+Add typed registrations compatible with existing registry architecture:
+- `ChangeDetectionRegistration`
+- `ChangeCaptionRegistration`
+- `FloodSegmentationRegistration`
 
-- [ ] **Step 5: Verify and commit**
+Temporal-specific records must make domain/preprocessing/output contracts explicit while preserving all Phase 1–3 registry compatibility.
+
+Do not hardcode STURM/Sentinel-1 values in generic base classes. Those belong to a future audited registry entry after reproduction.
+
+- [ ] **Step 4: Verify**
 
 ```bash
-python -m pytest tests/ml/test_phase4_contracts.py tests/ingestion/test_models.py -v
+python -m pytest tests/ml/test_phase4_contracts.py -v
+# discover and run the existing registry/model tests affected by satquery/registry/models.py
+python -m compileall -q ml/evaluation/phase4_contracts.py satquery/registry/models.py
 git diff --check
+git status --short
+```
+
+- [ ] **Step 5: Commit exactly three files**
+
+Expected diff:
+```text
+ml/evaluation/phase4_contracts.py
+tests/ml/test_phase4_contracts.py
+satquery/registry/models.py
+```
+
+```bash
 git add ml/evaluation/phase4_contracts.py tests/ml/test_phase4_contracts.py satquery/registry/models.py
 git commit -m "feat: validate phase 4 scientific contracts"
 ```
+
+**STOP for human review. Do not begin Task 3 automatically.**
+
+---
+
+### Task 2A: Close Lane-Specific Source Contracts Before Learned Specialist Execution
+
+This is a **gate**, not permission to implement learned specialists immediately. It may be resolved incrementally after Task 2 and may run in parallel with deterministic Tasks 3–5.
+
+A learned specialist task may start only when all of its required primary contracts are `PASS`.
+
+#### P4-E01 data closure
+- Authorized OSCD download: inspect actual publisher archive layout, compute local SHA-256, freeze materialization to a declared common grid.
+- If OSCD access remains unavailable, deterministic formula/grid/area lanes may still be implemented and verified with fixtures, but OSCD benchmark results remain `not_measured`.
+- Do not invent a validation split from the sealed publisher test set. If no publisher validation exists, freeze a pair-level development split from the training partition before looking at test.
+
+#### P4-E02 closure
+Before Task 6:
+- locally acquire/verify LEVIR-CD bytes/layout under accepted terms;
+- locally verify ChangerEx checkpoint bytes/size/SHA-256 against the official model-zoo object;
+- freeze exact Open-CD source revision, config chain, dependencies, preprocessing, channel convention, output semantics and official metric protocol.
+S2Looking may remain `BLOCKED`; that does not block primary LEVIR-CD reproduction.
+
+#### P4-E03 closure
+Before Task 7:
+- locally verify the LEVIR-CC package SHA and actual `LevirCCcaptions.json` schema/split membership;
+- confirm acceptable upstream imagery-use terms for this project;
+- acquire the official Chg2Cap checkpoint once, compute local SHA-256, and resolve checkpoint provenance/license;
+- freeze exact source revision, vocabulary, feature extractor, decoding and official metric implementation;
+- if official Torch requirements conflict with the project runtime, use an isolated external environment rather than downgrading the whole project.
+
+#### P4-E04 closure
+Before Task 9:
+- locally verify STURM dataset/model archives and compute SHA-256;
+- safely inspect the model archive and exact weight member;
+- freeze actual Sentinel-1 band order, radiometric/scaling/normalization path from authoritative code plus real dataset bytes;
+- freeze exact TensorFlow/Keras runtime versions;
+- because STURM has no publisher split, derive and freeze an event-grouped development/validation policy before evaluation and keep any final holdout sealed.
+Sen1Floods11 remains conditional until license and exact no-tuning transfer preprocessing are justified.
+
+All blocker-resolution edits must be limited, evidence-backed amendments to the Task 1 audit files and reviewed before a contract changes from `BLOCKED` to `PASS`.
 
 ---
 
@@ -570,7 +447,7 @@ git commit -m "feat: add temporal evidence contracts"
 - Produces: `prepare_common_grid(t1_path, t2_path, output_dir, *, resampling) -> AlignedPair` with two explicit derived raster paths.
 - Produces: `normalized_difference(first, second, valid) -> np.ma.MaskedArray`.
 - Produces: `compute_index(name, bands, valid) -> np.ma.MaskedArray`.
-- Produces: `threshold_temporal_difference(t1, t2, *, threshold, valid) -> np.ndarray`.
+- Produces: `threshold_temporal_difference(t1, t2, *, threshold, valid) -> np.ndarray` as an explicitly parameterized diagnostic operator; it is **not** a generic semantic change detector and must not be benchmarked against OSCD labels unless a separately audited method defines that use.
 - Produces: `measure_mask_area(mask, transform, crs, *, unit) -> MeasurementResult`.
 
 - [ ] **Step 1: Write failing spectral tests**
@@ -614,7 +491,7 @@ def test_identity_pair_has_zero_deterministic_change():
     assert not mask.any()
 ```
 
-Use `PairValidator` before raster reads. Reproject continuous bands with explicit bilinear resampling and masks/labels with nearest-neighbor. Record parent hashes, source/destination grids, CRS, resampling, and transform.
+Use `PairValidator` before pixelwise operations. Select the destination grid from an explicit dataset/analysis contract. Reproject continuous bands with explicit bilinear resampling and masks/labels with nearest-neighbor. Record parent hashes, source/destination grids, CRS, resampling, transform, valid-pixel handling, and whether the operation produced derived rasters. Equal shape alone never passes the grid gate.
 
 - [ ] **Step 3: Write failing area tests**
 
@@ -657,246 +534,153 @@ git commit -m "feat: add deterministic temporal analytics"
 
 ### Task 5: Prepare and Evaluate P4-E01
 
+**Purpose:** validate deterministic multispectral/temporal science without pretending that NDVI difference is generic change detection.
+
 **Files:**
-- Create: `ml/evaluation/prepare_p4_e01.py`
-- Create: `ml/evaluation/run_p4_e01.py`
-- Create: `tests/ml/test_p4_e01.py`
-- Create after preparation: `experiments/phase4_temporal_analytics/p4_e01/manifest.json`
-- Create after validation: `experiments/phase4_temporal_analytics/p4_e01/validation_result.json`
-- Create after validation: `experiments/phase4_temporal_analytics/p4_e01/validation_predictions.jsonl`
+- Create `ml/evaluation/prepare_p4_e01.py`
+- Create `ml/evaluation/run_p4_e01.py`
+- Create `tests/ml/test_p4_e01.py`
+- Add reviewed manifests/results under `experiments/phase4_temporal_analytics/p4_e01/` only when real source data are available.
 
-**Interfaces:**
-- Produces: `prepare_oscd_manifest(source_root: Path, contract: DatasetContract) -> dict`.
-- Produces: `run_p4_e01(manifest: Path, data_root: Path, output_dir: Path, split: Literal["validation"]) -> dict`.
-- Consumes: deterministic functions from Task 4.
+**P4-E01 lanes:**
+- **Lane A — formula correctness (mandatory):** NDVI, NDWI, MNDWI against hand-calculated fixtures and NoData/zero-denominator cases.
+- **Lane B — grid correctness (mandatory):** common-grid preparation, identity pair, reversed-order audit, deliberate equal-shape misalignment, resampling provenance.
+- **Lane C — measurement correctness (mandatory):** projected and geographic CRS area fixtures, pixel-count reconstruction.
+- **Lane D — optional OSCD deterministic change benchmark:** only if the audit freezes a scientifically defensible method such as CVA/normalized spectral change and the OSCD source contract is `PASS`.
 
-- [ ] **Step 1: Write failing manifest tests**
+**Forbidden:** `abs(NDVI_T2 - NDVI_T1) > arbitrary_threshold` labeled as generic OSCD change.
 
-```python
-def test_oscd_manifest_preserves_all_13_semantic_bands_and_pairs():
-    manifest = prepare_oscd_manifest(fixture_root, contract)
-    assert manifest["band_order"] == contract.contract.bands_or_polarizations
-    assert all(row["pair_id"] and row["t1"] != row["t2"] for row in manifest["samples"])
+- [ ] **Step 1: Write RED tests for real-source preparation**
 
+The OSCD preparer must consume the **actual audited publisher layout**, not assume `T1.tif`/`T2.tif` 13-band stacks. It must preserve semantic band identity and native-resolution provenance through an explicit materialization step.
 
-def test_runner_refuses_test_split():
-    with pytest.raises(SealedTestAccessError):
-        run_p4_e01(manifest, data_root, output_dir, split="test")
-```
+If the publisher exposes only train/test, derive any development validation split from the training partition at the temporal-pair level and freeze it before test access.
 
-- [ ] **Step 2: Verify RED and implement manifest validation**
+- [ ] **Step 2: Implement lanes A–C independently of OSCD benchmark availability**
 
-```bash
-python -m pytest tests/ml/test_p4_e01.py -v
-```
+Their results are deterministic verification artifacts, not learned-model benchmark metrics.
 
-Materialization must validate expected paths/hashes, 13-band identity, pair order, label semantics, dimensions, CRS/transforms, and pair grouping. No full download occurs without explicit `--allow-download` and accepted source terms.
+- [ ] **Step 3: Implement Lane D only if authorized by the audit**
 
-- [ ] **Step 3: Implement deterministic evaluator**
+If no defensible deterministic generic change method has been frozen:
+- set Lane D to `BLOCKED_METHOD_CONTRACT` or `NOT_EVALUATED`;
+- do not emit precision/recall/F1/IoU for OSCD.
 
-Save one JSONL row per pair with source hashes, selected bands, grid operation, threshold source, pixel counts, confusion counts, and artifact paths. Reconstruct aggregate precision/recall/F1/IoU from rows in test.
+If Lane D is enabled:
+- save one row per temporal pair;
+- save confusion counts and method/profile identity;
+- reconstruct aggregate metrics from rows;
+- never tune from sealed test data.
 
-Do not claim NDVI/NDWI/MNDWI benchmark accuracy from OSCD labels. Evaluate deterministic formula/grid correctness separately. Mark selected Sentinel-2 L2A examples `demonstration_only` and do not mix them into OSCD metrics.
+Sentinel-2 L2A examples remain `demonstration_only` and are never mixed into benchmark metrics.
 
-- [ ] **Step 4: Run local fixture and approved validation**
+- [ ] **Step 4: Verify and commit**
 
-```bash
-python -m pytest tests/ml/test_p4_e01.py tests/analytics -v
-python -m ml.evaluation.prepare_p4_e01 --source-root "$OSCD_ROOT" --output experiments/phase4_temporal_analytics/p4_e01/manifest.json
-python -m ml.evaluation.run_p4_e01 --manifest experiments/phase4_temporal_analytics/p4_e01/manifest.json --data-root "$OSCD_ROOT" --output-dir experiments/phase4_temporal_analytics/p4_e01/results --split validation
-```
-
-If data are unavailable, commit implementation and a structured `blocked.json`; do not synthesize metrics.
-
-- [ ] **Step 5: Audit and commit**
-
-```bash
-python -m pytest tests/ml/test_p4_e01.py -v
-git diff --check
-git add ml/evaluation/prepare_p4_e01.py ml/evaluation/run_p4_e01.py tests/ml/test_p4_e01.py experiments/phase4_temporal_analytics/p4_e01
-git commit -m "feat: evaluate deterministic temporal analytics"
-```
+Run targeted analytics/P4-E01 tests and `git diff --check`. If real OSCD data are unavailable, commit implementation plus a structured blocked/not-measured artifact only if the repository's experiment policy allows such an artifact; never synthesize metrics.
 
 ---
 
 ### Task 6: Implement and Reproduce ChangerEx P4-E02
 
-**Files:**
-- Create: `satquery/inference/change_detection.py`
-- Modify: `satquery/inference/config.py`
-- Modify: `satquery/inference/exceptions.py`
-- Create: `ml/evaluation/prepare_p4_e02.py`
-- Create: `ml/evaluation/run_p4_e02.py`
-- Create: `tests/inference/test_change_detection.py`
-- Create: `tests/ml/test_p4_e02.py`
+**Precondition:** LEVIR-CD and ChangerEx primary contracts are `PASS`. If either is still `BLOCKED`, stop this task.
 
-**Interfaces:**
-- Produces: `StructuralChangeBackend.predict(t1_rgb, t2_rgb) -> np.ndarray` protocol.
-- Produces: `ChangerExBackend` using exact audited Open-CD revision/checkpoint.
-- Produces: `StructuralChangeService.detect(t1, t2) -> ChangeMaskEvidence`.
-- Produces: `run_p4_e02(..., dataset: Literal["levir_cd", "s2looking"], split: Literal["validation", "robustness"])`.
+**Files:** same planned adapter/evaluator/test paths as above.
 
-- [ ] **Step 1: Write failing service tests with a deterministic fake backend**
+**Principle:** reproduce the official Open-CD pipeline first; the SatQuery service must delegate to the same pinned model/config behavior rather than inventing an alternate benchmark pipeline.
 
-```python
-def test_structural_change_service_emits_source_grid_mask(fake_pair, backend):
-    evidence = service(backend).detect(*fake_pair)
-    assert evidence.target_class == "high_res_structural_change"
-    assert evidence.mask.source_grid_observation_id == fake_pair[0].observation_id
+- [ ] **Step 1: RED tests for domain and evidence boundaries**
+Test:
+- optical RGB/high-resolution contract only;
+- known T1/T2 order;
+- verified/common pixel grid;
+- exact checkpoint hash rejection;
+- source-grid mask provenance;
+- model exceptions fail closed;
+- no semantic claim broader than `HIGH_RES_STRUCTURAL_CHANGE`.
 
+- [ ] **Step 2: Implement thin Open-CD adapter**
+Requirements:
+- pinned Open-CD revision/config chain from Task 2A;
+- verify checkpoint SHA-256 before handing path to Open-CD;
+- no arbitrary remote code or untracked package patching;
+- official normalization/data preprocessor and two-image ordering;
+- official probability/logit/decoder semantics;
+- benchmark path does not introduce custom tiling/thresholding absent from the official protocol.
 
-def test_structural_model_rejects_sar_and_unverified_alignment(fake_sar_pair):
-    with pytest.raises(ModelInputUnsupportedError):
-        service(backend).detect(*fake_sar_pair)
-```
+Production tiling for arbitrary large user rasters may be added only as a separately tested inference adaptation. It must preserve source-grid mapping and must not be described as the reproduced benchmark path.
 
-Also test 512×512 tiling, edge padding, deterministic overlap stitching, nearest-neighbor mask restoration, T1/T2 order, and exact checkpoint hash rejection.
+- [ ] **Step 3: Reproduce LEVIR-CD validation**
+Use the exact audited split/protocol and metric definitions. Save per-sample confusion counts/predictions sufficient to reconstruct precision/recall/F1/IoU.
 
-- [ ] **Step 2: Verify RED and implement thin adapter**
+If reproduction exceeds the predeclared tolerance:
+- write `reproduction_failure.json`;
+- do not register the model;
+- do not run optional robustness;
+- stop for review.
 
-```bash
-python -m pytest tests/inference/test_change_detection.py -v
-```
+- [ ] **Step 4: Optional S2Looking robustness**
+Run only if the S2Looking contract is `PASS`.
+If S2Looking remains license/contract blocked:
+- record robustness status as `BLOCKED`;
+- do **not** fail the LEVIR-CD primary lane;
+- do not replace the missing result with another unreviewed dataset.
 
-Adapter requirements:
+If run, use the identical frozen checkpoint/preprocessing/decision rule; no tuning after robustness exposure.
 
-- lazy import official Open-CD code from audit-approved installation;
-- no dynamic remote-code execution;
-- exact checkpoint hash before `torch.load`;
-- load weights only with safe supported mode where checkpoint format permits;
-- model input normalization exactly matches audited config;
-- output only binary structural-change probability/mask;
-- no semantic claims beyond `HIGH_RES_STRUCTURAL_CHANGE`;
-- domain warning outside audited RGB/GSD/sensor range.
+- [ ] **Step 5: Promote only after primary reproduction**
+Add registry/preprocessing entries only after LEVIR-CD reproduction passes. Promotion must state the model is a high-resolution structural/building-change specialist, not a universal change detector.
 
-- [ ] **Step 3: Write evaluator reconstruction tests and implement preparation**
-
-```python
-def test_p4_e02_metrics_reconstruct_from_prediction_rows(tmp_path):
-    result = run_fixture_evaluation(tmp_path)
-    rows = read_jsonl(result.prediction_path)
-    assert reconstruct_binary_metrics(rows) == result.metrics
-
-
-def test_s2looking_cannot_change_threshold_or_profile():
-    with pytest.raises(ValueError):
-        run_p4_e02(..., dataset="s2looking", threshold=0.4)
-```
-
-LEVIR-CD validation chooses no new model weights. Any allowed binary decision threshold must come from official config or be frozen on LEVIR validation before S2Looking. S2Looking consumes the exact frozen checkpoint/profile/threshold.
-
-- [ ] **Step 4: Reproduce official validation before robustness**
-
-```bash
-python -m ml.evaluation.prepare_p4_e02 --dataset levir_cd --source-root "$LEVIR_CD_ROOT" --output experiments/phase4_temporal_analytics/p4_e02/levir_manifest.json
-python -m ml.evaluation.run_p4_e02 --dataset levir_cd --manifest experiments/phase4_temporal_analytics/p4_e02/levir_manifest.json --data-root "$LEVIR_CD_ROOT" --output-dir outputs/p4_e02_levir --split validation
-```
-
-Compare only matching metric definitions/splits. If discrepancy exceeds the predeclared tolerance in `experiment_plan.yaml`, stop and write `reproduction_failure.json`; do not run S2Looking or register model.
-
-- [ ] **Step 5: Run unchanged robustness gate**
-
-```bash
-python -m ml.evaluation.prepare_p4_e02 --dataset s2looking --source-root "$S2LOOKING_ROOT" --output experiments/phase4_temporal_analytics/p4_e02/s2looking_manifest.json
-python -m ml.evaluation.run_p4_e02 --dataset s2looking --manifest experiments/phase4_temporal_analytics/p4_e02/s2looking_manifest.json --data-root "$S2LOOKING_ROOT" --output-dir outputs/p4_e02_s2looking --split robustness
-```
-
-Report raw score, absolute drop, relative drop, sensor/GSD shift, latency, and peak VRAM. No post-robustness tuning.
-
-- [ ] **Step 6: Promote only after reproduction, then commit**
-
-Add exact `structural_change_segmentation` model/profile registry entries only if gate passes. Copy reviewed small results into `experiments/phase4_temporal_analytics/p4_e02/results/`.
-
-```bash
-python -m pytest tests/inference/test_change_detection.py tests/ml/test_p4_e02.py tests/ingestion/test_models.py -v
-git diff --check
-git add satquery/inference/change_detection.py satquery/inference/config.py satquery/inference/exceptions.py \
-  ml/evaluation/prepare_p4_e02.py ml/evaluation/run_p4_e02.py \
-  tests/inference/test_change_detection.py tests/ml/test_p4_e02.py \
-  models/registry.yaml satquery/registry/models.py satquery/registry/preprocessing.yaml \
-  experiments/phase4_temporal_analytics/p4_e02
-git commit -m "feat: add validated structural change specialist"
-```
+Run targeted tests, existing registry tests, `git diff --check`, commit the coherent implementation/result set, then stop for review.
 
 ---
 
 ### Task 7: Implement and Reproduce Chg2Cap P4-E03
 
-**Files:**
-- Create: `satquery/inference/change_captioning.py`
-- Create: `ml/evaluation/prepare_p4_e03.py`
-- Create: `ml/evaluation/run_p4_e03.py`
-- Create: `tests/inference/test_change_captioning.py`
-- Create: `tests/ml/test_p4_e03.py`
+**Precondition:** LEVIR-CC and Chg2Cap primary contracts are `PASS`, including acceptable imagery-use terms and locally verified checkpoint identity/provenance. Otherwise stop.
 
-**Interfaces:**
-- Produces: `ChangeCaptionBackend.caption(t1_rgb, t2_rgb) -> str` protocol.
-- Produces: `Chg2CapBackend` using exact audited source/checkpoint/vocabulary.
-- Produces: `ChangeCaptionService.describe(t1, t2) -> ChangeCaptionEvidence`.
-- Produces: `run_p4_e03(..., split: Literal["validation"]) -> CaptionEvaluationResult`.
+**Files:** same planned adapter/evaluator/test paths as above.
 
-- [ ] **Step 1: Write failing lane-boundary tests**
+- [ ] **Step 1: RED tests for lane boundaries**
+Require:
+- ordered optical pair;
+- correct LEVIR-CC-like input contract;
+- empty/model-error paths fail closed;
+- exact checkpoint hash;
+- caption evidence contains text/provenance only, never mask/area/count/confidence;
+- unknown temporal order rejects.
 
-```python
-def test_caption_service_preserves_pair_order_and_returns_text_only(pair, backend):
-    evidence = service(backend).describe(*pair)
-    assert evidence.temporal.t1_observation_id == pair[0].observation_id
-    assert not hasattr(evidence, "measurement")
+- [ ] **Step 2: Reproduce official Chg2Cap runtime in an isolated environment if needed**
+Use the exact audited Chg2Cap source revision/checkpoint/vocabulary/feature extractor and decoding path.
 
+Do **not** downgrade or replace the project-wide PyTorch stack merely because the official model targets an older Torch version. If required, run Chg2Cap in a pinned Kaggle/container/isolated environment and keep the integration boundary explicit.
 
-def test_caption_service_rejects_unknown_temporal_order(pair_without_dates):
-    with pytest.raises(TemporalOrderUnknownError):
-        service(backend).describe(*pair_without_dates)
-```
+Do not patch third-party installed packages in place without an audited, versioned source change.
 
-Also test empty caption, model exception, wrong modality, bad alignment, and exact checkpoint hash.
+- [ ] **Step 3: Prepare the real LEVIR-CC layout**
+Consume:
+- `LevirCCcaptions.json`
+- `images/<split>/A`
+- `images/<split>/B`
 
-- [ ] **Step 2: Verify RED and implement minimal adapter**
+Preserve every reference caption for each pair and authoritative split membership. Do not invent per-pair `references.json`.
 
-```bash
-python -m pytest tests/inference/test_change_captioning.py -v
-```
+- [ ] **Step 4: Evaluate with pinned standard metrics**
+Required:
+- BLEU-4
+- METEOR
+- ROUGE-L
+- CIDEr
 
-Use official Chg2Cap code/config at audited revision. Do not modify third-party CLIP/model internals in-place. If official source cannot load without patching installed packages, mark model `BLOCKED` and stop P4-E03 rather than creating an untracked patch.
+Use the audited official/standard implementation and corpus semantics. Save generated caption + all references per pair. Prediction/reference counts must match declared sample counts.
 
-- [ ] **Step 3: Write manifest and metric integrity tests**
+Run predeclared T1+T1 and reversed-pair diagnostics without altering decoding.
 
-```python
-def test_levir_cc_pair_and_all_captions_stay_in_one_split():
-    manifest = prepare_levir_cc(fixture_root, contract)
-    assert no_pair_crosses_splits(manifest)
+- [ ] **Step 5: Promote only after reproduction**
+If official validation cannot be reproduced within the predeclared tolerance, preserve failure evidence and stop. Do not substitute a generic VLM.
 
+After pass, register the exact change-caption specialist/profile, run focused tests and `git diff --check`, commit, and stop for review.
 
-def test_caption_metric_input_counts_match_declared_samples(tmp_path):
-    result = evaluate_fixture_captions(tmp_path)
-    assert result.prediction_count == count_jsonl(result.prediction_path)
-    assert result.reference_count == sum(len(row["references"]) for row in read_jsonl(result.prediction_path))
-```
-
-Pin the exact official/standard BLEU-4, METEOR, ROUGE-L, and CIDEr evaluator revision. Save generated caption and all references per pair. Do not substitute custom approximate metrics under official names.
-
-- [ ] **Step 4: Reproduce validation**
-
-```bash
-python -m ml.evaluation.prepare_p4_e03 --source-root "$LEVIR_CC_ROOT" --output experiments/phase4_temporal_analytics/p4_e03/manifest.json
-python -m ml.evaluation.run_p4_e03 --manifest experiments/phase4_temporal_analytics/p4_e03/manifest.json --data-root "$LEVIR_CC_ROOT" --output-dir outputs/p4_e03_chg2cap --split validation
-```
-
-Run T1+T1 and reversed-pair controls on predeclared validation samples. Controls diagnose temporal sensitivity; they do not alter decoding.
-
-- [ ] **Step 5: Promote only after reproduction, then commit**
-
-Add exact `change_captioning` model/profile registry entries only after pass. Keep RSCaMa absent from runtime and dependency files.
-
-```bash
-python -m pytest tests/inference/test_change_captioning.py tests/ml/test_p4_e03.py tests/ingestion/test_models.py -v
-git diff --check
-git add satquery/inference/change_captioning.py ml/evaluation/prepare_p4_e03.py \
-  ml/evaluation/run_p4_e03.py tests/inference/test_change_captioning.py tests/ml/test_p4_e03.py \
-  models/registry.yaml satquery/registry/preprocessing.yaml \
-  experiments/phase4_temporal_analytics/p4_e03
-git commit -m "feat: add validated change caption specialist"
-```
+RSCaMa remains absent from runtime/dependencies during core Phase 4.
 
 ---
 
@@ -952,7 +736,7 @@ def test_agreement_is_iou_not_confidence():
     assert result.interpretation == "agreement_not_accuracy"
 ```
 
-Return intersection, union, IoU or `None` for empty union, and valid-pixel count. Do not label low agreement as either model being wrong.
+Return intersection, union, IoU or `None` for empty union, and valid-pixel count. Agreement is diagnostic only. Do not label low agreement as either model being wrong and do not map IoU to ALLOW/WARN/ABSTAIN thresholds in Phase 4.
 
 - [ ] **Step 4: Register tools and commit**
 
@@ -970,356 +754,243 @@ git commit -m "feat: add deterministic SAR change evidence"
 
 ### Task 9: Implement and Reproduce STURM P4-E04
 
-**Files:**
-- Create: `satquery/inference/flood.py`
-- Create: `ml/evaluation/prepare_p4_e04.py`
-- Create: `ml/evaluation/run_p4_e04.py`
-- Create: `tests/inference/test_flood.py`
-- Create: `tests/ml/test_p4_e04.py`
+**Precondition:** STURM model + STURM-Flood primary contracts are `PASS`, including verified archive/weight SHA-256, exact Sentinel-1 radiometric/scaling/normalization behavior, and pinned TensorFlow/Keras runtime. Otherwise stop.
 
-**Interfaces:**
-- Produces: `FloodBackend.segment(image) -> FloodBackendResult` protocol.
-- Produces: `SturmS1Backend` using exact audited model source/checkpoint.
-- Produces: `FloodSegmentationService.segment(observation) -> FloodMaskEvidence` with `target_class="water_or_flood_extent"` only when label semantics support it.
+**Files:** same planned adapter/evaluator/test paths as above.
 
-- [ ] **Step 1: Write failing strict sensor tests**
+**Runtime rule:** STURM remains an official TensorFlow/Keras specialist if that is the audited implementation. Do not reimplement it in PyTorch for convenience.
 
-```python
-def test_sturm_accepts_only_exact_audited_sentinel1_contract(valid_s1_observation):
-    evidence = service(fake_backend).segment(valid_s1_observation)
-    assert evidence.domain.status is DomainStatus.IN_DOMAIN
+- [ ] **Step 1: RED strict sensor/model tests**
+Test exact audited constraints:
+- Sentinel-1/platform requirements;
+- required polarization names and order;
+- calibrated/radiometric domain;
+- scaling/normalization;
+- GSD and input dimensions;
+- NoData handling;
+- exact archive/weight hashes;
+- finite output probabilities/logits;
+- output threshold/decoder semantics;
+- RISAT and incompatible polarizations reject before model execution.
 
-@pytest.mark.parametrize("polarizations", [("HH", "HV"), ("VV",), ()])
-def test_sturm_rejects_incompatible_polarization(polarizations):
-    with pytest.raises(ModelInputUnsupportedError):
-        service(fake_backend).segment(observation_with(polarizations=polarizations))
+Generic `FloodBackend` types must remain sensor-neutral; Sentinel-1 restrictions belong to the STURM registration/service contract.
 
+- [ ] **Step 2: Securely acquire/load official model**
+Safely inspect/extract only allowed regular files; reject traversal, links/devices, duplicates, oversized/unexpected members. Verify outer archive and selected weight member identities before TensorFlow/Keras loading.
 
-def test_risat_never_falls_through_to_sturm(risat_observation):
-    with pytest.raises(ModelInputUnsupportedError):
-        service(fake_backend).segment(risat_observation)
-```
+- [ ] **Step 3: Prepare real STURM-Flood data**
+Use the actual audited dataset layout/metadata and event grouping. Because no publisher split exists, use the frozen event-level split policy from Task 2A. Never split related tiles from one event across tuning/validation boundaries if the frozen contract forbids it.
 
-Also test radiometric domain, calibrated product requirement, 10 m GSD tolerance, 128×128 preparation, VV/VH order, NoData, archive/checkpoint SHA-256, finite logits, binary output, and raw-score labeling.
+- [ ] **Step 4: Reproduce primary STURM validation**
+Require nonzero evaluated samples. Report at least precision, recall, F1, IoU, event breakdown, latency, and memory/runtime information. Accuracy alone cannot pass.
 
-- [ ] **Step 2: Verify RED and implement model adapter**
+Metrics must reconstruct from saved valid-pixel confusion counts.
 
-```bash
-python -m pytest tests/inference/test_flood.py -v
-```
+- [ ] **Step 5: Conditional Sen1Floods11 external evaluation**
+Run only when Sen1Floods11 license and exact no-tuning STURM transfer preprocessing/input semantics are proven.
 
-Extract official `.tar.gz` only through validated regular-file allowlist into quarantine. Reject absolute paths, `..`, links, devices, duplicate members, oversized members, and unexpected weights. Verify outer archive and selected checkpoint hashes before loading.
+Freeze actual Sen1Floods11 source behavior:
+- 512×512 Sentinel-1 chips;
+- VV/VH semantics as audited;
+- labels: `-1` invalid, `0` non-water, `1` water;
+- **exclude `-1` pixels from all confusion metrics**.
 
-- [ ] **Step 3: Write evaluator and split-sealing tests**
+Do not reshape the dataset contract into fake `128×128 image.tif/label.tif` fixtures. Any resizing/preparation must be an explicit STURM preprocessing operation with provenance.
 
-```python
-def test_sen1floods11_cannot_tune_sturm_threshold():
-    with pytest.raises(ValueError):
-        run_p4_e04(dataset="sen1floods11", threshold=0.6)
+If transfer preprocessing cannot be justified, record:
+`BLOCKED_INPUT_CONTRACT`
+and keep the primary STURM result valid.
 
+No threshold/preprocessing tuning on the external holdout.
 
-def test_flood_metrics_reconstruct_from_saved_confusion_counts(tmp_path):
-    result = run_fixture_evaluation(tmp_path)
-    assert reconstruct_binary_metrics(read_jsonl(result.predictions)) == result.metrics
-```
+- [ ] **Step 6: Promote only after primary reproduction**
+Register STURM only after the primary STURM-Flood gate passes. Registry entry must state the exact Sentinel-1 domain and must not imply RISAT compatibility.
 
-Preparation records VV/VH order, dB/linear domain, CRS, transform, GSD, acquisition metadata, mask label semantics, source event/location, pair grouping, and hashes. If STURM and Sen1Floods11 radiometric/preprocessing contracts cannot be reconciled from authoritative sources, record external evaluation as `BLOCKED_INPUT_CONTRACT`; never invent conversion.
-
-- [ ] **Step 4: Reproduce STURM validation**
-
-```bash
-python -m ml.evaluation.prepare_p4_e04 --dataset sturm_flood --source-root "$STURM_ROOT" --output experiments/phase4_temporal_analytics/p4_e04/sturm_manifest.json
-python -m ml.evaluation.run_p4_e04 --dataset sturm_flood --manifest experiments/phase4_temporal_analytics/p4_e04/sturm_manifest.json --data-root "$STURM_ROOT" --output-dir outputs/p4_e04_sturm --split validation
-```
-
-Require nonzero evaluated samples. Report precision, recall, F1, IoU, event-level breakdown, latency, and peak VRAM. Accuracy alone cannot pass segmentation gate.
-
-- [ ] **Step 5: Run unchanged independent evaluation**
-
-```bash
-python -m ml.evaluation.prepare_p4_e04 --dataset sen1floods11 --source-root "$SEN1FLOODS11_ROOT" --output experiments/phase4_temporal_analytics/p4_e04/sen1floods11_manifest.json
-python -m ml.evaluation.run_p4_e04 --dataset sen1floods11 --manifest experiments/phase4_temporal_analytics/p4_e04/sen1floods11_manifest.json --data-root "$SEN1FLOODS11_ROOT" --output-dir outputs/p4_e04_sen1floods11 --split external_holdout
-```
-
-No threshold/preprocessing changes after STURM validation. Report cross-dataset degradation and domain caveats.
-
-- [ ] **Step 6: Promote only after reproduction, then commit**
-
-Add exact `flood_segmentation` model/profile registry entries only after pass. Save reviewed metadata/results, never the 1.8 GB archive/checkpoint.
-
-```bash
-python -m pytest tests/inference/test_flood.py tests/ml/test_p4_e04.py tests/ingestion/test_models.py -v
-git diff --check
-git add satquery/inference/flood.py ml/evaluation/prepare_p4_e04.py ml/evaluation/run_p4_e04.py \
-  tests/inference/test_flood.py tests/ml/test_p4_e04.py models/registry.yaml \
-  satquery/registry/preprocessing.yaml experiments/phase4_temporal_analytics/p4_e04
-git commit -m "feat: add validated SAR flood specialist"
-```
+Run focused tests, `git diff --check`, commit, and stop for review.
 
 ---
 
-### Task 10: Add Fail-Closed Evidence Reconciliation
+### Task 10: Add Semantic Compatibility and Diagnostic Mask Agreement
+
+**Phase 4 scope change:** do **not** implement an evidence-to-ALLOW/WARN/ABSTAIN policy from uncalibrated IoU bands. Phase 4 may verify whether two masks are semantically/spatially comparable and report diagnostic agreement only. Decision policy belongs to Phase 5 unless later calibrated evidence explicitly authorizes it.
 
 **Files:**
-- Create: `satquery/analytics/reconciliation.py`
-- Create: `tests/analytics/test_reconciliation.py`
+- Create `satquery/analytics/reconciliation.py` (or a more precise compatibility module name if consistent with repository style)
+- Create `tests/analytics/test_reconciliation.py`
 
 **Interfaces:**
-- Produces: `ReconciliationResult` with outcome, source evidence IDs, optional agreement evidence, warnings, and no aggregate confidence.
-- Produces: `reconcile_masks(learned: FloodMaskEvidence | ChangeMaskEvidence | None, deterministic: ChangeMaskEvidence | None) -> ReconciliationResult`.
-- Consumes: agreement calculation from Task 8 and failure outcomes.
+- `assess_mask_compatibility(first, second) -> CompatibilityResult`
+- optional `diagnostic_mask_agreement(first, second, valid) -> AgreementEvidence`
 
-- [ ] **Step 1: Write failing outcome tests**
+- [ ] **Step 1: RED compatibility tests**
+Reject or mark non-comparable when:
+- grids differ and have not been explicitly aligned;
+- target phenomena differ (for example post-event water extent vs generic temporal change);
+- time semantics differ;
+- mask value semantics differ;
+- source observations cannot be related.
 
-```python
-def test_compatible_agreeing_masks_allow_with_separate_scores():
-    result = reconcile_masks(learned, deterministic)
-    assert result.outcome == "ALLOW"
-    assert result.agreement.interpretation == "agreement_not_accuracy"
-    assert result.aggregate_confidence is None
+A `FloodMaskEvidence` and generic `ChangeMaskEvidence` are **not** automatically comparable merely because both are binary rasters.
 
+- [ ] **Step 2: Diagnostic agreement only**
+For compatible masks report:
+- intersection;
+- union;
+- IoU (or `None` for empty union);
+- valid-pixel count;
+- interpretation = `agreement_not_accuracy`.
 
-def test_strong_conflict_abstains_without_destroying_independent_evidence():
-    result = reconcile_masks(learned, conflicting_deterministic)
-    assert result.outcome == "ABSTAIN"
-    assert result.evidence_ids == (learned.evidence_id, conflicting_deterministic.evidence_id)
+Do not expose:
+- aggregate confidence;
+- `IoU < X -> ABSTAIN`;
+- `IoU < Y -> WARNING`;
+- claims that one model is correct.
 
-
-def test_missing_learned_model_degrades_to_deterministic_with_warning():
-    result = reconcile_masks(None, deterministic)
-    assert result.outcome == "ALLOW_WITH_WARNING"
-    assert "LEARNED_MODEL_NOT_APPLICABLE" in result.warnings
-```
-
-- [ ] **Step 2: Verify RED and implement fixed policy**
-
-```bash
-python -m pytest tests/analytics/test_reconciliation.py -v
-```
-
-Policy uses predeclared agreement bands from `experiment_plan.yaml`. Agreement changes support status only; it never becomes ground-truth correctness or calibrated confidence. Invalid geometry blocks reconciliation. Missing optional evidence degrades locally. Unknown sensor semantics reject model execution before reconciliation.
+Missing optional evidence should simply yield `not_available/not_comparable`, not a fabricated policy decision.
 
 - [ ] **Step 3: Verify and commit**
-
-```bash
-python -m pytest tests/analytics -v
-git diff --check
-git add satquery/analytics/reconciliation.py satquery/analytics/__init__.py \
-  tests/analytics/test_reconciliation.py
-git commit -m "feat: reconcile temporal evidence safely"
-```
+Run analytics tests and `git diff --check`, then commit the diagnostic/compatibility implementation. Stop for review.
 
 ---
 
-### Task 11: Extend Existing Kaggle Runner, Not Build Another Framework
+### Task 11: Harden and Extend the Existing Kaggle Runner
+
+**Do not build another execution framework.** First audit the runner that exists at the current branch; preserve working Phase 1–3 behavior.
 
 **Files:**
-- Modify: `scripts/kaggle/experiments.yaml`
-- Create: `notebooks/kaggle_p4_e01_oscd.ipynb`
-- Create: `notebooks/kaggle_p4_e02_changer.ipynb`
-- Create: `notebooks/kaggle_p4_e03_chg2cap.ipynb`
-- Create: `notebooks/kaggle_p4_e04_sturm.ipynb`
-- Modify: `tests/test_kaggle_runner.py`
-- Modify: `scripts/kaggle/README.md`
-- Modify: `docs/KAGGLE.md`
+- modify `scripts/kaggle/experiments.yaml`
+- create the four Phase 4 notebooks
+- modify `tests/test_kaggle_runner.py`
+- update `scripts/kaggle/README.md` / `docs/KAGGLE.md` only as needed
+- modify `scripts/kaggle/runner.py` only if required to satisfy the exact-path/stale-artifact contract below.
 
-**Interfaces:**
-- Consumes: existing `scripts/kaggle/runner.py`; no second runner.
-- Produces: exact experiment names and exact result-file retrieval.
+- [ ] **Step 1: RED runner tests**
+Require:
+- unique new kernel slug and `remote_output_dir` per Phase 4 experiment;
+- no reuse of historical Phase 4 slugs;
+- exact Git SHA injection;
+- clean-run provenance;
+- repository clone/checkout exactly once per notebook run;
+- exact remote result path retrieval, never first matching basename or unrestricted recursive search;
+- ambiguous/missing result path fails closed;
+- current results are staged/validated atomically before publication;
+- a failed new run cannot leave an older success metric looking current;
+- success and failure artifact sets are distinguishable;
+- dry-run launches nothing.
 
-- [ ] **Step 1: Write failing registry tests**
+- [ ] **Step 2: Register only experiments whose execution path exists**
+Use the exact audited dependency/runtime needs:
+- P4-E01: CPU unless a concrete reason needs GPU;
+- P4-E02: Open-CD/PyTorch environment;
+- P4-E03: isolated audited Chg2Cap environment;
+- P4-E04: isolated TensorFlow/Keras STURM environment.
 
-```python
-@pytest.mark.parametrize("name", ["p4-e01-oscd", "p4-e02-changer", "p4-e03-chg2cap", "p4-e04-sturm"])
-def test_phase4_experiment_has_unique_identity_and_output(name):
-    experiment = get_experiment(name)
-    assert experiment["remote_output_dir"].startswith(name)
-    assert experiment["download_policy"] == "metadata_only"
-
-
-def test_phase4_download_uses_exact_relative_paths_not_basename_search(tmp_path):
-    command = build_download_command("p4-e02-changer", tmp_path)
-    assert "**/validation_result.json" not in command
-```
-
-- [ ] **Step 2: Verify RED and add exact entries**
-
-Each entry has one unique notebook, kernel slug, experiment directory, remote output directory, declared small `result_files`, declared `large_result_files`, `download_policy: metadata_only`, GPU flag, internet flag, and exact kernel sources. Never reuse a historical Phase 4 slug.
+A `BLOCKED` model contract may have a dry-run preparation entry, but no canonical execution should be launched until the contract is `PASS`.
 
 - [ ] **Step 3: Keep notebooks thin**
-
-Each notebook contains only:
-
+Each notebook may only:
 ```text
-environment report
-exact Git clone once
-checkout injected SHA
-assert clean checkout
-install audited dependencies
-verify dataset/model inputs
-call one tested Python evaluator
-verify exact declared outputs
-exit nonzero on failure
+report environment
+→ clone exact repository once
+→ checkout injected SHA
+→ assert clean checkout
+→ install/use audited environment
+→ verify exact data/model identities
+→ call one tested Python evaluator
+→ verify exact declared output files
+→ fail nonzero on scientific/runtime failure
 ```
 
-No metrics, predictions, thresholds, scientific transforms, or fallback data are authored in notebook cells.
+No manually authored predictions, metrics, thresholds, scientific transformations, fallback datasets, or placeholder PASS values in cells.
 
-- [ ] **Step 4: Test dry runs without launching jobs**
+- [ ] **Step 4: Dry-run verification**
+Run runner tests plus all four `--dry-run` commands. Confirm exact output directories and no push/run.
 
-```bash
-python -m pytest tests/test_kaggle_runner.py -v
-python scripts/kaggle/runner.py run p4-e01-oscd --dry-run
-python scripts/kaggle/runner.py run p4-e02-changer --dry-run
-python scripts/kaggle/runner.py run p4-e03-chg2cap --dry-run
-python scripts/kaggle/runner.py run p4-e04-sturm --dry-run
-```
-
-Expected: exact commit, unique identity, exact output path, no upload/run during dry run.
-
-- [ ] **Step 5: Commit framework extension**
-
-```bash
-git diff --check
-git add scripts/kaggle/experiments.yaml scripts/kaggle/README.md docs/KAGGLE.md \
-  notebooks/kaggle_p4_e01_oscd.ipynb notebooks/kaggle_p4_e02_changer.ipynb \
-  notebooks/kaggle_p4_e03_chg2cap.ipynb notebooks/kaggle_p4_e04_sturm.ipynb \
-  tests/test_kaggle_runner.py
-git commit -m "feat: register phase 4 external experiments"
-```
+- [ ] **Step 5: Commit**
+Commit only the runner/notebook/registry/doc changes actually needed. Stop before any external run.
 
 ---
 
 ### Task 12: Execute, Retrieve, and Audit External Results
 
-**Files:**
-- Add reviewed small outputs under `experiments/phase4_temporal_analytics/p4_e0x/results/`.
-- Do not add model weights, data, caches, or large archives.
+Run only lanes whose required contracts and implementation gates are `PASS`.
 
-**Interfaces:**
-- Consumes: clean committed Git SHA and Task 11 experiment identities.
-- Produces: reproducible measured evidence or preserved failure artifacts.
-
-- [ ] **Step 1: Confirm canonical-run preconditions**
-
+**Canonical preconditions:**
 ```bash
 git status --short
 git rev-parse HEAD
 python -m pytest
+git diff --check
 ```
+Worktree must be clean. Never use `--allow-dirty` for canonical evidence.
 
-Expected: clean worktree and passing suite. Do not use `--allow-dirty`.
+**Execution independence:**
+- P4-E01 deterministic lanes may proceed independently of learned specialists.
+- P4-E02 primary requires LEVIR-CD + ChangerEx PASS.
+- P4-E03 requires LEVIR-CC + Chg2Cap PASS.
+- P4-E04 primary requires STURM-Flood + STURM PASS.
+- S2Looking and Sen1Floods11 optional/conditional lanes are skipped or explicitly blocked without invalidating a successful primary lane.
 
-- [ ] **Step 2: Run experiments in order**
+- [ ] **Run one experiment at a time and audit before the next promotion decision**
 
-```bash
-python scripts/kaggle/runner.py run p4-e01-oscd
-python scripts/kaggle/runner.py run p4-e02-changer
-python scripts/kaggle/runner.py run p4-e03-chg2cap
-python scripts/kaggle/runner.py run p4-e04-sturm
-```
+For each canonical run:
+1. record launched Git SHA/kernel identity;
+2. retrieve only exact declared output paths;
+3. verify runner metadata and dirty flag;
+4. verify dataset/checkpoint/profile hashes against frozen contracts;
+5. verify split is allowed and sealed test was not accessed;
+6. verify sample count > 0 for measured results;
+7. verify prediction row count == sample count;
+8. reconstruct aggregate metrics from saved rows/counts;
+9. inspect representative predictions/evidence, not only the aggregate score;
+10. verify output does not contain source datasets, checkpoints, cloned repository files or caches;
+11. preserve structured failure artifacts as failures.
 
-Run only experiments whose contracts are `PASS`. A failed earlier reproduction blocks its robustness/promotion step but does not block independent experiments.
+Do not run robustness/holdout lanes after a failed primary reproduction.
 
-- [ ] **Step 3: Retrieve exact declared metadata/results**
-
-```bash
-python scripts/kaggle/runner.py download p4-e01-oscd
-python scripts/kaggle/runner.py download p4-e02-changer
-python scripts/kaggle/runner.py download p4-e03-chg2cap
-python scripts/kaggle/runner.py download p4-e04-sturm
-```
-
-Never select first matching basename. Preserve runner metadata separately from scientific metrics.
-
-- [ ] **Step 4: Audit every result locally**
-
-For each experiment verify:
-
-- returned Git SHA equals launched SHA;
-- dirty-worktree flag is false;
-- dataset manifest and checkpoint/profile hashes match frozen contracts;
-- split is validation/robustness/external holdout, never sealed test;
-- prediction row count equals declared sample count and is greater than zero;
-- aggregate metrics reconstruct from prediction/confusion rows;
-- no source image, model weight, repository file, or cache appears in output;
-- latency/VRAM records identify hardware;
-- failures remain failures, not zero scores.
-
-- [ ] **Step 5: Commit each independently audited result**
-
-```bash
-git add experiments/phase4_temporal_analytics/p4_e01/results
-git commit -m "exp: record P4-E01 validation"
-```
-
-Repeat with separate commits for `P4-E02`, `P4-E03`, and `P4-E04`. Skip absent/blocked experiments; never create a success artifact manually.
+Commit each independently audited small result in a separate experiment commit. Never create a success artifact manually.
 
 ---
 
 ### Task 13: Freeze Phase 4 Decisions and Close Out
 
-**Files:**
-- Create: `experiments/phase4_temporal_analytics/PHASE_4_CLOSEOUT.json`
-- Modify: `experiments/phase4_temporal_analytics/README.md`
-- Modify: `docs/DEVELOPMENT_PLAN.md`
-- Modify if public scientific contracts changed: `docs/ARCHITECTURE.md`
-- Modify if evaluation policy changed: `docs/EVALUATION.md`
-- Modify if new failure behavior exists: `docs/FAILURE_POLICY.md`
-- Modify: `models/registry.yaml`
-- Modify: `satquery/registry/preprocessing.yaml`
-- Modify: `tests/ml/test_phase4_contracts.py`
+`PHASE_4_CLOSEOUT.json` is created **only here**.
 
-**Interfaces:**
-- Consumes: locally audited experiment artifacts only.
-- Produces: immutable Phase 4 status with per-capability outcomes: `SUPPORTED`, `SUPPORTED_WITH_LIMITS`, `BLOCKED`, or `NOT_EVALUATED`.
+**Mandatory core closeout gates:**
+- P4-E01 lanes A–C have measured deterministic verification evidence. Lane D may be `NOT_EVALUATED/BLOCKED` if no defensible OSCD benchmark method/data contract is available.
+- P4-E02 primary LEVIR-CD/ChangerEx reproduction passes.
+- P4-E03 primary LEVIR-CC/Chg2Cap reproduction passes.
+- P4-E04 primary STURM-Flood/STURM reproduction passes.
+- Optional S2Looking/Sen1Floods11 absence does not block `COMPLETE`, but their limitations/status must be explicit.
+- No model is promoted beyond its audited sensor/domain limits.
+- No Cartosat/RISAT transfer claim is made without measured evidence.
 
-- [ ] **Step 1: Write closeout reconstruction test**
+**Files:** create closeout; update development/evaluation/architecture/failure docs only where actual public contracts changed; update registries only for specialists already promoted by measured evidence.
 
-Add to `tests/ml/test_phase4_contracts.py`:
+- [ ] **Step 1: Add closeout reconstruction tests**
+Every referenced artifact must exist and hash-match. Every `SUPPORTED*` capability must have nonzero measured evidence and reconstructible metrics appropriate to that capability.
 
-```python
-def test_phase4_closeout_references_existing_hash_matching_artifacts():
-    closeout = load_closeout(CLOSEOUT_PATH)
-    for artifact in closeout.artifacts:
-        assert artifact.path.is_file()
-        assert sha256_file(artifact.path) == artifact.sha256
-
-
-def test_supported_capability_has_nonzero_measured_evidence():
-    closeout = load_closeout(CLOSEOUT_PATH)
-    for capability in closeout.capabilities:
-        if capability.status.startswith("SUPPORTED"):
-            assert capability.sample_count > 0
-            assert capability.metrics
-```
-
-- [ ] **Step 2: Verify RED and write closeout from evidence**
-
-```bash
-python -m pytest tests/ml/test_phase4_contracts.py -v
-```
-
-Closeout records:
-
-- exact Git SHA;
-- contract hashes;
+- [ ] **Step 2: Build closeout from locally audited artifacts only**
+Record:
+- exact Git SHA(s);
+- audit-contract hashes;
 - dataset/model/profile identities;
-- validation/robustness sample counts;
-- reconstructible metrics;
-- test-sealing status;
+- measured sample counts and metrics;
+- sealed-test status;
 - domain limitations;
-- external dependencies;
-- accepted/rejected model promotions;
-- explicit RISAT/Cartosat non-generalization statement;
+- optional/blocked lanes;
+- accepted/rejected promotions;
+- explicit Cartosat/RISAT non-generalization;
 - RSCaMa and Modified Sen1Floods11 exclusions;
-- no-training decision unless later separately authorized.
+- any no-training decision.
 
-- [ ] **Step 3: Reconcile docs with code and evidence**
+- [ ] **Step 3: Set phase state truthfully**
+`COMPLETE` only when all mandatory core gates above pass.
+Otherwise `IN_PROGRESS` or `BLOCKED` with exact reasons.
 
-Set canonical Phase 4 to `COMPLETE` only if mandatory accepted capabilities have measured evidence and all closeout checks pass. Otherwise use `IN PROGRESS` or `BLOCKED` with exact reason. Never edit frozen historical artifacts to make metrics agree.
+Never rewrite frozen historical artifacts to make results agree.
 
-- [ ] **Step 4: Run full release verification**
-
+- [ ] **Step 4: Full release verification**
 ```bash
 python -m pytest
 python -m compileall -q satquery ml apps scripts
@@ -1327,97 +998,92 @@ git diff --check
 git status --short
 ```
 
-Also inspect tracked file sizes and secrets:
-
-```bash
-git ls-files -z | xargs -0 -n1 sh -c 'n=$(wc -c < "$0"); [ "$n" -gt 20000000 ] && echo "$n $0"'
-git diff --cached --check
-```
-
-Expected: all tests pass; no unexpected large files, credentials, caches, datasets, or checkpoints.
+Inspect tracked file sizes and staged diff; verify no credentials, source datasets, checkpoints, caches, or accidental large artifacts.
 
 - [ ] **Step 5: Commit closeout**
-
-```bash
-git add experiments/phase4_temporal_analytics/PHASE_4_CLOSEOUT.json \
-  experiments/phase4_temporal_analytics/README.md \
-  docs/DEVELOPMENT_PLAN.md docs/ARCHITECTURE.md docs/EVALUATION.md docs/FAILURE_POLICY.md \
-  models/registry.yaml satquery/registry/preprocessing.yaml tests/ml/test_phase4_contracts.py
-git commit -m "docs: close phase 4 temporal analytics"
+Stage only files actually changed and commit:
+```text
+docs: close phase 4 temporal analytics
 ```
-
-Stage only files actually changed. Omit unchanged docs/registries from `git add`.
 
 ---
 
 ## Scientific Acceptance Gates
 
-### P4-E01 — deterministic multispectral
+### P4-E01 — deterministic multispectral/temporal core
 
-Pass only when:
+Pass core lanes only when:
+- semantic bands are explicit; no positional guessing;
+- native resolution, NoData and derived-grid provenance are explicit;
+- hand-calculated NDVI/NDWI/MNDWI fixtures pass;
+- identity/reversal/misalignment grid controls pass;
+- area fixtures reconstruct exactly within declared tolerance;
+- Sentinel-2 L2A examples remain demonstrations.
 
-- all 13 OSCD bands are identified from contract, not position guesses;
-- native resolutions and NoData are handled explicitly;
-- output grids are verified;
-- hand-calculated NDVI/NDWI/MNDWI and area fixtures pass;
-- identity/misalignment/reversal controls execute;
-- prediction rows reconstruct all reported mask metrics;
-- Sentinel-2 L2A examples remain demonstrations, not benchmark evidence.
+OSCD segmentation precision/recall/F1/IoU are reported **only** if optional Lane D has a frozen, defensible deterministic change method and a `PASS` OSCD data contract. NDVI-difference thresholding is not generic change detection.
 
 ### P4-E02 — ChangerEx
 
-Pass only when:
-
-- official checkpoint/source/profile hashes are verified;
+Primary pass only when:
+- LEVIR-CD data contract and ChangerEx model contract are `PASS`;
+- exact official source/config/checkpoint bytes are verified;
 - official LEVIR-CD validation is reproduced within predeclared tolerance;
-- masks map back to source grid;
-- identity/misalignment controls pass;
-- unchanged S2Looking degradation is reported;
-- capability is labeled high-resolution structural change, not generic change.
+- saved rows reconstruct metrics;
+- masks map to the declared source/common grid;
+- identity/misalignment/domain controls pass;
+- capability is labeled high-resolution structural/building change, not universal change.
+
+S2Looking is optional/non-gating. If unavailable or license-blocked, report robustness `BLOCKED/NOT_EVALUATED`; do not fail an otherwise valid primary reproduction.
 
 ### P4-E03 — Chg2Cap
 
 Pass only when:
-
-- official checkpoint/source/vocabulary/decoder are pinned;
-- official validation protocol is reproduced or discrepancy is accepted explicitly;
-- every generated caption and reference set is preserved;
+- LEVIR-CC imagery/package use and Chg2Cap checkpoint provenance/license are acceptable;
+- exact checkpoint/source/vocabulary/feature-extractor/decoder are pinned;
+- official validation protocol is reproduced or discrepancy is explicitly rejected/accepted under the frozen tolerance rule;
+- every generated caption and full reference set is preserved;
 - BLEU-4/METEOR/ROUGE-L/CIDEr use pinned standard implementations;
 - identity/reversal diagnostics are reported;
-- caption evidence contains no manufactured mask or measurement.
+- caption evidence contains no mask, area, count or manufactured confidence.
 
-### P4-E04 — STURM/Sen1Floods11
+### P4-E04 — STURM
 
-Pass only when:
-
-- exact Sentinel-1 input contract and checkpoint are verified;
-- STURM validation has nonzero samples and segmentation F1/IoU;
-- Sen1Floods11 uses unchanged preprocessing/threshold or is blocked for contract incompatibility;
+Primary pass only when:
+- exact STURM Sentinel-1 input/radiometric/scaling contract and TensorFlow/Keras runtime are verified;
+- exact archive/weight SHA-256 is verified;
+- event-grouped STURM validation has nonzero samples and reconstructible precision/recall/F1/IoU;
 - deterministic SAR processing refuses unknown radiometric domains/polarizations;
-- learned/deterministic agreement is labeled diagnostic only;
-- RISAT incompatibility routes away from STURM rather than forcing VV/VH assumptions.
+- learned/deterministic agreement is diagnostic only;
+- RISAT incompatibility routes away from STURM rather than forcing Sentinel-1 assumptions.
+
+Sen1Floods11 is conditional/non-gating. If run, `-1` pixels are excluded from metrics and the STURM preprocessing/threshold remains unchanged. Otherwise report `BLOCKED_INPUT_CONTRACT`/license blocker explicitly.
 
 ## Stop Conditions
 
-Stop affected path and preserve evidence when any occurs:
+Stop the affected lane and preserve evidence when any occurs:
 
-- upstream license or imagery terms are unresolved;
-- checkpoint authority, revision, bytes, or hash cannot be established;
-- preprocessing, band order, radiometric domain, or T1/T2 semantics are unknown;
-- official source requires unsafe runtime patching or arbitrary remote code;
-- validation split cannot be separated from test;
-- prediction/stat counts do not match declared sample count;
+- required dataset/model contract is still `BLOCKED`;
+- upstream license/imagery rights are unacceptable or unresolved for the intended execution;
+- checkpoint authority, bytes, local SHA-256, revision, or provenance cannot be established;
+- preprocessing, band order, radiometric/scaling domain, T1/T2 semantics, or label semantics are unknown;
+- official source requires unsafe arbitrary remote code or untracked installed-package patching;
+- validation cannot be isolated from sealed test data;
+- prediction/stat counts do not match sample count;
 - metrics cannot be reconstructed;
-- sealed test is accessed before freeze;
-- official reproduction exceeds predeclared discrepancy tolerance;
-- robustness/holdout results accidentally influence tuning;
-- output path is ambiguous or retrieved by basename search;
-- canonical run uses dirty/unrecorded source state.
+- sealed test/robustness/holdout data influence tuning;
+- official reproduction exceeds the predeclared tolerance;
+- output retrieval is ambiguous, basename-based, stale, or from the wrong experiment path;
+- canonical run uses dirty/unrecorded source state;
+- zero samples are evaluated;
+- optional robustness/holdout failure is incorrectly being used to rewrite the primary result.
+
+A stop in one independent lane does not automatically block unrelated Phase 4 lanes.
 
 ## Deferred Work
 
-- RSCaMa integration: add only after Phase 4 closeout if Chg2Cap is scientifically insufficient and Linux/Mamba/CLIP-patch risk is accepted.
-- ChangerEx retraining on S2Looking: add only if robustness degradation is unacceptable and a new sealed evaluation source is frozen first.
-- Any STURM adaptation to Sen1Floods11 or RISAT: add only with an explicit radiometric/sensor transfer experiment and untouched holdout.
-- Temporal API routes, natural-language query routing, answer composition, UI overlays, and downloadable reports: canonical Phases 5–6.
-- Generic framework for arbitrary spectral indices/models: add only when a second concrete implementation cannot use the explicit registered tools.
+- RSCaMa integration: only after Phase 4 closeout if Chg2Cap is scientifically insufficient and its Linux/Mamba/runtime risk is separately accepted.
+- ChangerEx adaptation/retraining on S2Looking: only after S2Looking rights are resolved and a new untouched evaluation source is frozen first.
+- Any STURM adaptation to Sen1Floods11 or RISAT: only through an explicit sensor/radiometric transfer experiment with untouched holdout.
+- Numeric agreement-to-decision thresholds or aggregate confidence: Phase 5+ only after calibration evidence; Phase 4 agreement remains diagnostic.
+- Temporal API routes, natural-language routing, answer composition, UI overlays and downloadable reports: canonical Phases 5–6.
+- Generic framework for arbitrary spectral indices/models: only when a second concrete implementation proves the explicit registered tools insufficient.
