@@ -37,6 +37,7 @@ from apps.api.app.routes.v1_jobs import router as v1_jobs_router
 from apps.api.app.routes.v1_artifacts import router as v1_artifacts_router
 from apps.api.app.routes.v1_query import router as v1_query_router
 from apps.api.app.routes.v1_analyses import router as v1_analyses_router
+from apps.api.app.routes.v1_reports import router as v1_reports_router
 from apps.api.app.routes.v1_system import router as v1_system_router
 from apps.api.app.routes.vqa import invalid_vqa_request_response
 from apps.api.app.routes.vqa import router as vqa_router
@@ -54,6 +55,7 @@ from satquery.artifacts import ArtifactStore
 from satquery.execution import ExecutionEngine, JobRunner
 from satquery.execution.adapters import build_registered_adapters
 from satquery.persistence import Database, MetadataRepository
+from satquery.reporting import ReportBuilder
 from satquery.registry import (
     load_model_registry,
     load_runtime_capabilities,
@@ -122,6 +124,7 @@ def create_app(
         timeout_seconds=float(os.environ.get("SATQUERY_TOOL_TIMEOUT_SECONDS", "300")),
     )
     application.state.artifact_store = artifact_store
+    application.state.report_builder = ReportBuilder(repository, artifact_store=artifact_store)
     application.state.execution_engine = execution_engine
     application.state.job_runner = JobRunner(
         repository,
@@ -157,6 +160,7 @@ def create_app(
     application.include_router(v1_artifacts_router)
     application.include_router(v1_query_router)
     application.include_router(v1_analyses_router)
+    application.include_router(v1_reports_router)
 
     add_request_id_middleware(application)
     install_v1_error_handlers(application)
