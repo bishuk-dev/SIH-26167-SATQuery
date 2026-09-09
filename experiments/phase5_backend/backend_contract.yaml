@@ -1,0 +1,445 @@
+# Phase 5 Backend Contract — frozen at Task 0
+#
+# This file is the authoritative capability/route/state contract for the
+# Phase 5 backend. It inventories REAL, audited capabilities only.
+# Schema/registry/notebook existence is never a capability.
+# Blocked learned specialists must never become runnable because Phase 5
+# started; they are represented as unavailable capabilities.
+
+schema_version: 1
+
+phase5_start:
+  mode: RESTRICTED_CAPABILITY
+  phase4_closeout_status: BLOCKED
+  phase4_closeout_path: experiments/phase4_temporal_analytics/PHASE_4_CLOSEOUT.json
+  phase4_closeout_sha256: 84b890f56c990ad83497668e1393a3086248ae8af9babb1eab081e9770e582e3
+  starting_git_sha: 5d2adc7a95fb3853788a905782a8e5f32b058031
+  start_policy: >-
+    Phase 5 may start once (1) a canonical Phase 4 closeout artifact exists,
+    (2) its hashes and reconstruction checks pass, (3) the closeout has been
+    human-reviewed, and (4) the capability inventory below is frozen.
+    FULL_CAPABILITY mode requires Phase 4 status COMPLETE. In
+    RESTRICTED_CAPABILITY mode, independently verified capabilities are
+    exposed and blocked capabilities remain unavailable. No blocked
+    capability may become runnable merely because Phase 5 started.
+
+# ---------------------------------------------------------------------------
+# Capability states (never a single boolean "available")
+# ---------------------------------------------------------------------------
+capability_states:
+  AVAILABLE: registered and independently verified; runnable now under its declared input contract
+  AVAILABLE_WITH_LIMITS: verified, but execution is gated by declared scientific or runtime limits
+  UNAVAILABLE_CONTRACT_BLOCKED: dataset/model contract BLOCKED; unblock work is separate scientific work
+  UNAVAILABLE_MODEL_NOT_INSTALLED: contract accepted but required model bytes are absent locally
+  UNAVAILABLE_RUNTIME: required pinned runtime cannot run in the API environment
+  UNSUPPORTED_INPUT: applies to requests, not capabilities — input violates the declared contract (for example unknown SAR radiometric semantics)
+  NOT_IMPLEMENTED: deliberately deferred; no implementation exists
+
+learned_capability_status_fields:
+  contract_status: state of the frozen dataset/model contract (ACCEPTED or BLOCKED)
+  runtime_status: dependency/checkpoint/runtime readiness (PROBED at Phase 5 Task 5; NOT_PROBED at Task 0)
+  promotion_status: PROMOTED only after measured official reproduction; NOT_PROMOTED otherwise
+  # capability_status is derived from the three fields and must never expose a
+  # BLOCKED or NOT_PROMOTED specialist as AVAILABLE.
+
+# ---------------------------------------------------------------------------
+# Frozen state enums
+# ---------------------------------------------------------------------------
+analysis_states: [PENDING, RUNNING, SUCCEEDED, FAILED, ABSTAINED, REJECTED, CANCELLED, INTERRUPTED]
+job_states: [QUEUED, RUNNING, SUCCEEDED, FAILED, CANCEL_REQUESTED, CANCELLED, INTERRUPTED]
+failure_outcomes: [ALLOW, ALLOW_WITH_WARNING, REQUEST_INPUT, ABSTAIN, REJECT]
+
+# HTTP status and scientific outcome are independent. Example: HTTP 422 with
+# outcome REQUEST_INPUT for a missing semantic NIR mapping.
+error_envelope:
+  shape:
+    error:
+      code: stable machine-readable error code
+      message: human-readable, no internal paths or stack traces
+      outcome: one of failure_outcomes
+      details: structured, policy-defined fields only
+      request_id: server-generated req_<32 hex> correlation ID
+
+# ---------------------------------------------------------------------------
+# Capability inventory (real code and accepted registrations only)
+# ---------------------------------------------------------------------------
+capabilities:
+
+  # ----- Phase 1: core geospatial platform (deterministic) -----
+  observation_ingestion:
+    status: AVAILABLE
+    source_phase: 1
+    implementation: satquery.ingestion (FilesystemObservationStore, ObservationIngestionService)
+    input_contract: GeoTIFF/visualization upload under existing raster limits
+    evidence_type: observation_metadata
+    measurement_support: none
+    limitations: [uploads are immutable; no physical deletion in Phase 5]
+    legacy_route: /api/observations
+
+  observation_metadata_inspection:
+    status: AVAILABLE
+    source_phase: 1
+    implementation: satquery.ingestion.models.ObservationState
+    exposes: [sensor, modality, acquisition_time, CRS, affine, bounds, GSD, band roles, NoData]
+    evidence_type: observation_metadata
+    measurement_support: none
+
+  pair_compatibility:
+    status: AVAILABLE
+    source_phase: 1
+    implementation: satquery.geo.pairing.PairValidator
+    evidence_type: pair_compatibility_report
+    measurement_support: none
+    limitations: [alignment facts are reported; pixelwise comparison still requires a verified common grid]
+
+  raster_visualization_tiles:
+    status: AVAILABLE
+    source_phase: 1
+    implementation: satquery.visualization.tiles.RasterTileService
+    evidence_type: tile_stream
+    measurement_support: none
+    legacy_route: /tiles
+
+  # ----- Phase 2: single-image vision intelligence (learned, promoted) -----
+  single_image_vqa:
+    status: AVAILABLE_WITH_LIMITS
+    source_phase: 2
+    model_ids: [smolvlm_256m_instruct_v1]
+    preprocessing_profile: smolvlm_single_image_v1
+    modality: optical RGB visualization
+    evidence_type: vqa_evidence
+    measurement_support: none
+    contract_status: ACCEPTED
+    runtime_status: NOT_PROBED   # torch/transformers installed locally; readiness probe is Phase 5 Task 5
+    promotion_status: PROMOTED
+    limitations: >
+      answers are model-generated text and never create masks, measurements,
+      or calibrated confidence; numeric-looking answer text carries no
+      evidentiary weight
+    legacy_route: /api/vqa
+
+  text_guided_grounding:
+    status: AVAILABLE_WITH_LIMITS
+    source_phase: 2
+    model_ids: [grounding_dino_tiny_v1, grounding_dino_tiny_phase3_final_v1]
+    preprocessing_profile: grounding_dino_tiny_v1
+    modality: optical RGB visualization
+    evidence_type: grounding_evidence
+    measurement_support: none
+    contract_status: ACCEPTED
+    runtime_status: NOT_PROBED   # checkpoint bytes not observed in local HF cache at Task 0
+    promotion_status: PROMOTED
+    limitations: [boxes are pixel/normalized-space localization, not georeferenced areas]
+    legacy_route: /api/grounding
+
+  # ----- Phase 3: multisensor intelligence (learned, promoted, limited) -----
+  multisensor_land_cover_s1:
+    status: AVAILABLE_WITH_LIMITS
+    source_phase: 3
+    model_ids: [bifold_resnet50_s1_v020]
+    preprocessing_profile: bifold_resnet50_s1_v020
+    modality: Sentinel-1 VV/VH (registered order)
+    evidence_type: multilabel_land_cover_evidence
+    measurement_support: none
+    contract_status: ACCEPTED
+    runtime_status: NOT_PROBED
+    promotion_status: PROMOTED
+
+  multisensor_land_cover_s2:
+    status: AVAILABLE_WITH_LIMITS
+    source_phase: 3
+    model_ids: [bifold_resnet50_s2_v020]
+    preprocessing_profile: bifold_resnet50_s2_v020
+    modality: Sentinel-2 ten-band model order
+    evidence_type: multilabel_land_cover_evidence
+    measurement_support: none
+    contract_status: ACCEPTED
+    runtime_status: NOT_PROBED
+    promotion_status: PROMOTED
+
+  multisensor_land_cover_joint:
+    status: AVAILABLE_WITH_LIMITS
+    source_phase: 3
+    model_ids: [bifold_resnet50_all_v020]
+    preprocessing_profile: bifold_resnet50_all_v020
+    modality: Sentinel-1 + Sentinel-2 (BIFOLD joint)
+    evidence_type: multilabel_land_cover_evidence
+    measurement_support: none
+    contract_status: ACCEPTED
+    runtime_status: NOT_PROBED
+    promotion_status: PROMOTED
+    limitations: >
+      joint fusion is MARGINAL_GLOBAL_BENEFIT_WITH_CLASS_CONDITIONAL_
+      COMPLEMENTARITY (frozen Phase 5A closeout); it must never be described
+      as a strong or broad multisensor improvement
+
+  # ----- Phase 4 deterministic analytics (locally verified) -----
+  spectral_index_ndvi:
+    status: AVAILABLE
+    source_phase: 4
+    tool_ids: []
+    implementation: satquery.analytics.spectral.compute_index (NDVI)
+    modality: multispectral with semantic RED/NIR band roles
+    evidence_type: index_raster
+    measurement_support: none
+
+  spectral_index_ndwi:
+    status: AVAILABLE
+    source_phase: 4
+    implementation: satquery.analytics.spectral.compute_index (NDWI)
+    modality: multispectral with semantic GREEN/NIR band roles
+    evidence_type: index_raster
+    measurement_support: none
+
+  spectral_index_mndwi:
+    status: AVAILABLE
+    source_phase: 4
+    implementation: satquery.analytics.spectral.compute_index (MNDWI)
+    modality: multispectral with semantic GREEN/SWIR1 band roles
+    evidence_type: index_raster
+    measurement_support: none
+
+  temporal_difference:
+    status: AVAILABLE
+    source_phase: 4
+    implementation: satquery.analytics.temporal.temporal_difference
+    evidence_type: difference_raster
+    measurement_support: none
+    limitations: [signed T2-T1 on a verified common grid only]
+
+  threshold_temporal_difference:
+    status: AVAILABLE
+    source_phase: 4
+    implementation: satquery.analytics.temporal.threshold_temporal_difference
+    evidence_type: change_mask
+    measurement_support: via mask-area measurement only
+    limitations: >
+      explicitly parameterized diagnostic operator; NOT a generic semantic
+      change detector and never benchmarked against OSCD labels
+
+  common_grid_preparation:
+    status: AVAILABLE
+    source_phase: 4
+    implementation: satquery.analytics.temporal.prepare_common_grid
+    evidence_type: aligned_pair_provenance
+    measurement_support: none
+    limitations: [destination grid is exactly one declared observation grid; source assets stay byte-identical]
+
+  mask_area_measurement:
+    status: AVAILABLE
+    source_phase: 4
+    implementation: satquery.analytics.measurement.measure_mask_area
+    evidence_type: measurement_evidence
+    measurement_support: deterministic (projected affine determinant or ellipsoidal parallel-band sum)
+    limitations: [requires valid CRS; unknown datums fail closed]
+
+  deterministic_sar_temporal_change:
+    status: AVAILABLE
+    source_phase: 4
+    tool_ids: [sar_temporal_change_v1]
+    implementation: satquery.analytics.sar.sar_temporal_change
+    modality: SAR with explicit radiometric domain and semantic polarizations
+    evidence_type: change_mask
+    measurement_support: via mask-area measurement only
+    limitations: >
+      only backscatter_db (absolute difference) and backscatter_linear (safe
+      log-ratio) are supported; amplitude, complex, and raw DN reject
+
+  diagnostic_mask_agreement:
+    status: AVAILABLE
+    source_phase: 4
+    tool_ids: [mask_agreement_v1]
+    implementation: satquery.analytics.reconciliation.diagnostic_mask_agreement
+    evidence_type: agreement_evidence
+    measurement_support: none
+    limitations: [IoU is diagnostic only (agreement_not_accuracy); no decision policy is derived]
+
+  # ----- Phase 4 blocked learned specialists -----
+  learned_structural_change:
+    status: UNAVAILABLE_CONTRACT_BLOCKED
+    source_phase: 4
+    # candidate_model_ids are NOT members of models/registry.yaml; they exist
+    # only in the blocked Phase 4 contracts and may not be executed
+    candidate_model_ids: [changerex_r18_levircd]
+    contract_status: BLOCKED
+    runtime_status: NOT_INSTALLED
+    promotion_status: NOT_PROMOTED
+    blocker: LEVIR-CD and ChangerEx contracts BLOCKED (checkpoint bytes and runtime lock pending)
+
+  learned_change_captioning:
+    status: UNAVAILABLE_CONTRACT_BLOCKED
+    source_phase: 4
+    candidate_model_ids: [chg2cap]
+    contract_status: BLOCKED
+    runtime_status: NOT_INSTALLED
+    promotion_status: NOT_PROMOTED
+    blocker: LEVIR-CC and Chg2Cap contracts BLOCKED (license audit and checkpoint provenance pending)
+
+  learned_flood_segmentation:
+    status: UNAVAILABLE_CONTRACT_BLOCKED
+    source_phase: 4
+    candidate_model_ids: [sturm]
+    contract_status: BLOCKED
+    runtime_status: NOT_INSTALLED
+    promotion_status: NOT_PROMOTED
+    blocker: STURM and STURM-Flood contracts BLOCKED (archive hashes, radiometric scaling, TF/Keras runtime lock pending)
+
+  deterministic_oscd_change_benchmark:
+    status: UNAVAILABLE_CONTRACT_BLOCKED
+    source_phase: 4
+    contract_status: BLOCKED
+    blocker: OSCD data contract BLOCKED and no defensible deterministic generic change method frozen
+
+  # ----- Explicitly deferred (NOT_IMPLEMENTED, per Phase 5 plan §5) -----
+  pdf_reports:
+    status: NOT_IMPLEMENTED
+    source_phase: 5
+    blocker: requires a separately audited renderer
+
+  automatic_reprojection_alignment_tool:
+    status: NOT_IMPLEMENTED
+    source_phase: 5
+    blocker: no registered, tested scientific alignment tool exists
+
+# ---------------------------------------------------------------------------
+# Tool registry audit (Task 0 snapshot)
+# ---------------------------------------------------------------------------
+tool_registry_audit:
+  registered_tools:
+    - id: sar_temporal_change_v1
+      implementation: satquery.analytics.sar.sar_temporal_change
+      parameters_bounded: true   # enum domains, enum polarizations, non-negative threshold
+      output_semantics: change_mask with per-polarization scores
+      failure_behavior: unknown radiometric domain/polarization and shape mismatches fail closed
+      loader_status: NO_STRICT_LOADER   # declarative YAML only
+    - id: mask_agreement_v1
+      implementation: satquery.analytics.sar.mask_agreement
+      parameters_bounded: true
+      output_semantics: agreement evidence (intersection/union/IoU/valid pixels)
+      failure_behavior: non-binary masks and shape mismatches reject
+      loader_status: NO_STRICT_LOADER
+  audit_conclusion: >
+    Both entries map to real callable implementations with bounded parameters,
+    output semantics, and failure behavior. satquery/registry/tools.yaml has
+    no strict ToolRegistry parser/schema yet; implementing the strict loader
+    (allowed executor IDs, rejected parameter types, duplicate/unknown-key
+    validation) is a Phase 5 Task 5 prerequisite. Entries are retained; none
+    is deletable merely because the loader is missing.
+
+# ---------------------------------------------------------------------------
+# Phase 5 API contract (frozen families; details in api_contract.md)
+# ---------------------------------------------------------------------------
+api:
+  canonical_prefix: /api/v1
+  route_families:
+    - /api/v1/system
+    - /api/v1/observations
+    - /api/v1/pairs
+    - /api/v1/query
+    - /api/v1/analyses
+    - /api/v1/jobs
+    - /api/v1/tools
+    - /api/v1/models
+    - /api/v1/evidence
+    - /api/v1/artifacts
+    - /api/v1/reports
+    - /api/v1/tiles
+  docs: [/docs, /redoc, /openapi.json]
+  health: [/health/live, /health/ready]
+  legacy_routes: [/api/observations, /api/vqa, /api/grounding, /tiles]
+  legacy_policy: remain backward-compatible during Phase 5
+  pdf_reports: disabled
+  max_plan_steps: 8
+
+openapi_requirements:
+  mandatory: true
+  every_canonical_endpoint_must_have:
+    - stable operation_id
+    - tag
+    - summary
+    - description
+    - typed request
+    - typed response
+    - structured error responses
+    - example payloads
+    - documented status codes
+  regression: OpenAPI schema receives automated regression tests
+  offline: docs assets must be self-hostable for offline/local SIH deployment
+
+# ---------------------------------------------------------------------------
+# Agent security boundary (frozen)
+# ---------------------------------------------------------------------------
+agent_security_boundary:
+  interpreter_output: typed QueryIntent only
+  planner_selection: registered tools/models only
+  planner_may_not_create:
+    - python code
+    - shell commands
+    - SQL
+    - raw filesystem paths
+    - arbitrary URLs
+    - arbitrary model IDs
+    - arbitrary tool IDs
+    - arbitrary GDAL/raster expressions
+  numeric_measurement_rule: >
+    numeric measurement requests must be answered from deterministic
+    MeasurementEvidence linked to spatial evidence; caption/VQA text never
+    produces them
+  chain_of_thought: never persisted or returned
+
+# ---------------------------------------------------------------------------
+# Phase 4 blocker carry-forward
+# ---------------------------------------------------------------------------
+carried_blockers:
+  changerex:
+    blocker: LEVIR-CD and ChangerEx contracts BLOCKED_PENDING_LOCAL_CHECKPOINT_BYTES_AND_RUNTIME_LOCK
+    required_resolution:
+      - LEVIR-CD dataset contract PASS
+      - ChangerEx checkpoint locally verified (SHA-256)
+      - official LEVIR-CD validation reproduced and accepted
+    blocked_capabilities: [learned_structural_change]
+    phase5_blocking: false
+    backend_infrastructure_may_proceed_independently: true
+  chg2cap:
+    blocker: LEVIR-CC and Chg2Cap contracts BLOCKED (imagery-use terms, checkpoint provenance, license audit)
+    required_resolution:
+      - LEVIR-CC imagery/package use terms accepted
+      - Chg2Cap checkpoint identity/provenance verified
+      - official caption reproduction accepted
+    blocked_capabilities: [learned_change_captioning]
+    phase5_blocking: false
+    backend_infrastructure_may_proceed_independently: true
+  sturm:
+    blocker: STURM/STURM-Flood contracts BLOCKED (archive/weight SHA-256, radiometric scaling, pinned TensorFlow/Keras runtime)
+    required_resolution:
+      - STURM archive and weight hashes locally verified
+      - Sentinel-1 radiometric/scaling contract frozen
+      - pinned TF/Keras runtime locked
+      - STURM-Flood primary reproduction accepted
+    blocked_capabilities: [learned_flood_segmentation]
+    phase5_blocking: false
+    backend_infrastructure_may_proceed_independently: true
+  oscd_lane_d:
+    blocker: OSCD data contract BLOCKED; no frozen defensible deterministic change method
+    required_resolution:
+      - OSCD source contract PASS
+      - separately audited deterministic change method frozen
+    blocked_capabilities: [deterministic_oscd_change_benchmark]
+    phase5_blocking: false
+    backend_infrastructure_may_proceed_independently: true
+
+# ---------------------------------------------------------------------------
+# Implementation order (confirmed; unchanged from the approved plan)
+# ---------------------------------------------------------------------------
+implementation_order:
+  order:
+    [api_openapi_foundation, persistence, observation_api, pair_api,
+     capability_introspection, query_intent, feasibility_validator,
+     bounded_planner, jobs_execution_engine, integrate_available_tools,
+     evidence_verification, natural_language_query_api, analysis_history,
+     artifacts_geojson_tiles, reports, progress_cancellation, cache_idempotency,
+     security, observability, swagger_polish, full_integration, deployment,
+     phase5_closeout]
+  critical_rule: >
+    step 10 integrates only AVAILABLE capabilities; blocked learned
+    specialists remain represented as unavailable capabilities.
