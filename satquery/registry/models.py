@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from enum import Enum
 from pathlib import Path
 from typing import Annotated, Literal
 
@@ -9,6 +10,15 @@ import yaml
 from pydantic import Field, field_validator
 
 from satquery.ingestion.models import ContractModel
+
+
+class SarPolarization(str, Enum):
+    """Known semantic SAR polarization identifiers; no sensor implied."""
+
+    VV = "VV"
+    VH = "VH"
+    HH = "HH"
+    HV = "HV"
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_MODEL_REGISTRY = PROJECT_ROOT / "models" / "registry.yaml"
@@ -110,11 +120,9 @@ class ChangeCaptionRegistration(_TemporalModelRegistration):
 class FloodSegmentationRegistration(_TemporalModelRegistration):
     task: Literal["flood_segmentation"]
     required_sensor_names: tuple[str, ...]
-    # exact ordered VV-then-VH contract; any other order or count is invalid
-    required_polarizations: tuple[
-        Literal["VV"],
-        Literal["VH"],
-    ]
+    # explicitly ordered semantic polarization contract; the schema is sensor
+    # generic (VV/VH/HH/HV) — sensor-specific orders belong on model entries
+    required_polarizations: tuple[SarPolarization, ...]
     required_radiometric_domain: str = Field(min_length=1)
     expected_resolution_m: float = Field(gt=0)
 
@@ -123,7 +131,33 @@ class FloodSegmentationRegistration(_TemporalModelRegistration):
     )
     @classmethod
     def _normalize_sensor_names(cls, value: object) -> object:
-        return tuple(value) if isinstance(value, list) else value
+        if isinstance(value, (list, tuple)):
+            return tuple(value)
+        return value
+
+    @field_validator("required_polarizations", mode="before")
+    @classmethod
+    def _coerce_polarization_identifiers(cls, value: object) -> object:
+        if isinstance(value, (list, tuple)):
+            return tuple(
+                SarPolarization(item) if isinstance(item, str) else item
+                for item in value
+            )
+        return value
+
+    @field_validator("required_polarizations")
+    @classmethod
+    def _require_explicit_polarization_order(
+        cls, value: tuple[SarPolarization, ...]
+    ) -> tuple[SarPolarization, ...]:
+        if not value:
+            raise ValueError(
+                "flood registration must declare a non-empty ordered "
+                "polarization contract"
+            )
+        if len(set(value)) != len(value):
+            raise ValueError("polarization contract must not repeat a channel")
+        return value
 
     @field_validator("required_sensor_names")
     @classmethod

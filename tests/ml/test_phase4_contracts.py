@@ -534,13 +534,56 @@ def test_flood_registration_rejects_missing_sensor_and_radiometric_contract(
         load_model_registry(_write_temporal_registry(tmp_path, entry))
 
 
-def test_flood_registration_rejects_unknown_polarization_order(
+def test_flood_registration_accepts_alternative_ordered_polarizations(
     tmp_path: Path,
 ) -> None:
     from satquery.registry.models import load_model_registry
 
     entry = _temporal_entry("flood_segmentation")
+    entry["required_polarizations"] = ["HH", "HV"]
+
+    parsed = load_model_registry(_write_temporal_registry(tmp_path, entry))
+    flood = parsed.models["test_temporal_model"]
+    assert tuple(p.value for p in flood.required_polarizations) == ("HH", "HV")
+
     entry["required_polarizations"] = ["VH", "VV"]
+    reversed_order = load_model_registry(_write_temporal_registry(tmp_path, entry))
+    assert tuple(
+        p.value for p in reversed_order.models["test_temporal_model"].required_polarizations
+    ) == ("VH", "VV")
+
+
+def test_flood_registration_rejects_duplicate_polarizations(
+    tmp_path: Path,
+) -> None:
+    from satquery.registry.models import load_model_registry
+
+    entry = _temporal_entry("flood_segmentation")
+    entry["required_polarizations"] = ["VV", "VV"]
+
+    with pytest.raises(ValidationError):
+        load_model_registry(_write_temporal_registry(tmp_path, entry))
+
+
+def test_flood_registration_rejects_empty_polarizations(
+    tmp_path: Path,
+) -> None:
+    from satquery.registry.models import load_model_registry
+
+    entry = _temporal_entry("flood_segmentation")
+    entry["required_polarizations"] = []
+
+    with pytest.raises(ValidationError):
+        load_model_registry(_write_temporal_registry(tmp_path, entry))
+
+
+def test_flood_registration_rejects_unknown_polarization_identifier(
+    tmp_path: Path,
+) -> None:
+    from satquery.registry.models import load_model_registry
+
+    entry = _temporal_entry("flood_segmentation")
+    entry["required_polarizations"] = ["XX"]
 
     with pytest.raises(ValidationError):
         load_model_registry(_write_temporal_registry(tmp_path, entry))
