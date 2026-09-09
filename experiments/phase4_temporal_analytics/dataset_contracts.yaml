@@ -273,7 +273,7 @@ datasets:
     blockers:
       - archive bytes not locally verified (download once, record size + SHA-256, compare against publisher sha256)
       - LevirCCcaptions.json field-level schema and exact validation membership not yet inspected from bytes
-      - imagery-rights confirmation pending: apache-2.0 covers the dataset package only; Google Earth upstream terms must be confirmed as compatible with the planned use before any execution
+      - "imagery-rights confirmation pending: apache-2.0 covers the dataset package only; Google Earth upstream terms must be confirmed as compatible with the planned use before any execution"
 
   sturm_flood:
     status: BLOCKED

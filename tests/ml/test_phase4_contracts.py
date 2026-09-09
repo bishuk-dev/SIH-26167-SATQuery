@@ -346,6 +346,32 @@ def test_p4_e03_requires_official_caption_metric_names(tmp_path: Path) -> None:
         load_phase4_contracts(root)
 
 
+def test_canonical_audit_loads_from_committed_state(tmp_path: Path) -> None:
+    """The committed audit files must load without any working-tree edits."""
+    import subprocess
+
+    for name in AUDIT_FILES:
+        committed = subprocess.run(
+            ["git", "show", f"HEAD:{ROOT.as_posix()}/{name}"],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            check=True,
+        ).stdout
+        (tmp_path / name).write_text(committed, encoding="utf-8")
+
+    contracts = load_phase4_contracts(tmp_path)
+
+    assert contracts.datasets["levir_cc"].status == "BLOCKED"
+    assert contracts.datasets["levir_cc"].blockers
+    assert isinstance(
+        contracts.datasets["levir_cc"].blockers, tuple
+    )
+    assert all(
+        isinstance(blocker, str) for blocker in contracts.datasets["levir_cc"].blockers
+    )
+
+
 def test_loading_contracts_performs_no_registry_mutation(
     tmp_path: Path,
 ) -> None:
