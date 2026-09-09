@@ -2,28 +2,86 @@
 
 from __future__ import annotations
 
+import json
 import os
 import queue
 from datetime import datetime, timezone
 from threading import Event, Lock, Thread
 from uuid import uuid4
 
+from satquery.agent.composer import AnswerComposer
+from satquery.agent.models import QueryIntent
+from satquery.evidence.graph import (
+    EVIDENCE_NODE_ADAPTER,
+    EdgeType,
+    EvidenceEdge,
+    EvidenceGraph,
+    EvidenceNode,
+)
+from satquery.evidence.models import AgreementEvidence, MeasurementEvidence
 from satquery.execution.engine import ExecutionEngine, JobCancelledError
 from satquery.execution.models import (
     ExecutionContext,
     ExecutionEventType,
     ExecutionPlan,
+    ToolResult,
 )
 from satquery.persistence import (
+    AnalysisStatus,
     ExecutionEvent,
     JobRecord,
     JobStatus,
     MetadataRepository,
 )
+from satquery.verification.analysis import AnalysisVerifier
 
 
 class JobQueueFullError(RuntimeError):
     """The bounded local queue has no capacity."""
+
+
+def _graph_from_results(
+    results: tuple[ToolResult, ...], *, input_ids: tuple[str, ...]
+) -> EvidenceGraph:
+    nodes = _evidence_nodes(results)
+    return EvidenceGraph(nodes=nodes, edges=_evidence_edges(nodes), input_ids=input_ids)
+
+
+def _evidence_nodes(results: tuple[ToolResult, ...]) -> tuple[EvidenceNode, ...]:
+    nodes: list[EvidenceNode] = []
+    for result in results:
+        raw = result.evidence
+        if raw is None:
+            continue
+        values = raw if isinstance(raw, (list, tuple)) else (raw,)
+        for item in values:
+            nodes.append(EVIDENCE_NODE_ADAPTER.validate_python(item))
+    return tuple(nodes)
+
+
+def _evidence_edges(nodes: tuple[EvidenceNode, ...]) -> tuple[EvidenceEdge, ...]:
+    node_ids = {node.evidence_id for node in nodes}
+    edges: set[tuple[str, str, EdgeType]] = set()
+    for node in nodes:
+        if isinstance(node, MeasurementEvidence):
+            edges.add((node.source_evidence_id, node.evidence_id, EdgeType.MEASURED_FROM))
+        elif isinstance(node, AgreementEvidence):
+            edges.add((node.first_evidence_id, node.evidence_id, EdgeType.DERIVED_FROM))
+            edges.add((node.second_evidence_id, node.evidence_id, EdgeType.DERIVED_FROM))
+        if not isinstance(node, MeasurementEvidence):
+            for parent_id in node.provenance.parent_evidence_ids:
+                if parent_id in node_ids and parent_id != node.evidence_id:
+                    edges.add((parent_id, node.evidence_id, EdgeType.DERIVED_FROM))
+    return tuple(
+        EvidenceEdge(
+            source_evidence_id=source_id,
+            target_evidence_id=target_id,
+            edge_type=edge_type,
+        )
+        for source_id, target_id, edge_type in sorted(
+            edges, key=lambda edge: (edge[1], edge[0], edge[2].value)
+        )
+    )
 
 
 class JobRunner:
@@ -198,6 +256,9 @@ class JobRunner:
 
     def _run(self, job: JobRecord) -> None:
         self._append_event(job.job_id, ExecutionEventType.STARTED, {})
+        self.repository.transition_analysis(
+            job.analysis_id, AnalysisStatus.PENDING, AnalysisStatus.RUNNING, updated_at=self._now()
+        )
         cancel_event = Event()
         with self._lock:
             cancel_event = self._cancel_events.setdefault(job.job_id, cancel_event)
@@ -214,10 +275,11 @@ class JobRunner:
                 cancel_event=cancel_event,
                 metadata=metadata,
             )
-            self.engine.execute(plan, context)
+            results = self.engine.execute(plan, context)
             current = self.repository.get_job(job.job_id)
             if current is not None and current.status is JobStatus.CANCEL_REQUESTED:
                 raise JobCancelledError("job cancellation requested")
+            self._verify_and_persist_answer(job, results)
             succeeded = self.repository.transition_job(
                 job.job_id, JobStatus.RUNNING, JobStatus.SUCCEEDED, updated_at=self._now()
             )
@@ -232,6 +294,7 @@ class JobRunner:
                         JobStatus.CANCELLED,
                         updated_at=self._now(),
                     ):
+                        self._mark_analysis_terminal(job.analysis_id, AnalysisStatus.CANCELLED)
                         self._append_event(job.job_id, ExecutionEventType.CANCELLED, {})
         except JobCancelledError:
             current = self.repository.get_job(job.job_id)
@@ -243,6 +306,7 @@ class JobRunner:
                 self.repository.transition_job(
                     job.job_id, JobStatus.CANCEL_REQUESTED, JobStatus.CANCELLED, updated_at=self._now()
                 )
+            self._mark_analysis_terminal(job.analysis_id, AnalysisStatus.CANCELLED)
             self._append_event(job.job_id, ExecutionEventType.CANCELLED, {})
         except BaseException as exc:
             current = self.repository.get_job(job.job_id)
@@ -250,11 +314,13 @@ class JobRunner:
                 self.repository.transition_job(
                     job.job_id, JobStatus.CANCEL_REQUESTED, JobStatus.CANCELLED, updated_at=self._now()
                 )
+                self._mark_analysis_terminal(job.analysis_id, AnalysisStatus.CANCELLED)
                 self._append_event(job.job_id, ExecutionEventType.CANCELLED, {})
             elif current is not None and current.status is JobStatus.RUNNING:
                 self.repository.transition_job(
                     job.job_id, JobStatus.RUNNING, JobStatus.FAILED, updated_at=self._now()
                 )
+                self._mark_analysis_terminal(job.analysis_id, AnalysisStatus.FAILED)
                 self._append_event(
                     job.job_id,
                     ExecutionEventType.FAILED,
@@ -263,6 +329,43 @@ class JobRunner:
         finally:
             with self._lock:
                 self._cancel_events.pop(job.job_id, None)
+
+    def _verify_and_persist_answer(self, job: JobRecord, results: tuple[ToolResult, ...]) -> None:
+        analysis = self.repository.get_analysis(job.analysis_id)
+        if analysis is None:
+            raise RuntimeError("analysis record is missing")
+        intent = QueryIntent.model_validate_json(json.dumps(analysis.payload["intent"]))
+        graph = _graph_from_results(
+            results,
+            input_ids=tuple(str(item) for item in analysis.payload.get("observation_ids", ())),
+        )
+        report = AnalysisVerifier().verify(intent, graph)
+        answer = AnswerComposer().compose(
+            str(analysis.payload.get("query", "")), intent, graph, report
+        )
+        target_status = AnalysisStatus.SUCCEEDED if answer.answered else AnalysisStatus.ABSTAINED
+        persisted = self.repository.complete_analysis_with_evidence(
+            job.analysis_id,
+            expected=AnalysisStatus.RUNNING,
+            target=target_status,
+            updated_at=self._now(),
+            evidence_rows=graph.to_evidence_rows(analysis_id=job.analysis_id),
+            edge_rows=graph.to_edge_rows(analysis_id=job.analysis_id),
+            verification_payload=report.model_dump(mode="json"),
+            answer_payload=answer.model_dump(mode="json"),
+        )
+        if not persisted:
+            raise RuntimeError("analysis completion could not be persisted")
+
+    def _mark_analysis_terminal(self, analysis_id: str, target: AnalysisStatus) -> None:
+        now = self._now()
+        if self.repository.transition_analysis(
+            analysis_id, AnalysisStatus.RUNNING, target, updated_at=now
+        ):
+            return
+        self.repository.transition_analysis(
+            analysis_id, AnalysisStatus.PENDING, target, updated_at=now
+        )
 
 
 __all__ = ["JobQueueFullError", "JobRunner"]

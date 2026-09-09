@@ -13,6 +13,7 @@ import sqlite3
 from collections.abc import Iterator
 from datetime import datetime, timezone
 from enum import Enum
+from pathlib import Path
 from typing import Any, Literal
 
 from pydantic import Field, field_validator, model_validator
@@ -262,6 +263,12 @@ class MetadataRepository:
     def __init__(self, db: Database) -> None:
         self._db = db
 
+    @property
+    def data_root(self) -> Path:
+        """Filesystem root for repository-relative stored asset paths."""
+
+        return self._db.path.parent
+
     # -- shared helpers ----------------------------------------------------
 
     @staticmethod
@@ -471,6 +478,78 @@ class MetadataRepository:
                     analysis_id,
                     expected.value,
                     encode_timestamp(updated_at),
+                ),
+            )
+            return cursor.rowcount == 1
+
+    def complete_analysis_with_evidence(
+        self,
+        analysis_id: str,
+        *,
+        expected: AnalysisStatus,
+        target: AnalysisStatus,
+        updated_at: datetime,
+        evidence_rows: tuple[dict[str, Any], ...],
+        edge_rows: tuple[dict[str, Any], ...],
+        verification_payload: dict[str, Any],
+        answer_payload: dict[str, Any],
+    ) -> bool:
+        """Atomically persist verified evidence and make an analysis terminal."""
+
+        allowed = _ANALYSIS_TRANSITIONS[expected]
+        if target not in allowed:
+            raise IllegalTransitionError(
+                f"analysis transition {expected.value} -> {target.value} is illegal"
+            )
+        with self._db.transaction() as connection:
+            row = connection.execute(
+                "SELECT status, updated_at, payload_json FROM analyses WHERE analysis_id = ?",
+                (analysis_id,),
+            ).fetchone()
+            if row is None or row["status"] != expected.value:
+                return False
+            if decode_timestamp(row["updated_at"]) > updated_at:
+                return False
+            for evidence in evidence_rows:
+                try:
+                    connection.execute(
+                        "INSERT INTO evidence(evidence_id, analysis_id, created_at, payload_json)"
+                        " VALUES (?, ?, ?, ?)",
+                        (
+                            evidence["evidence_id"],
+                            analysis_id,
+                            evidence["created_at"],
+                            evidence["payload_json"],
+                        ),
+                    )
+                except sqlite3.IntegrityError as exc:
+                    raise self._wrap_integrity_error(exc, "evidence") from exc
+            for edge in edge_rows:
+                try:
+                    connection.execute(
+                        "INSERT INTO evidence_edges(analysis_id, source_evidence_id,"
+                        " target_evidence_id, edge_type) VALUES (?, ?, ?, ?)",
+                        (
+                            analysis_id,
+                            edge["source_evidence_id"],
+                            edge["target_evidence_id"],
+                            edge["edge_type"],
+                        ),
+                    )
+                except sqlite3.IntegrityError as exc:
+                    raise self._wrap_integrity_error(exc, "evidence_edges") from exc
+            payload = json.loads(row["payload_json"])
+            payload["verification"] = verification_payload
+            payload["answer"] = answer_payload
+            cursor = connection.execute(
+                "UPDATE analyses SET status = ?, updated_at = ?, payload_json = ?"
+                " WHERE analysis_id = ? AND status = ?",
+                (
+                    target.value,
+                    encode_timestamp(updated_at),
+                    canonical_json(payload),
+                    analysis_id,
+                    expected.value,
                 ),
             )
             return cursor.rowcount == 1

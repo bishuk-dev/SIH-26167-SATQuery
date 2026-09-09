@@ -64,10 +64,23 @@ def _observation(context: ExecutionContext, observation_id: str) -> ObservationS
     record = context.repository.get_observation(observation_id)
     if record is None:
         raise AdapterInputError(f"observation is not registered: {observation_id}")
+    payload = record.payload.get("observation", record.payload)
     try:
-        return ObservationState.model_validate_json(json.dumps(record.payload))
+        observation = ObservationState.model_validate_json(json.dumps(payload))
     except Exception as exc:
         raise AdapterInputError(f"observation metadata is invalid: {observation_id}") from exc
+    asset_path = Path(observation.source_asset.path)
+    if not asset_path.is_absolute():
+        observation = ObservationState.model_validate(
+            {
+                **observation.model_dump(),
+                "source_asset": {
+                    **observation.source_asset.model_dump(),
+                    "path": str(context.repository.data_root / asset_path),
+                },
+            }
+        )
+    return observation
 
 
 def _verify_source_asset(observation: ObservationState) -> Path:

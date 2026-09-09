@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from pathlib import Path
 
 import numpy as np
@@ -139,6 +140,82 @@ def test_query_submission_persists_frozen_plan_and_hashes(tmp_path: Path) -> Non
         "sar_temporal_change_v1",
         "compute_mask_area_v1",
     ]
+
+
+def test_query_submission_runs_worker_and_persists_verified_answer(tmp_path: Path) -> None:
+    application = create_app(data_root=tmp_path / "data")
+    with TestClient(application) as client:
+        first, _ = _upload(
+            client,
+            _sar_raster_bytes(
+                tmp_path,
+                "worker-first.tif",
+                value=1,
+                acquisition_time="2026-01-01T00:00:00+00:00",
+            ),
+            "worker-first.tif",
+        )
+        second, _ = _upload(
+            client,
+            _sar_raster_bytes(
+                tmp_path,
+                "worker-second.tif",
+                value=5,
+                acquisition_time="2026-01-02T00:00:00+00:00",
+            ),
+            "worker-second.tif",
+        )
+
+        response = client.post(
+            "/api/v1/query",
+            json={
+                "query": "calculate the area of SAR change between T1 and T2",
+                "observation_ids": [first, second],
+                "parameters": {
+                    "radiometric_domain": "backscatter_db",
+                    "polarizations": ["VV"],
+                    "threshold": 2.0,
+                },
+            },
+        )
+        assert response.status_code == 202, response.text
+        body = response.json()
+        repository = application.state.observation_repository
+        for _ in range(100):
+            job = repository.get_job(body["job_id"])
+            if job is not None and job.status in {
+                JobStatus.SUCCEEDED,
+                JobStatus.FAILED,
+                JobStatus.CANCELLED,
+                JobStatus.INTERRUPTED,
+            }:
+                break
+            time.sleep(0.05)
+
+    job = repository.get_job(body["job_id"])
+    analysis = repository.get_analysis(body["analysis_id"])
+    assert job is not None
+    assert analysis is not None
+    assert job.status is JobStatus.SUCCEEDED
+    assert analysis.status is AnalysisStatus.SUCCEEDED
+    answer = analysis.payload["answer"]
+    assert answer["answered"] is True
+    assert answer["outcome"] == "ALLOW"
+    assert answer["measurements"][0]["value"] == 0.16
+    assert answer["measurements"][0]["unit"] == "ha"
+    assert analysis.payload["verification"]["answered"] is True
+
+    with repository._db.read_transaction() as connection:
+        evidence_rows = connection.execute(
+            "SELECT evidence_id FROM evidence WHERE analysis_id = ?",
+            (body["analysis_id"],),
+        ).fetchall()
+        measured_edges = connection.execute(
+            "SELECT edge_type FROM evidence_edges WHERE analysis_id = ?",
+            (body["analysis_id"],),
+        ).fetchall()
+    assert len(evidence_rows) == 2
+    assert [row["edge_type"] for row in measured_edges] == ["MEASURED_FROM"]
 
 
 def test_query_submission_does_not_inject_tools_from_arbitrary_text(tmp_path: Path) -> None:
