@@ -20,14 +20,23 @@ from satquery.persistence import AnalysisRecord, AnalysisStatus, Database, JobSt
 
 
 class FakeAdapter:
-    def __init__(self, *, started: Event | None = None, release: Event | None = None):
+    def __init__(
+        self,
+        *,
+        started: Event | None = None,
+        release: Event | None = None,
+        captured_cancel_events: list[Event] | None = None,
+    ):
         self.started, self.release = started, release
+        self.captured_cancel_events = captured_cancel_events
 
     def execute(self, call, context):
         if self.started:
             self.started.set()
         if self.release:
             self.release.wait(timeout=2)
+        if self.captured_cancel_events is not None:
+            self.captured_cancel_events.append(context.cancel_event)
         return ToolResult(output=call.step_id)
 
 
@@ -82,6 +91,63 @@ def test_runner_serializes_concurrent_event_sequence_allocation(tmp_path: Path):
     events = repo.list_events(job.job_id)
     assert len(events) == 17
     assert [event.sequence for event in events] == list(range(17))
+
+
+def test_runner_preserves_preexisting_cancel_event(tmp_path: Path):
+    captured: list[Event] = []
+    runner, repo = _runner(
+        tmp_path,
+        FakeAdapter(captured_cancel_events=captured),
+    )
+    job = runner.submit("ana_" + "a" * 32, _plan())
+    assert repo.transition_job(
+        job.job_id,
+        JobStatus.QUEUED,
+        JobStatus.RUNNING,
+        updated_at=datetime.now(timezone.utc),
+    )
+    existing = Event()
+    with runner._lock:
+        runner._cancel_events[job.job_id] = existing
+    runner._run(repo.get_job(job.job_id))
+    assert captured == [existing]
+
+
+def test_runner_handles_success_cas_losing_to_cancellation(tmp_path: Path, monkeypatch):
+    runner, repo = _runner(tmp_path, FakeAdapter())
+    job = runner.submit("ana_" + "a" * 32, _plan())
+    assert repo.transition_job(
+        job.job_id,
+        JobStatus.QUEUED,
+        JobStatus.RUNNING,
+        updated_at=datetime.now(timezone.utc),
+    )
+    original_transition = repo.transition_job
+    cancellation_won = False
+
+    def transition(job_id, expected, target, *, updated_at):
+        nonlocal cancellation_won
+        if expected is JobStatus.RUNNING and target is JobStatus.SUCCEEDED and not cancellation_won:
+            cancellation_won = True
+            assert original_transition(
+                job_id,
+                JobStatus.RUNNING,
+                JobStatus.CANCEL_REQUESTED,
+                updated_at=updated_at,
+            )
+            return False
+        return original_transition(job_id, expected, target, updated_at=updated_at)
+
+    monkeypatch.setattr(repo, "transition_job", transition)
+    runner._run(repo.get_job(job.job_id))
+    assert repo.get_job(job.job_id).status is JobStatus.CANCELLED
+    assert [event.event_type for event in repo.list_events(job.job_id)] == [
+        "JOB_SUBMITTED",
+        "JOB_STARTED",
+        "STEP_STARTED",
+        "STEP_SUCCEEDED",
+        "JOB_CANCELLED",
+    ]
 
 
 def test_runner_cancellation_between_claim_and_execution(tmp_path: Path):

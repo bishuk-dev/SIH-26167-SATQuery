@@ -185,7 +185,7 @@ class JobRunner:
         self._append_event(job.job_id, ExecutionEventType.STARTED, {})
         cancel_event = Event()
         with self._lock:
-            self._cancel_events[job.job_id] = cancel_event
+            cancel_event = self._cancel_events.setdefault(job.job_id, cancel_event)
         try:
             plan = ExecutionPlan.from_payload(job.payload["plan"])
             context = ExecutionContext(
@@ -203,10 +203,21 @@ class JobRunner:
             current = self.repository.get_job(job.job_id)
             if current is not None and current.status is JobStatus.CANCEL_REQUESTED:
                 raise JobCancelledError("job cancellation requested")
-            self.repository.transition_job(
+            succeeded = self.repository.transition_job(
                 job.job_id, JobStatus.RUNNING, JobStatus.SUCCEEDED, updated_at=self._now()
             )
-            self._append_event(job.job_id, ExecutionEventType.SUCCEEDED, {})
+            if succeeded:
+                self._append_event(job.job_id, ExecutionEventType.SUCCEEDED, {})
+            else:
+                current = self.repository.get_job(job.job_id)
+                if current is not None and current.status is JobStatus.CANCEL_REQUESTED:
+                    if self.repository.transition_job(
+                        job.job_id,
+                        JobStatus.CANCEL_REQUESTED,
+                        JobStatus.CANCELLED,
+                        updated_at=self._now(),
+                    ):
+                        self._append_event(job.job_id, ExecutionEventType.CANCELLED, {})
         except JobCancelledError:
             current = self.repository.get_job(job.job_id)
             if current is not None and current.status is JobStatus.RUNNING:

@@ -228,6 +228,7 @@ capabilities:
   mask_area_measurement:
     status: AVAILABLE
     source_phase: 4
+    tool_ids: [compute_mask_area_v1]
     implementation: satquery.analytics.measurement.measure_mask_area
     evidence_type: measurement_evidence
     measurement_support: deterministic (projected affine determinant or ellipsoidal parallel-band sum)
