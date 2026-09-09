@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import logging
 import os
+import time
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
@@ -66,6 +68,7 @@ from satquery.registry import (
 from satquery.visualization.config import VisualizationSettings
 from satquery.visualization.derivatives import VisualizationDerivativeGenerator
 from satquery.visualization.tiles import RasterTileService
+from satquery.observability import configure_json_logging
 
 
 def create_app(
@@ -79,6 +82,7 @@ def create_app(
     grounding_backend: GroundingBackend | None = None,
     security_settings: SecuritySettings | None = None,
 ) -> FastAPI:
+    configure_json_logging()
     safety_limits = limits or RasterSafetyLimits.from_env()
     display_settings = visualization_settings or VisualizationSettings.from_env()
     api_security = security_settings or SecuritySettings.from_env()
@@ -121,6 +125,8 @@ def create_app(
     application.state.tool_registry = tool_registry
     application.state.model_registry = model_registry
     application.state.runtime_capabilities = runtime_capabilities
+    application.state.safety_limits = safety_limits
+    application.state.visualization_settings = display_settings
     artifact_store = ArtifactStore(store.data_root)
     execution_engine = ExecutionEngine(
         build_registered_adapters(tool_registry, artifact_store=artifact_store),
@@ -152,6 +158,12 @@ def create_app(
         store,
         settings=grounding_settings,
         backend=grounding_backend,
+    )
+    application.state.model_roots = tuple(
+        {
+            application.state.single_image_vqa_service.settings.model_root,
+            application.state.text_guided_grounding_service.settings.model_root,
+        }
     )
     application.include_router(router)
     application.include_router(tiles_router)
@@ -197,9 +209,29 @@ def add_request_id_middleware(application: FastAPI) -> None:
     async def request_id_middleware(request: Request, call_next):  # type: ignore[no-untyped-def]
         request_id = new_request_id()
         request.state.request_id = request_id
-        response = await call_next(request)
-        response.headers["X-Request-ID"] = request_id
-        return response
+        started = time.monotonic()
+        response = None
+        try:
+            response = await call_next(request)
+            response.headers["X-Request-ID"] = request_id
+            return response
+        finally:
+            # Path parameters are restricted to the two durable correlation IDs;
+            # request paths and payloads never enter the log record.
+            extra: dict[str, object] = {
+                "request_id": request_id,
+                "event": "request_completed",
+                "duration_ms": round((time.monotonic() - started) * 1000, 2),
+            }
+            if response is not None:
+                extra["status_code"] = response.status_code
+            for field, prefix in (("job_id", "job_"), ("analysis_id", "ana_")):
+                value = request.path_params.get(field)
+                if isinstance(value, str) and value.startswith(prefix):
+                    extra[field] = value
+            logging.getLogger("satquery.api").info(
+                "request completed", extra=extra
+            )
 
 
 def install_v1_error_handlers(application: FastAPI) -> None:
