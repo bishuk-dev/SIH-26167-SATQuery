@@ -11,6 +11,7 @@ from affine import Affine
 from fastapi.testclient import TestClient
 
 from apps.api.app.main import create_app
+from satquery.execution import JobQueueFullError
 from satquery.persistence import JobStatus
 
 
@@ -401,6 +402,34 @@ def test_rerun_creates_new_ids_and_retains_the_frozen_plan(tmp_path: Path) -> No
             (rerun["analysis_id"],),
         ).fetchall()
     assert len(rerun_evidence) == 2
+
+
+def test_rerun_does_not_inherit_original_answer_or_verification(tmp_path: Path) -> None:
+    application = create_app(data_root=tmp_path / "data")
+    with TestClient(application) as client:
+        submitted, _first, _second = _submit_pair(client, tmp_path, "rerun-answer")
+        repository = application.state.observation_repository
+        _wait_terminal(repository, submitted["job_id"])
+        original = repository.get_analysis(submitted["analysis_id"])
+        assert original is not None
+        assert "answer" in original.payload
+        assert "verification" in original.payload
+
+        def _queue_full(job_id: str):
+            raise JobQueueFullError("job queue is full")
+
+        # Block queueing so the rerun analysis stays pre-completion: a rerun
+        # that has not executed (or that fails) must never carry the original
+        # run's composed answer or verification payload.
+        application.state.job_runner.enqueue_existing = _queue_full
+        response = client.post(f"/api/v1/analyses/{submitted['analysis_id']}/rerun")
+        assert response.status_code == 503, response.text
+        rerun_id = response.json()["error"]["details"]["analysis_id"]
+
+    rerun = repository.get_analysis(rerun_id)
+    assert rerun is not None
+    assert "answer" not in rerun.payload
+    assert "verification" not in rerun.payload
 
 
 def test_rerun_returns_409_when_original_tools_are_unavailable(tmp_path: Path) -> None:

@@ -361,6 +361,11 @@ def rerun_analysis_v1(request: Request, analysis_id: str) -> AnalysisRerunRespon
     new_job_id = f"job_{uuid4().hex}"
     now = datetime.now(timezone.utc)
     rerun_payload = dict(record.payload)
+    # The original run's composed answer and verification belong to that run's
+    # execution only. Keeping them would misattribute scientific results to a
+    # rerun that has not produced them (reports read these payload keys).
+    rerun_payload.pop("answer", None)
+    rerun_payload.pop("verification", None)
     rerun_payload["rerun_of"] = analysis_id
     with repository._db.transaction() as connection:
         connection.execute(

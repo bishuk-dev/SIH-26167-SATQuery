@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import json
+from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeout
 from threading import BoundedSemaphore
 from typing import Any, Mapping
+from uuid import uuid4
 
 from satquery.artifacts import ArtifactStore
 from satquery.execution.cache import AnalysisCache, CacheKeyError, build_cache_key
@@ -33,6 +36,65 @@ class ToolExecutionError(ExecutionError):
 
 class JobCancelledError(ExecutionError):
     """Execution stopped at a cancellation checkpoint."""
+
+
+_EVIDENCE_ID_REFERENCE_FIELDS = ("source_evidence_id", "first_evidence_id", "second_evidence_id")
+
+
+def _evidence_id_references(node: Any) -> Iterator[str]:
+    """Every evidence-ID reference carried by one evidence node."""
+
+    for parent in node.provenance.parent_evidence_ids:
+        yield parent
+    for field in _EVIDENCE_ID_REFERENCE_FIELDS:
+        value = getattr(node, field, None)
+        if value is not None:
+            yield value
+
+
+def _remap_evidence_ids(
+    nodes: list[Any],
+    replayed_ids: dict[str, str],
+) -> list[Any] | None:
+    """Mint fresh evidence IDs for one replayed cache payload.
+
+    Evidence IDs are the global primary key of the evidence table, so a cache
+    hit that keeps the original analysis's IDs would collide on insert and
+    break per-analysis evidence traceability. Cross-evidence references are
+    remapped to the IDs minted in this run; a reference that cannot be remapped
+    (its producing step did not replay in this run) fails closed to a cache
+    miss so the step re-executes with self-consistent IDs.
+    """
+
+    from satquery.evidence.graph import EVIDENCE_NODE_ADAPTER
+
+    mapping: dict[str, str] = dict(replayed_ids)
+    for node in nodes:
+        mapping[node.evidence_id] = f"evidence_{uuid4().hex}"
+    for node in nodes:
+        for reference in _evidence_id_references(node):
+            if reference not in mapping:
+                return None
+    replayed_ids.update({node.evidence_id: mapping[node.evidence_id] for node in nodes})
+    remapped: list[Any] = []
+    for node in nodes:
+        data = node.model_dump(mode="json")
+        data["evidence_id"] = mapping[node.evidence_id]
+        provenance = data.get("provenance")
+        if isinstance(provenance, dict):
+            provenance = dict(provenance)
+            provenance["parent_evidence_ids"] = [
+                mapping[parent] for parent in provenance.get("parent_evidence_ids", ())
+            ]
+            data["provenance"] = provenance
+        for field in _EVIDENCE_ID_REFERENCE_FIELDS:
+            value = data.get(field)
+            if isinstance(value, str) and value in mapping:
+                data[field] = mapping[value]
+        # evidence contracts are strict-mode models: JSON-shaped payloads must
+        # revalidate through validate_json, not validate_python
+        remapped.append(EVIDENCE_NODE_ADAPTER.validate_json(json.dumps(data)))
+    return remapped
 
 
 class ExecutionEngine:
@@ -156,15 +218,31 @@ class ExecutionEngine:
         except CacheKeyError:
             return None
 
-    def _result_from_cache(self, payload: Mapping[str, Any]) -> ToolResult | None:
+    def _result_from_cache(
+        self,
+        payload: Mapping[str, Any],
+        replayed_ids: dict[str, str],
+    ) -> ToolResult | None:
         evidence = payload.get("evidence")
         if evidence is not None:
             from satquery.evidence.graph import EVIDENCE_NODE_ADAPTER
 
             try:
-                evidence = EVIDENCE_NODE_ADAPTER.validate_python(evidence)
+                if isinstance(evidence, (list, tuple)):
+                    nodes = [
+                        EVIDENCE_NODE_ADAPTER.validate_json(json.dumps(item))
+                        for item in evidence
+                    ]
+                else:
+                    nodes = [EVIDENCE_NODE_ADAPTER.validate_json(json.dumps(evidence))]
+                remapped = _remap_evidence_ids(nodes, replayed_ids)
             except Exception:
                 return None
+            if remapped is None:
+                return None
+            evidence = (
+                remapped if isinstance(payload.get("evidence"), (list, tuple)) else remapped[0]
+            )
         output = payload.get("output")
         return ToolResult(output=output, evidence=evidence)
 
@@ -214,6 +292,9 @@ class ExecutionEngine:
         for step in ordered:
             self._validate_step(step)
         results: dict[str, ToolResult] = {}
+        # Cached-original evidence ID -> freshly minted ID for this execution,
+        # so cross-step references in replayed payloads stay self-consistent.
+        replayed_ids: dict[str, str] = {}
         for step in ordered:
             if context.is_cancelled():
                 raise JobCancelledError("job cancellation requested")
@@ -223,7 +304,7 @@ class ExecutionEngine:
                     cache_key, artifact_store=self._artifact_store
                 )
                 if cached is not None:
-                    replayed = self._result_from_cache(cached)
+                    replayed = self._result_from_cache(cached, replayed_ids)
                     if replayed is not None:
                         self._emit(
                             context,

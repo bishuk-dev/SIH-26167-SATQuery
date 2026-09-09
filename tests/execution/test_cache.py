@@ -11,22 +11,43 @@ from __future__ import annotations
 
 import hashlib
 import json
+import time
+from datetime import datetime, timezone
 from pathlib import Path
+from uuid import uuid4
 
 import pytest
 
 from satquery.artifacts import ArtifactStore
+from satquery.evidence.graph import EvidenceGraph
+from satquery.evidence.models import (
+    ChangeMaskEvidence,
+    DomainAssessment,
+    DomainStatus,
+    EvidenceProvenance,
+    MaskAsset,
+    MeasurementEvidence,
+    TemporalPairEvidence,
+)
 from satquery.execution import (
     ExecutionContext,
     ExecutionEngine,
     ExecutionPlan,
+    JobRunner,
     PlanStep,
     ToolExecutionError,
     ToolResult,
 )
 from satquery.execution.cache import AnalysisCache, CacheKeyError, build_cache_key
+from satquery.execution.jobs import _evidence_edges
 from satquery.execution.models import ArtifactMetadata, ArtifactOutput
-from satquery.persistence import Database, MetadataRepository
+from satquery.persistence import (
+    AnalysisRecord,
+    AnalysisStatus,
+    Database,
+    JobStatus,
+    MetadataRepository,
+)
 from satquery.registry.tools import load_tool_registry
 
 _REGISTRY_HASH = "a" * 64
@@ -361,3 +382,223 @@ def test_engine_without_registry_or_cache_never_reuses(tmp_path: Path) -> None:
     engine.execute(_plan(), ExecutionContext("job_" + "a" * 32, "ana_" + "a" * 32))
     engine.execute(_plan(), ExecutionContext("job_" + "b" * 32, "ana_" + "b" * 32))
     assert state["calls"] == 2
+
+
+# ---------------------------------------------------------------------------
+# replayed evidence identity
+# ---------------------------------------------------------------------------
+
+
+def _mask_evidence(observation_id: str) -> ChangeMaskEvidence:
+    return ChangeMaskEvidence(
+        evidence_id=f"evidence_{uuid4().hex}",
+        target_class="sar_backscatter_change",
+        change_kind="symmetric_change",
+        temporal=TemporalPairEvidence(
+            t1_observation_id=observation_id,
+            t2_observation_id="obs_" + "f" * 32,
+            order_source="metadata",
+        ),
+        mask=MaskAsset(
+            asset_id="mask-asset",
+            path="unused",
+            sha256="0" * 64,
+            width=4,
+            height=4,
+            source_grid_observation_id=observation_id,
+        ),
+        tool_id=_TOOL_ID,
+        domain=DomainAssessment(status=DomainStatus.IN_DOMAIN, reasons=()),
+        provenance=EvidenceProvenance(
+            created_at=datetime.now(timezone.utc),
+            operation_id="op",
+            input_asset_id="asset",
+        ),
+    )
+
+
+def _measurement_evidence(source: ChangeMaskEvidence) -> MeasurementEvidence:
+    return MeasurementEvidence(
+        evidence_id=f"evidence_{uuid4().hex}",
+        source_evidence_id=source.evidence_id,
+        value=1.0,
+        unit="ha",
+        method="test_method",
+        calculation_crs="EPSG:32633",
+        positive_pixel_count=1,
+        valid_pixel_count=1,
+        tool_id=_TOOL_ID,
+        provenance=EvidenceProvenance(
+            created_at=datetime.now(timezone.utc),
+            operation_id="op-measure",
+            input_asset_id=source.mask.asset_id,
+            parent_evidence_ids=(source.evidence_id,),
+        ),
+    )
+
+
+def _chain_plan() -> ExecutionPlan:
+    return ExecutionPlan(
+        steps=(
+            PlanStep("a", _TOOL_ID, parameters={"step": "mask"}),
+            PlanStep("b", _TOOL_ID, parameters={"unit": "ha"}, depends_on=("a",)),
+        ),
+        planner_version="1",
+    )
+
+
+def test_replayed_evidence_mints_fresh_ids_and_remaps_references(tmp_path: Path) -> None:
+    repository = _repository(tmp_path)
+    cache = AnalysisCache(repository)
+    calls = {"mask": 0, "measure": 0}
+
+    class Chain:
+        def execute(self, call: object, context: object) -> ToolResult:
+            if call.step_id == "a":  # type: ignore[attr-defined]
+                calls["mask"] += 1
+                return ToolResult(
+                    output={"mask_step": True}, evidence=_mask_evidence("obs_" + "0" * 32)
+                )
+            calls["measure"] += 1
+            source = call.prior_results["a"].evidence  # type: ignore[attr-defined]
+            return ToolResult(output={"area": 1.0}, evidence=_measurement_evidence(source))
+
+    def _engine() -> ExecutionEngine:
+        return ExecutionEngine(
+            {_TOOL_ID: Chain()},  # type: ignore[dict-item]
+            artifact_store=ArtifactStore(tmp_path / "data"),
+            tool_registry=load_tool_registry(),
+            cache=cache,
+        )
+
+    first = _engine().execute(
+        _chain_plan(), ExecutionContext("job_" + "a" * 32, "ana_" + "a" * 32)
+    )
+    assert calls == {"mask": 1, "measure": 1}
+
+    second = _engine().execute(
+        _chain_plan(), ExecutionContext("job_" + "b" * 32, "ana_" + "b" * 32)
+    )
+    assert calls == {"mask": 1, "measure": 1}  # both steps replayed from cache
+
+    first_mask, first_measurement = first[0].evidence, first[1].evidence
+    second_mask, second_measurement = second[0].evidence, second[1].evidence
+    assert second_mask.evidence_id != first_mask.evidence_id
+    assert second_measurement.evidence_id != first_measurement.evidence_id
+    assert second_measurement.source_evidence_id == second_mask.evidence_id
+    assert second_measurement.provenance.parent_evidence_ids == (second_mask.evidence_id,)
+
+    # the replayed graph must stay internally consistent (no dangling edges)
+    graph = EvidenceGraph(
+        nodes=(second_mask, second_measurement),
+        edges=_evidence_edges((second_mask, second_measurement)),
+    )
+    assert graph.node_by_id[second_measurement.source_evidence_id] is second_mask
+
+
+def test_unremappable_replay_reference_fails_closed_to_a_cache_miss(tmp_path: Path) -> None:
+    repository = _repository(tmp_path)
+    cache = AnalysisCache(repository)
+    calls = {"mask": 0, "measure": 0}
+
+    class Chain:
+        def execute(self, call: object, context: object) -> ToolResult:
+            if call.step_id == "a":  # type: ignore[attr-defined]
+                calls["mask"] += 1
+                return ToolResult(
+                    output={"mask_step": True}, evidence=_mask_evidence("obs_" + "0" * 32)
+                )
+            calls["measure"] += 1
+            source = call.prior_results["a"].evidence  # type: ignore[attr-defined]
+            return ToolResult(output={"area": 1.0}, evidence=_measurement_evidence(source))
+
+    def _engine() -> ExecutionEngine:
+        return ExecutionEngine(
+            {_TOOL_ID: Chain()},  # type: ignore[dict-item]
+            artifact_store=ArtifactStore(tmp_path / "data"),
+            tool_registry=load_tool_registry(),
+            cache=cache,
+        )
+
+    _engine().execute(_chain_plan(), ExecutionContext("job_" + "a" * 32, "ana_" + "a" * 32))
+    assert calls == {"mask": 1, "measure": 1}
+
+    # Drop only the mask step's cache entry: the cached measurement still
+    # references the first run's mask evidence ID, which cannot be remapped in
+    # this run, so the measurement step must re-execute instead of replaying.
+    with repository._db.transaction() as connection:
+        cursor = connection.execute(
+            "DELETE FROM cache_entries WHERE payload_json LIKE '%\"mask_step\"%'"
+        )
+        assert cursor.rowcount == 1
+
+    second = _engine().execute(
+        _chain_plan(), ExecutionContext("job_" + "b" * 32, "ana_" + "b" * 32)
+    )
+    assert calls == {"mask": 2, "measure": 2}
+    assert second[1].evidence.source_evidence_id == second[0].evidence.evidence_id
+
+
+def test_cached_replay_through_job_runner_completes_second_analysis(tmp_path: Path) -> None:
+    repository = _repository(tmp_path)
+    cache = AnalysisCache(repository)
+
+    class MaskOnly:
+        def execute(self, call: object, context: object) -> ToolResult:
+            return ToolResult(
+                output={"mask_step": True}, evidence=_mask_evidence("obs_" + "0" * 32)
+            )
+
+    engine = ExecutionEngine(
+        {_TOOL_ID: MaskOnly()},  # type: ignore[dict-item]
+        artifact_store=ArtifactStore(tmp_path / "data"),
+        tool_registry=load_tool_registry(),
+        cache=cache,
+    )
+    now = datetime.now(timezone.utc)
+    payload = {
+        "query": "show me where change happened",
+        "intent": {"task_family": "CHANGE_LOCALIZE", "matched_rule": "test-fixture"},
+        "observation_ids": ["obs_" + "0" * 32, "obs_" + "f" * 32],
+    }
+    for suffix in ("a" * 32, "b" * 32):
+        repository.create_analysis(
+            AnalysisRecord(
+                analysis_id=f"ana_{suffix}",
+                status=AnalysisStatus.PENDING,
+                created_at=now,
+                updated_at=now,
+                payload=dict(payload),
+            )
+        )
+    runner = JobRunner(repository, engine)
+    runner.start()
+    try:
+        jobs = [runner.submit(f"ana_{suffix}", _plan()) for suffix in ("a" * 32, "b" * 32)]
+        for job in jobs:
+            deadline = time.time() + 5
+            while time.time() < deadline:
+                record = repository.get_job(job.job_id)
+                if record is not None and record.status in {
+                    JobStatus.SUCCEEDED,
+                    JobStatus.FAILED,
+                    JobStatus.CANCELLED,
+                    JobStatus.INTERRUPTED,
+                }:
+                    break
+                time.sleep(0.01)
+            assert repository.get_job(job.job_id).status is JobStatus.SUCCEEDED
+    finally:
+        runner.stop()
+
+    evidence_ids: dict[str, list[str]] = {}
+    for suffix in ("a" * 32, "b" * 32):
+        with repository._db.read_transaction() as connection:
+            rows = connection.execute(
+                "SELECT evidence_id FROM evidence WHERE analysis_id = ?",
+                (f"ana_{suffix}",),
+            ).fetchall()
+        evidence_ids[suffix] = [row["evidence_id"] for row in rows]
+    assert len(evidence_ids["a" * 32]) == 1
+    assert len(evidence_ids["b" * 32]) == 1
+    assert evidence_ids["a" * 32] != evidence_ids["b" * 32]
