@@ -10,7 +10,7 @@
     "experiments/phase4_temporal_analytics/model_contracts.yaml": "eca4ac709c455ae4009f70528f7ba560b610eb069e661d379665c6404c062f38",
     "experiments/phase4_temporal_analytics/dataset_contracts.yaml": "cf68ff68cf16c061578df9064ea8428c20da5b825fc8e9d8ef69a30c25fa5585",
     "experiments/phase4_temporal_analytics/experiment_plan.yaml": "3966b0a3eb134a6791d4b9ff84f53205490155245116d0319d6a58e50b84562c",
-    "satquery/registry/tools.yaml": "1c23c4bed804c5d1b864f5cac28cf5934f66c5e34a7d6f7b7ff145ca63085f8c",
+    "satquery/registry/tools.yaml": "9832787984cf58a9b2d3df7f3fff8d90ee043927912dbfe712966a6a98bc8dc1",
     "models/registry.yaml": "60daaec39cf53b0faadd983e854c9b2f716f4c3846fb2758f1fc84d99f580113",
     "satquery/registry/preprocessing.yaml": "4a0f03a9e69bc2170444286cc5f9313878f48da8d149010902bbe54c5fb4e189"
   },
