@@ -1,0 +1,109 @@
+{
+  "experiment_id": "P4-E01",
+  "fixture_provenance": "deterministic_synthetic_fixtures",
+  "generated_utc": "2026-09-09T07:12:13.053066+00:00",
+  "git_sha": "9cbfd725d7c6abd8c6c8684180f912956b2ae63e",
+  "lane_d": {
+    "oscd_metrics_emitted": false,
+    "reason": "OSCD data contract is BLOCKED and no defensible deterministic generic change method has been frozen; NDVI-difference thresholding is not generic change detection.",
+    "status": "BLOCKED_METHOD_CONTRACT"
+  },
+  "lanes": {
+    "A_formula_correctness": {
+      "checks": [
+        {
+          "expected": [
+            0.5,
+            0.0,
+            -1.0
+          ],
+          "formula": "NDVI = (NIR - RED) / (NIR + RED)",
+          "name": "ndvi_hand_calculation",
+          "status": "PASS"
+        },
+        {
+          "formula": "NDWI = (GREEN - NIR) / (GREEN + NIR)",
+          "name": "ndwi_hand_calculation",
+          "status": "PASS"
+        },
+        {
+          "formula": "MNDWI = (GREEN - SWIR1) / (GREEN + SWIR1)",
+          "name": "mndwi_hand_calculation",
+          "status": "PASS"
+        },
+        {
+          "formula": "NDVI = (NIR - RED) / (NIR + RED)",
+          "name": "ndvi_nodata_masked",
+          "status": "PASS"
+        },
+        {
+          "formula": "NDVI = (NIR - RED) / (NIR + RED)",
+          "name": "ndvi_zero_denominator_masked",
+          "status": "PASS"
+        }
+      ],
+      "lane": "A_formula_correctness",
+      "status": "PASS"
+    },
+    "B_grid_correctness": {
+      "checks": [
+        {
+          "name": "identity_pair_untouched",
+          "reprojected": false,
+          "source_hashes_unchanged": true,
+          "status": "PASS"
+        },
+        {
+          "name": "reversed_order_untouched",
+          "reference": "t2",
+          "reprojected": false,
+          "status": "PASS"
+        },
+        {
+          "derived_hash": "64f61b184635ab13dd3efb8303268a394076a0001a474b6fb708ff49246abe98",
+          "name": "misaligned_grid_reprojected_onto_reference",
+          "reference": "t1",
+          "reprojected": true,
+          "status": "PASS"
+        },
+        {
+          "derived_artifact": "laneb_t2s_bilinear_on_laneb_t1_grid.tif",
+          "name": "resampling_provenance_recorded",
+          "resampling": "bilinear",
+          "status": "PASS"
+        }
+      ],
+      "lane": "B_grid_correctness",
+      "status": "PASS"
+    },
+    "C_measurement_correctness": {
+      "checks": [
+        {
+          "crs": "EPSG:32633",
+          "method": "projected_affine_determinant",
+          "name": "projected_area_pixel_count_reconstruction",
+          "positive_pixel_count": 7,
+          "reconstructed_value_m2": 700.0,
+          "reconstruction_error_m2": 0.0,
+          "status": "PASS",
+          "unit": "m2"
+        },
+        {
+          "crs": "EPSG:4326",
+          "method": "ellipsoidal_parallel_band_sum",
+          "name": "geographic_area_ellipsoidal_reconstruction",
+          "positive_pixel_count": 1,
+          "reconstructed_value_m2": 1230907.206409006,
+          "reconstruction_error_m2": 0.0,
+          "spherical_cross_check_relative_error": 0.004467667352987758,
+          "status": "PASS",
+          "unit": "m2"
+        }
+      ],
+      "lane": "C_measurement_correctness",
+      "status": "PASS"
+    }
+  },
+  "real_source_data_used": false,
+  "schema_version": 1
+}
