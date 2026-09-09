@@ -1,2 +1,50 @@
 schema_version: 1
-tools: {}
+tools:
+  sar_temporal_change_v1:
+    title: Deterministic SAR temporal change
+    kind: deterministic_analytics
+    description: >-
+      Absolute-change score between two co-observed SAR arrays under an
+      explicitly contracted radiometric domain and semantic polarizations.
+      Unknown radiometric semantics (amplitude, complex, raw DN) reject.
+    inputs:
+      - name: t1
+        kind: observation_array
+        temporal_role: T1
+      - name: t2
+        kind: observation_array
+        temporal_role: T2
+    parameters:
+      radiometric_domain:
+        type: enum
+        values: [backscatter_db, backscatter_linear]
+      polarizations:
+        type: enum_list
+        values: [VV, VH, HH, HV]
+        min_items: 1
+      threshold:
+        type: number
+        minimum: 0
+    evidence:
+      type: change_mask
+      deterministic: true
+      requires_verified_common_grid: true
+
+  mask_agreement_v1:
+    title: Diagnostic mask agreement (IoU)
+    kind: deterministic_analytics
+    description: >-
+      Intersection/union/IoU between two binary masks over valid pixels.
+      Agreement is diagnostic only and maps to no decision policy.
+    inputs:
+      - name: first
+        kind: mask
+      - name: second
+        kind: mask
+    parameters:
+      valid:
+        type: mask
+    evidence:
+      type: agreement
+      deterministic: true
+      interpretation: agreement_not_accuracy

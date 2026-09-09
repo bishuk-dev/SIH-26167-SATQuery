@@ -12,6 +12,13 @@ from satquery.analytics.exceptions import (
     UnsupportedCrsMeasurementError,
 )
 from satquery.analytics.measurement import MeasurementResult, measure_mask_area
+from satquery.analytics.sar import (
+    AgreementResult,
+    SarChangeResult,
+    SarInputContract,
+    mask_agreement,
+    sar_temporal_change,
+)
 from satquery.analytics.spectral import (
     SpectralBandRole,
     SpectralIndex,
@@ -26,6 +33,7 @@ from satquery.analytics.temporal import (
 )
 
 __all__ = [
+    "AgreementResult",
     "AlignedPair",
     "AnalyticsError",
     "CrsRequiredForMeasurementError",
@@ -34,15 +42,19 @@ __all__ = [
     "MeasurementResult",
     "MissingRequiredBandError",
     "NoSpatialOverlapError",
+    "SarChangeResult",
+    "SarInputContract",
     "SingularTransformError",
     "SourceAssetIntegrityError",
     "SpectralBandRole",
     "SpectralIndex",
     "UnsupportedCrsMeasurementError",
     "compute_index",
+    "mask_agreement",
     "measure_mask_area",
     "normalized_difference",
     "prepare_common_grid",
+    "sar_temporal_change",
     "temporal_difference",
     "threshold_temporal_difference",
 ]
