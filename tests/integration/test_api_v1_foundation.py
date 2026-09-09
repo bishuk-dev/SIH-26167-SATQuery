@@ -166,7 +166,19 @@ def _tiny_v1_app() -> TestClient:
     def boom_route() -> dict[str, str]:
         raise RuntimeError("sensitive internal failure detail")
 
+    @application.get("/test-only/legacy-boom")
+    def legacy_boom_route() -> dict[str, str]:
+        raise RuntimeError("legacy internal failure")
+
     return TestClient(application, raise_server_exceptions=False)
+
+
+def test_unexpected_legacy_exception_keeps_legacy_shape_with_header() -> None:
+    client = _tiny_v1_app()
+    response = client.get("/test-only/legacy-boom")
+    assert response.status_code == 500
+    assert response.text == "Internal Server Error"  # legacy default shape
+    assert REQUEST_ID_PATTERN.match(response.headers["X-Request-ID"])
 
 
 def test_v1_validation_error_uses_frozen_envelope() -> None:
@@ -214,6 +226,7 @@ def test_wrong_method_on_v1_route_uses_frozen_405_envelope(
     assert detail["code"] == "METHOD_NOT_ALLOWED"
     assert detail["outcome"] == "REJECT"
     assert REQUEST_ID_PATTERN.match(detail["request_id"])
+    assert detail["request_id"] == response.headers["X-Request-ID"]
 
 
 def test_unexpected_v1_exception_returns_sanitized_500() -> None:
@@ -224,9 +237,13 @@ def test_unexpected_v1_exception_returns_sanitized_500() -> None:
     assert detail["code"] == "INTERNAL_ERROR"
     assert detail["outcome"] == "ABSTAIN"
     assert detail["message"] == "An unexpected internal error occurred."
+    assert REQUEST_ID_PATTERN.match(detail["request_id"])
+    # the header must survive the application-level exception path and match
+    # the body ID even though the response bypasses the middleware return
+    assert REQUEST_ID_PATTERN.match(response.headers["X-Request-ID"])
+    assert response.headers["X-Request-ID"] == detail["request_id"]
     assert "sensitive internal failure detail" not in response.text
     assert "RuntimeError" not in response.text
-    assert REQUEST_ID_PATTERN.match(detail["request_id"])
 
 
 # ---------------------------------------------------------------------------

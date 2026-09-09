@@ -10,6 +10,7 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
+from fastapi import Request
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 
@@ -26,6 +27,25 @@ def new_request_id() -> str:
     """Server-side correlation ID; incoming client IDs are never trusted."""
 
     return f"req_{uuid.uuid4().hex}"
+
+
+def request_id_from(request: Request) -> str:
+    """Resolve the one correlation ID for this exchange.
+
+    Middleware already set ``request.state.request_id`` for requests that
+    reached routing; the eager-default ``getattr`` antipattern is avoided so
+    a fallback ID is minted only when genuinely absent.
+    """
+
+    request_id = getattr(request.state, "request_id", None)
+    return request_id if request_id is not None else new_request_id()
+
+
+def with_request_id(response: JSONResponse, request_id: str) -> JSONResponse:
+    """Attach the correlation ID header to a handler-created response."""
+
+    response.headers["X-Request-ID"] = request_id
+    return response
 
 
 def failure_response(
@@ -48,7 +68,14 @@ def failure_response(
             "request_id": request_id,
         }
     }
-    return JSONResponse(status_code=status_code, content=payload)
+    # the header travels with the response itself so the body/header
+    # invariant holds even when the middleware return path is bypassed
+    # (application-level exception handlers)
+    return JSONResponse(
+        status_code=status_code,
+        content=payload,
+        headers={"X-Request-ID": request_id},
+    )
 
 
 def internal_error_response(request_id: str) -> JSONResponse:

@@ -15,7 +15,9 @@ from apps.api.app.errors import (
     failure_response,
     internal_error_response,
     new_request_id,
+    request_id_from,
     safe_validation_details,
+    with_request_id,
 )
 from apps.api.app.routes.observations import invalid_request_response, router
 from apps.api.app.routes.grounding import (
@@ -125,7 +127,7 @@ def install_v1_error_handlers(application: FastAPI) -> None:
         request: Request, error: RequestValidationError
     ) -> JSONResponse:
         if _is_v1(request):
-            request_id = getattr(request.state, "request_id", new_request_id())
+            request_id = request_id_from(request)
             return failure_response(
                 code="INVALID_REQUEST",
                 message="The request body failed validation.",
@@ -145,7 +147,7 @@ def install_v1_error_handlers(application: FastAPI) -> None:
         request: Request, error: StarletteHTTPException
     ) -> JSONResponse:
         if _is_v1(request):
-            request_id = getattr(request.state, "request_id", new_request_id())
+            request_id = request_id_from(request)
             code = {
                 404: "NOT_FOUND",
                 405: "METHOD_NOT_ALLOWED",
@@ -173,9 +175,13 @@ def install_v1_error_handlers(application: FastAPI) -> None:
         # sanitized envelope while legacy paths keep the default Starlette
         # plaintext response so no legacy behavior changes.
         if _is_v1(request):
-            request_id = getattr(request.state, "request_id", new_request_id())
-            return internal_error_response(request_id)
-        return PlainTextResponse("Internal Server Error", status_code=500)
+            return internal_error_response(request_id_from(request))
+        # legacy paths keep the default Starlette plaintext response (with
+        # the correlation header added, per the Task-1 every-response rule)
+        return with_request_id(
+            PlainTextResponse("Internal Server Error", status_code=500),
+            request_id_from(request),
+        )
 
 
 app = create_app()
