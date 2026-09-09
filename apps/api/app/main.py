@@ -34,6 +34,7 @@ from apps.api.app.routes.v1_observations import (
 from apps.api.app.routes.v1_pairs import router as v1_pairs_router
 from apps.api.app.routes.v1_registry import router as v1_registry_router
 from apps.api.app.routes.v1_jobs import router as v1_jobs_router
+from apps.api.app.routes.v1_artifacts import router as v1_artifacts_router
 from apps.api.app.routes.v1_query import router as v1_query_router
 from apps.api.app.routes.v1_analyses import router as v1_analyses_router
 from apps.api.app.routes.v1_system import router as v1_system_router
@@ -153,6 +154,7 @@ def create_app(
     application.include_router(v1_pairs_router)
     application.include_router(v1_registry_router)
     application.include_router(v1_jobs_router)
+    application.include_router(v1_artifacts_router)
     application.include_router(v1_query_router)
     application.include_router(v1_analyses_router)
 

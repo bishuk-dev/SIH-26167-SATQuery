@@ -330,6 +330,30 @@ class SarTemporalChangeAdapter:
             t1.observation_id: t1.source_asset.sha256,
             t2.observation_id: t2.source_asset.sha256,
         }
+        assert t1.geo.transform is not None and t1.geo.bounds is not None
+        # Grid provenance travels with the published artifact so the public
+        # API can project spatial evidence without re-reading or guessing.
+        grid_provenance = {
+            "width": t1.raster.width,
+            "height": t1.raster.height,
+            "crs": t1.geo.crs,
+            "transform": [
+                t1.geo.transform.a,
+                t1.geo.transform.b,
+                t1.geo.transform.c,
+                t1.geo.transform.d,
+                t1.geo.transform.e,
+                t1.geo.transform.f,
+            ],
+            "bounds": [
+                t1.geo.bounds.left,
+                t1.geo.bounds.bottom,
+                t1.geo.bounds.right,
+                t1.geo.bounds.top,
+            ],
+            "source_grid_observation_id": t1.observation_id,
+            "value_semantics": "binary_0_1",
+        }
         return ToolResult(
             output={
                 "mask_artifact_id": staged.artifact_id,
@@ -352,6 +376,7 @@ class SarTemporalChangeAdapter:
                             "source_hashes": source_hashes,
                             "radiometric_domain": radiometric_domain,
                             "polarizations": list(polarizations),
+                            "grid": grid_provenance,
                         },
                     ),
                 ),
