@@ -206,6 +206,12 @@ class DeterministicQueryInterpreter:
                 matched_rule=measurement_rule or "measurement",
             )
 
+        if _METADATA_RE.search(text):
+            return QueryIntent(
+                task_family="METADATA_QUERY",
+                target_semantic=_target(text),
+                matched_rule="metadata_question",
+            )
         if _SAR_RE.search(text) and _OPTICAL_RE.search(text):
             return QueryIntent(
                 task_family="CROSS_MODAL_VQA",
@@ -238,12 +244,6 @@ class DeterministicQueryInterpreter:
                 temporal_direction=_direction(text, temporal=True),
                 spatial_request=bool(_GROUND_RE.search(text)),
                 matched_rule="temporal_change_question",
-            )
-        if _METADATA_RE.search(text):
-            return QueryIntent(
-                task_family="METADATA_QUERY",
-                target_semantic=_target(text),
-                matched_rule="metadata_question",
             )
         if not temporal and _GROUND_RE.search(text):
             return QueryIntent(
