@@ -803,7 +803,7 @@ class TestCanonicalLaunchGate:
             ),
         )
 
-    def test_blocked_experiment_refuses_to_run(self, tmp_path: Path, capsys) -> None:
+    def test_blocked_experiment_refuses_canonical_run(self, tmp_path: Path, capsys) -> None:
         exp = {
             "_name": "p4-e02-changerex",
             "notebook": "notebooks/kaggle_phase4_e02.ipynb",
@@ -816,8 +816,25 @@ class TestCanonicalLaunchGate:
         patches = self._patched_checks(exp)
         with patches[0], patches[1], patches[2], patches[3]:
             with pytest.raises(SystemExit):
-                runner.cmd_run(self._namespace(tmp_path, dry_run=True))
+                runner.cmd_run(self._namespace(tmp_path, dry_run=False))
         assert "canonical_launch_allowed" in capsys.readouterr().err
+
+    def test_blocked_experiment_allows_dry_run(self, tmp_path: Path) -> None:
+        """Blocked lanes keep dry-run preparation; only execution is refused."""
+        exp = {
+            "_name": "p4-e02-changerex",
+            "notebook": "notebooks/kaggle_phase4_e02.ipynb",
+            "kernel_slug": "satquery-phase4-e02-changerex",
+            "experiment_dir": "experiments/phase4_temporal_analytics",
+            "remote_output_dir": "phase4-e02-changerex",
+            "result_files": ["metrics.json"],
+            "canonical_launch_allowed": False,
+        }
+        patches = self._patched_checks(exp)
+        with patches[0], patches[1], patches[2], patches[3]:
+            runner.cmd_run(self._namespace(tmp_path, dry_run=True))
+        push_dir = runner.PUSH_WORK_DIR / "satquery-phase4-e02-changerex"
+        assert (push_dir / "kernel-metadata.json").exists()
 
     def test_allowed_experiment_passes_the_gate(self, tmp_path: Path) -> None:
         """A launchable experiment must get past the gate (dry-run, no push)."""
