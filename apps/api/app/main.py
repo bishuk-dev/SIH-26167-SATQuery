@@ -41,7 +41,10 @@ from apps.api.app.routes.v1_artifacts import router as v1_artifacts_router
 from apps.api.app.routes.v1_query import router as v1_query_router
 from apps.api.app.routes.v1_analyses import router as v1_analyses_router
 from apps.api.app.routes.v1_reports import router as v1_reports_router
-from apps.api.app.routes.v1_system import router as v1_system_router
+from apps.api.app.routes.v1_system import (
+    public_router as public_system_router,
+    router as v1_system_router,
+)
 from apps.api.app.routes.vqa import invalid_vqa_request_response
 from apps.api.app.routes.vqa import router as vqa_router
 from apps.api.app.schemas_v1 import FailureOutcomeV1
@@ -171,6 +174,10 @@ def create_app(
     application.include_router(vqa_router)
     application.include_router(grounding_router)
     v1_dependencies = auth_dependencies(api_security)
+    # API-key authentication is scoped to the versioned API. Health probes
+    # and the deprecated legacy limits alias remain usable by infrastructure
+    # without credentials.
+    application.include_router(public_system_router)
     application.include_router(v1_system_router, dependencies=v1_dependencies)
     application.include_router(v1_observations_router, dependencies=v1_dependencies)
     application.include_router(v1_pairs_router, dependencies=v1_dependencies)

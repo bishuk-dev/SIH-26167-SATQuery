@@ -12,6 +12,7 @@ from apps.api.app.schemas import ApiModel
 from satquery.observability import readiness_payload
 
 router = APIRouter(tags=["System"])
+public_router = APIRouter(tags=["System"])
 
 # Frozen at Phase 5 Task 0 (experiments/phase5_backend/backend_contract.yaml,
 # phase5_start.mode). A constant is deliberate: Task 1 performs no registry
@@ -63,7 +64,7 @@ def get_system_version_v1() -> SystemVersionV1:
     )
 
 
-@router.get(
+@public_router.get(
     "/health/live",
     operation_id="get_liveness",
     response_model=LivenessV1,
@@ -71,19 +72,18 @@ def get_system_version_v1() -> SystemVersionV1:
     description=(
         "Extremely cheap check: no models, checkpoints, network, raster "
         "inspection, or database access. Dependency readiness is reported "
-        "separately once implemented."
+        "separately by the readiness probe."
     ),
-    responses=error_responses(401),
 )
 def get_liveness() -> LivenessV1:
     return LivenessV1(status="alive")
 
 
-@router.get(
+@public_router.get(
     "/health/ready",
     operation_id="get_readiness",
     response_model=ReadinessV1,
-    responses={503: {"model": ReadinessV1, "description": "One or more dependencies are not ready."}, **error_responses(401)},
+    responses={503: {"model": ReadinessV1, "description": "One or more dependencies are not ready."}},
     summary="Report dependency readiness without loading model checkpoints.",
     description=(
         "Checks SQLite, writable storage, loaded registries, queue capacity, "
@@ -150,7 +150,7 @@ def get_system_limits_v1(request: Request) -> SystemLimitsV1:
     return SystemLimitsV1.model_validate(_limits_payload(request))
 
 
-@router.get(
+@public_router.get(
     "/limits",
     operation_id="get_limits",
     response_model=SystemLimitsV1,

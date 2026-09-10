@@ -105,8 +105,22 @@ def test_security_is_visible_only_when_api_key_is_enabled(tmp_path: Path) -> Non
     with _client(tmp_path / "enabled", api_key="secret") as client:
         document = client.get("/openapi.json").json()
     assert "APIKeyHeader" in document["components"]["securitySchemes"]
+    public_paths = {
+        "/api/observations",
+        "/api/vqa",
+        "/api/grounding",
+        "/limits",
+        "/health/live",
+        "/health/ready",
+        "/tiles/{asset_id}/{z}/{x}/{y}.png",
+    }
     assert all(
         "security" in operation
         for path, _, operation in _operations(document)
-        if path not in {"/api/observations", "/api/vqa", "/api/grounding", "/tiles/{asset_id}/{z}/{x}/{y}.png"}
+        if path not in public_paths
+    )
+    assert all(
+        "security" not in operation
+        for path, _, operation in _operations(document)
+        if path in {"/limits", "/health/live", "/health/ready"}
     )

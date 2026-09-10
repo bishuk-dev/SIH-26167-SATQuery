@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 
+from fastapi import Request
 from fastapi.testclient import TestClient
 
 from apps.api.app.main import create_app
-from apps.api.app.security import SecuritySettings
+from apps.api.app.security import SecuritySettings, _limited_body
 
 
 def test_security_settings_are_strictly_loaded_from_environment() -> None:
@@ -47,6 +49,41 @@ def test_disabled_api_key_has_no_auth_scheme(tmp_path: Path) -> None:
     with TestClient(create_app(data_root=tmp_path / "data")) as client:
         schema = client.get("/openapi.json").json()
     assert "securitySchemes" not in schema.get("components", {})
+
+
+def test_health_probes_and_legacy_limits_remain_public_with_api_key_enabled(
+    tmp_path: Path,
+) -> None:
+    with TestClient(
+        create_app(
+            data_root=tmp_path / "data",
+            security_settings=SecuritySettings(api_key="secret"),
+        )
+    ) as client:
+        for path in ("/health/live", "/health/ready", "/limits"):
+            response = client.get(path)
+            assert response.status_code in {200, 503}, (path, response.text)
+
+
+def test_disconnected_request_body_stops_the_receive_loop() -> None:
+    async def receive() -> dict[str, object]:
+        return {"type": "http.disconnect"}
+
+    request = Request(
+        {
+            "type": "http",
+            "method": "POST",
+            "path": "/api/v1/query/plan",
+            "headers": [],
+            "query_string": b"",
+            "scheme": "http",
+            "server": ("testserver", 80),
+            "client": ("testclient", 1),
+            "root_path": "",
+        },
+        receive,
+    )
+    assert asyncio.run(_limited_body(request, 1024)) is None
 
 
 def test_query_and_roi_limits_are_rejected_before_input_loading(tmp_path: Path) -> None:

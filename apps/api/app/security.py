@@ -143,7 +143,13 @@ async def _limited_body(request: Request, limit: int) -> bytes | None:
     total = 0
     while True:
         message = await receive()
-        if message.get("type") != "http.request":
+        message_type = message.get("type")
+        if message_type == "http.disconnect":
+            # A disconnected client must terminate the receive loop. Uvicorn
+            # may continue returning disconnect notifications, so continuing
+            # here would leak a request task in a hot loop.
+            return None
+        if message_type != "http.request":
             continue
         chunk = message.get("body", b"")
         total += len(chunk)
@@ -191,24 +197,52 @@ async def security_middleware(request: Request, call_next: Callable[..., Any], s
                 return _error(request, "UNSAFE_INPUT", "The request contains an unsupported raw resource reference.", 422)
 
     response = await call_next(request)
-    if request.url.path.startswith("/api/v1") and response.headers.get("content-type", "").startswith("text/event-stream"):
+    if not request.url.path.startswith("/api/v1"):
         return response
-    if request.url.path.startswith("/api/v1"):
-        body = getattr(response, "body", None)
-        if body is None and hasattr(response, "body_iterator"):
-            body = b"".join([chunk async for chunk in response.body_iterator])
-        if body is not None and len(body) > settings.max_result_bytes:
-            return _error(request, "RESULT_TOO_LARGE", "The response exceeds the configured result size limit.", 500)
-        if body is not None:
-            headers = dict(response.headers)
-            headers.pop("content-length", None)
-            return Response(
-                content=body,
-                status_code=response.status_code,
-                headers=headers,
-                media_type=response.media_type,
-                background=response.background,
-            )
+    content_type = response.headers.get("content-type", "").split(";", 1)[0].casefold()
+    if content_type == "text/event-stream":
+        return response
+    # FileResponse is represented as a streaming response after call_next.
+    # ArtifactStore and the tile service enforce their own bounded binary
+    # outputs; do not consume those files into memory in this middleware.
+    binary_response = content_type.startswith("image/") or content_type in {
+        "application/octet-stream",
+    }
+    if binary_response:
+        return response
+
+    limit = settings.max_result_bytes
+    content_length = response.headers.get("content-length")
+    if content_length is not None:
+        try:
+            if int(content_length) > limit:
+                return _error(request, "RESULT_TOO_LARGE", "The response exceeds the configured result size limit.", 500)
+        except ValueError:
+            # A malformed server-generated length must not disable the cap.
+            return _error(request, "INVALID_CONTENT_LENGTH", "The response content length is invalid.", 500)
+
+    body = getattr(response, "body", None)
+    if body is None and hasattr(response, "body_iterator"):
+        chunks: list[bytes] = []
+        total = 0
+        async for chunk in response.body_iterator:
+            total += len(chunk)
+            if total > limit:
+                return _error(request, "RESULT_TOO_LARGE", "The response exceeds the configured result size limit.", 500)
+            chunks.append(chunk)
+        body = b"".join(chunks)
+    if body is not None and len(body) > limit:
+        return _error(request, "RESULT_TOO_LARGE", "The response exceeds the configured result size limit.", 500)
+    if body is not None:
+        headers = dict(response.headers)
+        headers.pop("content-length", None)
+        return Response(
+            content=body,
+            status_code=response.status_code,
+            headers=headers,
+            media_type=response.media_type,
+            background=response.background,
+        )
     return response
 
 
