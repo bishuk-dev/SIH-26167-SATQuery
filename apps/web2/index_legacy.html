@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html class="h-full" lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta content="width=device-width, initial-scale=1.0" name="viewport">
+    <title>SatQuery AI - Earth Observation Intelligence</title>
+    <!-- Tailwind CSS v3 with Plugins -->
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'Fira Code', 'Menlo', 'monospace'],
+                    },
+                    colors: {
+                        space: {
+                            950: '#05070a',
+                            900: '#07090e',
+                            850: '#0b1122',
+                            800: '#111827',
+                        }
+                    },
+                    animation: {
+                        'spin-slow': 'spin 3s linear infinite',
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Custom Styles for Deep Space Ambience and Glassmorphism -->
+    <style data-purpose="custom-styling">
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+        body {
+            background-color: #07090e;
+            color: #f8fafc;
+            overflow-x: hidden;
+        }
+
+        .deep-space-vignette {
+            background: radial-gradient(circle at center, transparent 30%, rgba(7, 9, 14, 0.75) 75%, rgba(5, 7, 10, 0.95) 100%);
+        }
+
+        .custom-scroll::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .custom-scroll::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.5);
+        }
+
+        .custom-scroll::-webkit-scrollbar-thumb {
+            background: rgba(100, 116, 139, 0.5);
+            border-radius: 2px;
+        }
+    </style>
+</head>
+
+<body
+    class="min-h-full flex flex-col justify-between bg-space-900 text-slate-100 font-sans selection:bg-emerald-500/30 selection:text-emerald-200 relative overflow-x-hidden">
+    <!-- BEGIN: ThreeJsBackgroundScene -->
+    <!-- 3D WebGL Earth globe with rotating cloud layer & orbital satellite visualization background -->
+    <!-- STITCH_THREEJS_START:ANIMATION_14 class="fixed inset-0 w-full h-full pointer-events-none z-0" -->
+    <div class="fixed inset-0 w-full h-full pointer-events-none z-0" style="display:block;">
+        <script src="https://ajax.googleapis.com/ajax/libs/threejs/r125/three.min.js"></script>
+        <div id="threejs-container-ANIMATION_14" style="width:100%;height:100%"><canvas width="1600" height="928"
+                style="display: block; width: 1280px; height: 743px;"></canvas></div>
+        <script>
+                (function () {
+                    const container = document.getElementById('threejs-container-ANIMATION_14');
+                    const devicePixelRatio = window.devicePixelRatio || 1;
+                    // Realistic Three.js globe with rotating cloud layer (inspired by three-globe cloud version)
+                    const scene = new THREE.Scene();
+
+                    const width = container.clientWidth || window.innerWidth;
+                    const height = container.clientHeight || window.innerHeight;
+
+                    const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 2000);
+                    camera.position.set(0, 10, 68);
+                    camera.lookAt(0, 0, 0);
+
+                    const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+                    renderer.setSize(width, height);
+                    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+                    container.appendChild(renderer.domElement);
+
+                    // Lighting
+                    const ambientLight = new THREE.AmbientLight(0x334466, 1.4);
+                    scene.add(ambientLight);
+
+                    // Primary Sun light
+                    const sunLight = new THREE.DirectionalLight(0xffffff, 2.5);
+                    sunLight.position.set(60, 40, 50);
+                    scene.add(sunLight);
+
+                    // Rim / Atmosphere back-light
+                    const rimLight = new THREE.DirectionalLight(0x38bdf8, 1.2);
+                    rimLight.position.set(-60, -20, -40);
+                    scene.add(rimLight);
+
+                    // System Group
+                    const systemGroup = new THREE.Group();
+                    systemGroup.position.set(0, 2, 0);
+                    scene.add(systemGroup);
+
+                    const globeRadius = 16;
+
+                    // 1. Procedural High-Res Earth Surface Map
+                    const earthCanvas = document.createElement('canvas');
+                    earthCanvas.width = 2048;
+                    earthCanvas.height = 1024;
+                    const eCtx = earthCanvas.getContext('2d');
+
+                    // Deep realistic oceanic gradient
+                    const oceanGradient = eCtx.createLinearGradient(0, 0, 0, 1024);
+                    oceanGradient.addColorStop(0, '#061325');
+                    oceanGradient.addColorStop(0.25, '#0a2342');
+                    oceanGradient.addColorStop(0.5, '#0e345e');
+                    oceanGradient.addColorStop(0.75, '#0a2342');
+                    oceanGradient.addColorStop(1, '#061325');
+                    eCtx.fillStyle = oceanGradient;
+                    eCtx.fillRect(0, 0, 2048, 1024);
+
+                    // Landmasses with topography variation (Deep greens, arid sienna, sand)
+                    function drawContinentsDetailed() {
+                        eCtx.save();
+
+                        // Eurasia & Africa
+                        eCtx.fillStyle = '#1e4d2b';
+                        eCtx.beginPath();
+                        eCtx.ellipse(1160, 420, 280, 180, 0.15, 0, Math.PI * 2);
+                        eCtx.fill();
+
+                        // Africa
+                        eCtx.fillStyle = '#785938';
+                        eCtx.beginPath();
+                        eCtx.ellipse(1080, 620, 150, 220, -0.1, 0, Math.PI * 2);
+                        eCtx.fill();
+                        eCtx.fillStyle = '#2d6a4f';
+                        eCtx.beginPath();
+                        eCtx.ellipse(1080, 680, 120, 140, -0.1, 0, Math.PI * 2);
+                        eCtx.fill();
+
+                        // Americas (North)
+                        eCtx.fillStyle = '#1e4d2b';
+                        eCtx.beginPath();
+                        eCtx.ellipse(520, 380, 190, 160, -0.3, 0, Math.PI * 2);
+                        eCtx.fill();
+
+                        // Americas (South)
+                        eCtx.fillStyle = '#1b4332';
+                        eCtx.beginPath();
+                        eCtx.ellipse(640, 680, 130, 220, 0.35, 0, Math.PI * 2);
+                        eCtx.fill();
+
+                        // Australia / Indonesia
+                        eCtx.fillStyle = '#99582a';
+                        eCtx.beginPath();
+                        eCtx.ellipse(1640, 700, 120, 90, 0.1, 0, Math.PI * 2);
+                        eCtx.fill();
+
+                        // Polar ice caps
+                        eCtx.fillStyle = '#e2e8f0';
+                        eCtx.beginPath();
+                        eCtx.ellipse(1024, 36, 1024, 56, 0, 0, Math.PI * 2);
+                        eCtx.fill();
+                        eCtx.beginPath();
+                        eCtx.ellipse(1024, 996, 1024, 56, 0, 0, Math.PI * 2);
+                        eCtx.fill();
+
+                        // Fine Latitude/Longitude Geo-grid (subtle three-globe styling)
+                        eCtx.strokeStyle = 'rgba(56, 189, 248, 0.2)';
+                        eCtx.lineWidth = 1.5;
+                        for (let lat = 128; lat < 1024; lat += 128) {
+                            eCtx.beginPath();
+                            eCtx.moveTo(0, lat);
+                            eCtx.lineTo(2048, lat);
+                            eCtx.stroke();
+                        }
+                        for (let lon = 128; lon < 2048; lon += 128) {
+                            eCtx.beginPath();
+                            eCtx.moveTo(lon, 0);
+                            eCtx.lineTo(lon, 1024);
+                            eCtx.stroke();
+                        }
+                        eCtx.restore();
+                    }
+                    drawContinentsDetailed();
+
+                    const earthTexture = new THREE.CanvasTexture(earthCanvas);
+                    earthTexture.wrapS = THREE.RepeatWrapping;
+                    earthTexture.wrapT = THREE.ClampToEdgeWrapping;
+
+                    const globeGeo = new THREE.SphereGeometry(globeRadius, 64, 64);
+                    const globeMat = new THREE.MeshPhongMaterial({
+                        map: earthTexture,
+                        specular: new THREE.Color(0x1a365d),
+                        shininess: 25,
+                        bumpScale: 0.05
+                    });
+                    const globeMesh = new THREE.Mesh(globeGeo, globeMat);
+                    systemGroup.add(globeMesh);
+
+                    // 2. Realistic Three-Globe Cloud Layer
+                    const cloudCanvas = document.createElement('canvas');
+                    cloudCanvas.width = 2048;
+                    cloudCanvas.height = 1024;
+                    const cCtx = cloudCanvas.getContext('2d');
+
+                    cCtx.clearRect(0, 0, 2048, 1024);
+
+                    // Draw dynamic fluffy procedural cloud bands & swirling storm systems
+                    function drawCloudLayer() {
+                        cCtx.fillStyle = 'rgba(255, 255, 255, 0.82)';
+
+                        // Cyclone swirl 1 (North Atlantic)
+                        for (let i = 0; i < 40; i++) {
+                            const angle = i * 0.25;
+                            const r = 20 + i * 2.8;
+                            const cx = 800 + Math.cos(angle) * r;
+                            const cy = 340 + Math.sin(angle) * (r * 0.6);
+                            cCtx.beginPath();
+                            cCtx.arc(cx, cy, 18 + Math.random() * 15, 0, Math.PI * 2);
+                            cCtx.fill();
+                        }
+
+                        // Cyclone swirl 2 (Western Pacific)
+                        for (let i = 0; i < 35; i++) {
+                            const angle = i * 0.22;
+                            const r = 18 + i * 2.5;
+                            const cx = 1450 + Math.cos(angle) * r;
+                            const cy = 410 + Math.sin(angle) * (r * 0.55);
+                            cCtx.beginPath();
+                            cCtx.arc(cx, cy, 15 + Math.random() * 14, 0, Math.PI * 2);
+                            cCtx.fill();
+                        }
+
+                        // Intertropical Convergence Zone (equatorial cloud belt)
+                        for (let x = 0; x < 2048; x += 30) {
+                            const yWave = 520 + Math.sin(x * 0.015) * 35 + Math.cos(x * 0.04) * 20;
+                            cCtx.beginPath();
+                            cCtx.ellipse(x, yWave, 45 + Math.random() * 25, 20 + Math.random() * 15, Math.random() * 0.5, 0, Math.PI * 2);
+                            cCtx.fill();
+                        }
+
+                        // Temperate storm fronts (Wavy mid-latitude bands)
+                        for (let x = 0; x < 2048; x += 38) {
+                            const yNorth = 280 + Math.cos(x * 0.012) * 50 + Math.sin(x * 0.035) * 25;
+                            cCtx.beginPath();
+                            cCtx.ellipse(x, yNorth, 50 + Math.random() * 30, 24 + Math.random() * 12, -0.2, 0, Math.PI * 2);
+                            cCtx.fill();
+
+                            const ySouth = 780 + Math.sin(x * 0.014) * 45 + Math.cos(x * 0.03) * 20;
+                            cCtx.beginPath();
+                            cCtx.ellipse(x, ySouth, 55 + Math.random() * 35, 26 + Math.random() * 15, 0.2, 0, Math.PI * 2);
+                            cCtx.fill();
+                        }
+
+                        // Soft scattered cumulus clusters
+                        for (let n = 0; n < 120; n++) {
+                            const rx = Math.random() * 2048;
+                            const ry = 140 + Math.random() * 740;
+                            cCtx.fillStyle = 'rgba(255, 255, 255, ' + (0.35 + Math.random() * 0.45) + ')';
+                            cCtx.beginPath();
+                            cCtx.arc(rx, ry, 12 + Math.random() * 22, 0, Math.PI * 2);
+                            cCtx.fill();
+                        }
+                    }
+                    drawCloudLayer();
+
+                    const cloudTexture = new THREE.CanvasTexture(cloudCanvas);
+                    cloudTexture.wrapS = THREE.RepeatWrapping;
+                    cloudTexture.wrapT = THREE.ClampToEdgeWrapping;
+
+                    // Cloud sphere positioned slightly above Earth radius
+                    const cloudRadius = globeRadius * 1.015;
+                    const cloudGeo = new THREE.SphereGeometry(cloudRadius, 64, 64);
+                    const cloudMat = new THREE.MeshPhongMaterial({
+                        map: cloudTexture,
+                        transparent: true,
+                        opacity: 0.88,
+                        blending: THREE.NormalBlending,
+                        depthWrite: false
+                    });
+                    const cloudMesh = new THREE.Mesh(cloudGeo, cloudMat);
+                    systemGroup.add(cloudMesh);
+
+                    // 3. Atmospheric Halo Glow (Outer rim)
+                    const atmoGeo = new THREE.SphereGeometry(globeRadius * 1.05, 48, 48);
+                    const atmoMat = new THREE.MeshBasicMaterial({
+                        color: 0x38bdf8,
+                        transparent: true,
+                        opacity: 0.22,
+                        side: THREE.BackSide,
+                        blending: THREE.AdditiveBlending
+                    });
+                    const atmoMesh = new THREE.Mesh(atmoGeo, atmoMat);
+                    systemGroup.add(atmoMesh);
+
+                    // 4. Orbital Path & Satellite (Sentinel/SatQuery)
+                    const orbitXRadius = 31;
+                    const orbitZRadius = 25;
+                    const orbitPoints = [];
+                    for (let i = 0; i <= 128; i++) {
+                        const theta = (i / 128) * Math.PI * 2;
+                        orbitPoints.push(new THREE.Vector3(
+                            Math.cos(theta) * orbitXRadius,
+                            0,
+                            Math.sin(theta) * orbitZRadius
+                        ));
+                    }
+                    const orbitGeo = new THREE.BufferGeometry().setFromPoints(orbitPoints);
+                    const orbitMat = new THREE.LineBasicMaterial({
+                        color: 0xf59e0b,
+                        transparent: true,
+                        opacity: 0.75
+                    });
+                    const orbitGroup = new THREE.Group();
+                    orbitGroup.rotation.x = THREE.MathUtils.degToRad(32);
+                    orbitGroup.rotation.y = THREE.MathUtils.degToRad(-15);
+                    systemGroup.add(orbitGroup);
+
+                    const orbitLine = new THREE.Line(orbitGeo, orbitMat);
+                    orbitGroup.add(orbitLine);
+
+                    // Satellite Model
+                    const satellite = new THREE.Group();
+
+                    // Bus
+                    const busMesh = new THREE.Mesh(
+                        new THREE.BoxGeometry(1.6, 1.8, 1.4),
+                        new THREE.MeshStandardMaterial({ color: 0xfbbf24, roughness: 0.3, metalness: 0.6 })
+                    );
+                    satellite.add(busMesh);
+
+                    // Optical Nadir Sensor
+                    const sensorMesh = new THREE.Mesh(
+                        new THREE.CylinderGeometry(0.45, 0.55, 0.6, 16),
+                        new THREE.MeshBasicMaterial({ color: 0x0284c7 })
+                    );
+                    sensorMesh.rotation.x = Math.PI / 2;
+                    sensorMesh.position.z = 0.8;
+                    satellite.add(sensorMesh);
+
+                    // Solar Array Panels
+                    const panelMat = new THREE.MeshPhongMaterial({
+                        color: 0x1e3a8a,
+                        emissive: 0x0c4a6e,
+                        specular: 0x38bdf8,
+                        shininess: 90
+                    });
+                    const leftPanel = new THREE.Mesh(new THREE.BoxGeometry(3.6, 1.0, 0.08), panelMat);
+                    leftPanel.position.set(-2.7, 0, 0);
+                    satellite.add(leftPanel);
+
+                    const rightPanel = new THREE.Mesh(new THREE.BoxGeometry(3.6, 1.0, 0.08), panelMat);
+                    rightPanel.position.set(2.7, 0, 0);
+                    satellite.add(rightPanel);
+
+                    // Solar Struts
+                    const strutMat = new THREE.MeshBasicMaterial({ color: 0x94a3b8 });
+                    const leftStrut = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 1.2), strutMat);
+                    leftStrut.rotation.z = Math.PI / 2;
+                    leftStrut.position.set(-1.2, 0, 0);
+                    satellite.add(leftStrut);
+                    const rightStrut = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 1.2), strutMat);
+                    rightStrut.rotation.z = Math.PI / 2;
+                    rightStrut.position.set(1.2, 0, 0);
+                    satellite.add(rightStrut);
+
+                    orbitGroup.add(satellite);
+
+                    // Telemetry laser down to Earth
+                    const beamGeo = new THREE.BufferGeometry();
+                    const beamPositions = new Float32Array([0, 0, 0, 0, 0, 0]);
+                    beamGeo.setAttribute('position', new THREE.BufferAttribute(beamPositions, 3));
+                    const beamLine = new THREE.Line(beamGeo, new THREE.LineDashedMaterial({
+                        color: 0x38bdf8,
+                        dashSize: 1.2,
+                        gapSize: 0.8,
+                        transparent: true,
+                        opacity: 0.85
+                    }));
+                    orbitGroup.add(beamLine);
+
+                    // 5. Starfield Background
+                    const starCount = 350;
+                    const starGeo = new THREE.BufferGeometry();
+                    const starPos = new Float32Array(starCount * 3);
+                    for (let i = 0; i < starCount * 3; i += 3) {
+                        starPos[i] = (Math.random() - 0.5) * 450;
+                        starPos[i + 1] = (Math.random() - 0.5) * 450;
+                        starPos[i + 2] = (Math.random() - 0.5) * 250 - 80;
+                    }
+                    starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
+                    const stars = new THREE.Points(starGeo, new THREE.PointsMaterial({
+                        color: 0xffffff,
+                        size: 1.2,
+                        transparent: true,
+                        opacity: 0.75
+                    }));
+                    scene.add(stars);
+
+                    // Animation Loop (Differing rotation speeds for Earth and Clouds as in three-globe)
+                    let orbitProgress = 0;
+                    const clock = new THREE.Clock();
+
+                    function animate() {
+                        requestAnimationFrame(animate);
+                        const delta = clock.getDelta();
+
+                        // Globe rotation
+                        globeMesh.rotation.y += 0.09 * delta;
+
+                        // Cloud layer rotation (slightly faster and distinct relative drift, identical to three-globe clouds example)
+                        cloudMesh.rotation.y += 0.13 * delta;
+
+                        // Satellite orbit animation
+                        orbitProgress += 0.28 * delta;
+                        const satX = Math.cos(orbitProgress) * orbitXRadius;
+                        const satZ = Math.sin(orbitProgress) * orbitZRadius;
+                        satellite.position.set(satX, 0, satZ);
+
+                        // Orient satellite along trajectory
+                        const nextSatX = Math.cos(orbitProgress + 0.02) * orbitXRadius;
+                        const nextSatZ = Math.sin(orbitProgress + 0.02) * orbitZRadius;
+                        satellite.lookAt(nextSatX, 0, nextSatZ);
+
+                        // Update nadir ground telemetry beam
+                        const posArr = beamLine.geometry.attributes.position.array;
+                        posArr[0] = satX;
+                        posArr[1] = 0;
+                        posArr[2] = satZ;
+                        const dirToOrigin = new THREE.Vector3(-satX, 0, -satZ).normalize();
+                        const groundPt = dirToOrigin.multiplyScalar(satZ > 0 ? globeRadius : globeRadius * 0.9);
+                        posArr[3] = groundPt.x;
+                        posArr[4] = groundPt.y;
+                        posArr[5] = groundPt.z;
+                        beamLine.geometry.attributes.position.needsUpdate = true;
+                        beamLine.computeLineDistances();
+
+                        // Subtle camera oscillation
+                        const time = clock.getElapsedTime();
+                        camera.position.x = Math.sin(time * 0.12) * 2.5;
+                        camera.position.y = 10 + Math.cos(time * 0.18) * 1.2;
+                        camera.lookAt(0, 0, 0);
+
+                        renderer.render(scene, camera);
+                    }
+                    animate();
+
+                    function onWindowResize() {
+                        const w = container.clientWidth || window.innerWidth;
+                        const h = container.clientHeight || window.innerHeight;
+                        camera.aspect = w / h;
+                        camera.updateProjectionMatrix();
+                        renderer.setSize(w, h);
+                    }
+                    window.addEventListener('resize', onWindowResize);
+
+                })();
+        </script>
+    </div>
+    <!-- STITCH_THREEJS_END:ANIMATION_14 -->
+    <!-- Vignette overlay for readable typography & spatial depth -->
+    <div class="absolute inset-0 pointer-events-none z-0 deep-space-vignette"></div>
+    <!-- END: ThreeJsBackgroundScene -->
+    <!-- BEGIN: TopDockedHeader -->
+    <header
+        class="relative z-20 w-full border-b border-slate-800/80 bg-space-900/70 backdrop-blur-xl transition-colors duration-200">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <!-- Brand & Pro Badge -->
+            <div class="flex items-center space-x-3.5">
+                <a class="flex items-center space-x-2.5 group focus:outline-none" href="#">
+                    <div
+                        class="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-400 p-[1px] shadow-lg shadow-emerald-950/50">
+                        <div
+                            class="w-full h-full bg-space-950 rounded-[11px] flex items-center justify-center group-hover:bg-slate-900 transition-colors">
+                            <svg class="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor"
+                                stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24">
+                                <circle cx="12" cy="12" r="9"></circle>
+                                <path d="M12 3v18"></path>
+                                <path d="M3 12h18"></path>
+                                <circle cx="12" cy="12" r="4"></circle>
+                            </svg>
+                        </div>
+                    </div>
+                    <div class="flex items-baseline space-x-1.5">
+                        <span class="text-xl font-bold tracking-tight text-white font-sans">SatQuery<span
+                                class="text-emerald-400">.ai</span></span>
+                        <span
+                            class="text-[10px] uppercase font-mono tracking-wider font-semibold text-emerald-400 bg-emerald-950/70 border border-emerald-500/40 px-1.5 py-0.5 rounded">PRO</span>
+                    </div>
+                </a>
+            </div>
+            <!-- Center Navigation Links -->
+            <nav class="hidden md:flex items-center space-x-1 font-mono text-xs text-slate-300">
+                <a class="px-3.5 py-2 rounded-lg hover:text-white hover:bg-slate-800/60 transition-colors"
+                    href="#">Analysis Docs</a>
+                <a class="px-3.5 py-2 rounded-lg hover:text-white hover:bg-slate-800/60 transition-colors flex items-center gap-1.5"
+                    href="#">
+                    <span class="">Sensor Catalog</span>
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                </a>
+                <a class="px-3.5 py-2 rounded-lg hover:text-white hover:bg-slate-800/60 transition-colors" href="#">API
+                    Keys</a>
+                <a class="px-3.5 py-2 rounded-lg hover:text-white hover:bg-slate-800/60 transition-colors"
+                    href="#">Benchmarks</a>
+            </nav>
+            <!-- Right Action & Workspace Launch -->
+            <div class="flex items-center space-x-3">
+                <button
+                    class="hidden sm:inline-flex items-center space-x-1.5 text-xs font-mono text-slate-300 hover:text-white px-3 py-1.5 rounded-lg border border-slate-700/60 bg-slate-900/60 hover:bg-slate-800 transition"
+                    type="button">
+                    <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <circle cx="18" cy="5" r="3"></circle>
+                        <circle cx="6" cy="12" r="3"></circle>
+                        <circle cx="18" cy="19" r="3"></circle>
+                        <line x1="8.59" x2="15.42" y1="13.51" y2="17.49"></line>
+                        <line x1="15.41" x2="8.59" y1="6.51" y2="10.49"></line>
+                    </svg>
+                    <span class="">Share</span>
+                </button>
+                <a class="inline-flex items-center space-x-2 text-xs font-mono font-semibold text-slate-950 bg-gradient-to-r from-emerald-400 to-teal-300 hover:from-emerald-300 hover:to-teal-200 px-3.5 py-2 rounded-lg shadow-md shadow-emerald-950/40 transition-all duration-150 transform active:scale-95"
+                    href="#">
+                    <svg class="w-4 h-4 text-slate-950" fill="none" stroke="currentColor" stroke-width="2"
+                        viewBox="0 0 24 24">
+                        <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                    </svg>
+                    <span class="">Launch Workspace</span>
+                </a>
+            </div>
+        </div>
+    </header>
+    <!-- END: TopDockedHeader -->
+    <!-- BEGIN: MainHeroContent -->
+    <main
+        class="relative z-10 flex-1 flex flex-col justify-center items-center px-4 sm:px-6 lg:px-8 py-10 max-w-5xl mx-auto w-full text-center">
+        <!-- Hero Status Badge -->
+        <div
+            class="inline-flex items-center gap-2 mb-6 bg-slate-900/90 border border-emerald-500/40 text-emerald-300 font-mono text-xs px-4 py-1.5 rounded-full shadow-lg shadow-black/40 backdrop-blur-md">
+            <span class="relative flex h-2 w-2">
+                <span
+                    class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+            </span>
+            <span class="tracking-wide">ORBITAL OBSERVATION &amp; AI CHANGE DETECTION</span>
+        </div>
+        <!-- Hero Headlines with drop shadow for guaranteed readability against 3D earth -->
+        <h1
+            class="text-3xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-white mb-4 drop-shadow-[0_4px_24px_rgba(0,0,0,0.95)] max-w-3xl leading-[1.15]">
+            Ask anything about our changing planet.
+        </h1>
+        <p
+            class="text-purple-300 border border-purple-500/60 bg-purple-950/30 backdrop-blur-sm rounded-xl px-4 py-2 text-sm sm:text-base md:text-lg font-normal max-w-2xl mx-auto mb-9 drop-shadow-[0_2px_12px_rgba(0,0,0,0.85)] leading-relaxed">
+            Natural language spatial queries powered by multi-temporal Sentinel-1/2, Landsat-9, and synthetic aperture
+            radar.
+        </p>
+        <!-- BEGIN: CentralPromptBox -->
+        <!-- Minimalist stitch-inspired conversational geospatial input card -->
+        <section
+            class="w-full max-w-3xl text-left bg-space-850/90 backdrop-blur-2xl border border-slate-700/70 rounded-2xl p-4 sm:p-5 shadow-[0_24px_64px_rgba(0,0,0,0.85)] ring-1 ring-white/10"
+            data-purpose="prompt-card">
+            <!-- Multi-line Prompt Input Area -->
+            <div class="relative w-full">
+                <textarea
+                    class="w-full bg-transparent border-0 resize-none p-2 text-white placeholder:text-slate-400 focus:ring-0 text-sm sm:text-base leading-relaxed custom-scroll font-sans"
+                    id="geo-query-input"
+                    placeholder="Describe an area of interest or change detection query (e.g. Detect urban sprawl and lake boundary contraction in Bengaluru from 2022 to 2024)..."
+                    rows="3"></textarea>
+            </div>
+            <!-- Action & Parameter Filter Bar -->
+            <div class="mt-3 pt-3 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-3">
+                <!-- Left Filter Buttons -->
+                <div class="flex flex-wrap items-center gap-2">
+                    <!-- Add Imagery Button -->
+                    <button
+                        class="inline-flex items-center gap-1.5 text-xs font-mono text-slate-300 bg-slate-900/80 hover:bg-slate-800 hover:text-white border border-slate-700/70 px-3 py-1.5 rounded-lg transition"
+                        type="button">
+                        <svg class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" stroke-width="2"
+                            viewBox="0 0 24 24">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="17 8 12 3 7 8"></polyline>
+                            <line x1="12" x2="12" y1="3" y2="15"></line>
+                        </svg>
+                        <span class="">+ Add Imagery (GeoTIFF)</span>
+                    </button>
+                    <!-- Bounding Box / Polygon Filter -->
+                    <button
+                        class="inline-flex items-center gap-1.5 text-xs font-mono text-slate-300 bg-slate-900/80 hover:bg-slate-800 hover:text-white border border-slate-700/70 px-3 py-1.5 rounded-lg transition"
+                        type="button">
+                        <svg class="w-3.5 h-3.5 text-sky-400" fill="none" stroke="currentColor" stroke-width="2"
+                            viewBox="0 0 24 24">
+                            <rect height="18" rx="2" stroke-dasharray="3 3" width="18" x="3" y="3"></rect>
+                            <circle cx="3" cy="3" fill="currentColor" r="1.5"></circle>
+                            <circle cx="21" cy="3" fill="currentColor" r="1.5"></circle>
+                            <circle cx="21" cy="21" fill="currentColor" r="1.5"></circle>
+                            <circle cx="3" cy="21" fill="currentColor" r="1.5"></circle>
+                        </svg>
+                        <span class="hidden sm:inline">Bounding Box</span>
+                    </button>
+                    <!-- Sensor Dual-Pol Filter -->
+                    <button
+                        class="inline-flex items-center gap-1.5 text-xs font-mono text-slate-300 bg-slate-900/80 hover:bg-slate-800 hover:text-white border border-slate-700/70 px-3 py-1.5 rounded-lg transition"
+                        type="button">
+                        <svg class="w-3.5 h-3.5 text-amber-400" fill="none" stroke="currentColor" stroke-width="2"
+                            viewBox="0 0 24 24">
+                            <path d="M12 2a10 10 0 1 0 10 10H12V2z"></path>
+                            <path d="M12 12L2.5 7.5"></path>
+                        </svg>
+                        <span class="">Sentinel-2 &amp; SAR</span>
+                    </button>
+                </div>
+                <!-- Right Primary CTA Execution Button -->
+                <button
+                    class="group inline-flex items-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-sans font-semibold text-xs sm:text-sm px-5 py-2 rounded-xl transition duration-150 shadow-lg shadow-emerald-950/60 active:scale-95"
+                    type="button">
+                    <!-- Globe icon with hover spin animation -->
+                    <svg class="w-4 h-4 text-slate-950 transition-transform duration-700 group-hover:rotate-180"
+                        fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="2" x2="22" y1="12" y2="12"></line>
+                        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1 4-10z"></path>
+                    </svg>
+                    <span class="">Query Orbit</span>
+                </button>
+            </div>
+        </section>
+        <!-- END: CentralPromptBox -->
+        <!-- BEGIN: QuickQueryStarters -->
+        <section class="mt-5 flex flex-wrap items-center justify-center gap-2 max-w-2xl" data-purpose="starter-prompts">
+            <span class="text-xs font-mono text-slate-400 mr-1 hidden sm:inline">Try asking:</span>
+            <button
+                class="inline-flex items-center gap-1.5 bg-slate-900/80 hover:bg-slate-800/90 border border-slate-700/60 text-slate-200 hover:text-white px-3 py-1.5 rounded-full text-xs font-mono shadow-md backdrop-blur-md transition hover:border-emerald-500/50"
+                onclick="setPrompt('Detect coastal port terminal expansion in Barcelona from 2023 to 2024 with radar backscatter')"
+                type="button">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                <span class="">Port terminal expansion in Barcelona</span>
+            </button>
+            <button
+                class="inline-flex items-center gap-1.5 bg-slate-900/80 hover:bg-slate-800/90 border border-slate-700/60 text-slate-200 hover:text-white px-3 py-1.5 rounded-full text-xs font-mono shadow-md backdrop-blur-md transition hover:border-emerald-500/50"
+                onclick="setPrompt('Analyze lithium brine evaporation pond surface changes in Atacama basin between Q3 2023 and Q1 2024')"
+                type="button">
+                <span class="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
+                <span class="">Lithium brine evaporation delta</span>
+            </button>
+            <button
+                class="inline-flex items-center gap-1.5 bg-slate-900/80 hover:bg-slate-800/90 border border-slate-700/60 text-slate-200 hover:text-white px-3 py-1.5 rounded-full text-xs font-mono shadow-md backdrop-blur-md transition hover:border-emerald-500/50"
+                onclick="setPrompt('Identify unpermitted canopy loss alerts in southern Pará deforestation buffer Q1 2024')"
+                type="button">
+                <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                <span class="">Amazon canopy loss Q1 2024</span>
+            </button>
+            <button
+                class="inline-flex items-center gap-1.5 bg-slate-900/80 hover:bg-slate-800/90 border border-slate-700/60 text-slate-200 hover:text-white px-3 py-1.5 rounded-full text-xs font-mono shadow-md backdrop-blur-md transition hover:border-emerald-500/50"
+                onclick="setPrompt('Count anchored crude tankers and fairway transits in Europort Rotterdam using SAR C-band')"
+                type="button">
+                <span class="w-1.5 h-1.5 rounded-full bg-indigo-400"></span>
+                <span class="">Rotterdam tanker fairway count</span>
+            </button>
+        </section>
+        <!-- END: QuickQueryStarters -->
+    </main>
+    <!-- END: MainHeroContent -->
+    <!-- BEGIN: BottomTelemetryStatusBar -->
+    <footer
+        class="relative z-20 w-full border-t border-slate-800/90 bg-space-950/85 backdrop-blur-xl py-2 px-4 sm:px-6 lg:px-8">
+        <div
+            class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-y-2 text-[11px] font-mono text-slate-400">
+            <!-- Left: Constellation Status -->
+            <div class="flex items-center space-x-4">
+                <div class="flex items-center space-x-2 text-slate-200">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <span class="font-medium">Orbital Sync: Active</span>
+                    <span class="text-slate-500">•</span>
+                    <span class="text-slate-300">14 Satellites Locked</span>
+                </div>
+                <span class="hidden md:inline text-slate-600">|</span>
+                <div class="hidden md:flex items-center space-x-1 text-slate-300">
+                    <span class="text-slate-400">Resolution:</span>
+                    <span class="text-emerald-300">10m Optical / 5m SAR C-Band</span>
+                </div>
+            </div>
+            <!-- Right: Latency & Spatial Coordinates Reference -->
+            <div class="flex items-center space-x-4 ml-auto">
+                <div class="flex items-center space-x-1.5">
+                    <span class="text-slate-400">Latency:</span>
+                    <span class="text-slate-200">&lt; 800ms</span>
+                </div>
+                <span class="text-slate-600">|</span>
+                <div class="flex items-center space-x-1.5 text-slate-300">
+                    <svg class="w-3 h-3 text-sky-400" fill="none" stroke="currentColor" stroke-width="2"
+                        viewBox="0 0 24 24">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <polygon points="12 8 8 12 12 16 16 12 12 8"></polygon>
+                    </svg>
+                    <span class="text-slate-200">N 41°21' E 02°09' • EPSG:32643</span>
+                </div>
+            </div>
+        </div>
+    </footer>
+    <!-- END: BottomTelemetryStatusBar -->
+    <!-- Interactive script for starter pills -->
+    <script data-purpose="starter-prompts-handler">
+        function setPrompt(text) {
+            const textarea = document.getElementById('geo-query-input');
+            if (textarea) {
+                textarea.value = text;
+                textarea.focus();
+            }
+        }
+    </script>
+
+
+</body>
+
+</html>
