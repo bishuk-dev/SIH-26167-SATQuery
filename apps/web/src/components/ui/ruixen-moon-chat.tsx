@@ -51,20 +51,36 @@ function useAutoResizeTextarea({ minHeight, maxHeight }: AutoResizeProps) {
 
 export interface AnalysisRequest {
   query: string;
-  file: {
-    name: string;
-    size: string;
-  };
+  file: File;
 }
 
 interface RuixenMoonChatProps {
-  onStartAnalysis?: (request: AnalysisRequest) => void;
+  onStartAnalysis: (request: AnalysisRequest) => Promise<void>;
+  isSubmitting: boolean;
+  submissionStage: string | null;
+  submissionError: string | null;
+  backendStatus: "checking" | "ready" | "degraded" | "offline";
+}
+
+function isTiff(file: File) {
+  return /\.(tif|tiff|geotiff)$/i.test(file.name);
+}
+
+function formatFileSize(size: number) {
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 /* ─── Main component ───────────────────────────────────────────────────── */
-export default function RuixenMoonChat({ onStartAnalysis }: RuixenMoonChatProps) {
+export default function RuixenMoonChat({
+  onStartAnalysis,
+  isSubmitting,
+  submissionStage,
+  submissionError,
+  backendStatus,
+}: RuixenMoonChatProps) {
   const [message, setMessage] = useState("");
-  const [uploadedFile, setUploadedFile] = useState<{ name: string; size: string } | null>(null);
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [fileError, setFileError] = useState<string | null>(null);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -82,15 +98,20 @@ export default function RuixenMoonChat({ onStartAnalysis }: RuixenMoonChatProps)
     adjustHeight();
   }, [message, adjustHeight]);
 
-  const handleSubmit = () => {
-    if (!message.trim()) return;
-    const fileToSubmit = uploadedFile || {
-      name: "barcelona_port_multisensor.tif",
-      size: "48.2 MB",
-    };
-    onStartAnalysis?.({
+  const selectFile = (file: File) => {
+    if (!isTiff(file)) {
+      setFileError("Choose a GeoTIFF file ending in .tif or .tiff.");
+      return;
+    }
+    setUploadedFile(file);
+    setFileError(null);
+  };
+
+  const handleSubmit = async () => {
+    if (!message.trim() || !uploadedFile || isSubmitting) return;
+    await onStartAnalysis({
       query: message.trim(),
-      file: fileToSubmit,
+      file: uploadedFile,
     });
   };
 
@@ -104,22 +125,26 @@ export default function RuixenMoonChat({ onStartAnalysis }: RuixenMoonChatProps)
         className="hidden"
         onChange={(e) => {
           const file = e.target.files?.[0];
-          if (file) {
-            const sizeMb = (file.size / (1024 * 1024)).toFixed(1);
-            setUploadedFile({
-              name: file.name,
-              size: `${sizeMb} MB`,
-            });
-          }
+          if (file) selectFile(file);
         }}
       />
 
-      {/* Subtle star-field radial gradient bg */}
+      {/* Star field and vignette adapted from the apps/web2 landing background. */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          backgroundImage: "url('/earth/galaxy_starfield.png')",
+          backgroundPosition: "center",
+          backgroundSize: "cover",
+          opacity: 0.58,
+        }}
+      />
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
           background:
-            "radial-gradient(ellipse 120% 80% at 50% 110%, #1a1060 0%, #050510 70%)",
+            "radial-gradient(ellipse at 50% 48%, transparent 22%, rgba(0,0,0,0.68) 82%)," +
+            "linear-gradient(to bottom, rgba(2,3,15,0.18), rgba(5,5,25,0.72))",
         }}
       />
 
@@ -204,13 +229,7 @@ export default function RuixenMoonChat({ onStartAnalysis }: RuixenMoonChatProps)
             e.preventDefault();
             setIsDraggingFile(false);
             const file = e.dataTransfer.files?.[0];
-            if (file) {
-              const sizeMb = (file.size / (1024 * 1024)).toFixed(1);
-              setUploadedFile({
-                name: file.name,
-                size: `${sizeMb} MB`,
-              });
-            }
+            if (file) selectFile(file);
           }}
           className={cn(
             "relative rounded-2xl border transition-all duration-200 shadow-2xl",
@@ -236,14 +255,17 @@ export default function RuixenMoonChat({ onStartAnalysis }: RuixenMoonChatProps)
                 {uploadedFile.name}
               </span>
               <span className="text-[11px] text-neutral-400 font-mono">
-                ({uploadedFile.size})
+                ({formatFileSize(uploadedFile.size)})
               </span>
               <span className="px-1.5 py-0.5 rounded bg-sky-500/20 text-[9px] font-mono text-sky-300 font-bold tracking-wider uppercase">
-                GeoTIFF Ready
+                  Ready to upload
               </span>
               <button
                 type="button"
-                onClick={() => setUploadedFile(null)}
+                onClick={() => {
+                  setUploadedFile(null);
+                  if (fileInputRef.current) fileInputRef.current.value = "";
+                }}
                 className="ml-auto p-1 text-neutral-400 hover:text-white rounded hover:bg-white/10 transition-colors"
                 title="Remove attached file"
               >
@@ -255,6 +277,7 @@ export default function RuixenMoonChat({ onStartAnalysis }: RuixenMoonChatProps)
           <Textarea
             ref={textareaRef}
             value={message}
+            maxLength={500}
             onChange={(e) => {
               setMessage(e.target.value);
               adjustHeight();
@@ -265,7 +288,7 @@ export default function RuixenMoonChat({ onStartAnalysis }: RuixenMoonChatProps)
                 handleSubmit();
               }
             }}
-            placeholder="Ask anything about your imagery... (Press Enter to analyze)"
+            placeholder="Ask a question about your GeoTIFF..."
             className={cn(
               "w-full px-5 py-4 resize-none border-none bg-transparent",
               "text-white text-sm leading-relaxed font-sans",
@@ -306,20 +329,15 @@ export default function RuixenMoonChat({ onStartAnalysis }: RuixenMoonChatProps)
                 </div>
               </div>
 
-              {/* Quick Sample File Button */}
+              {/* A real file is required; the UI no longer fabricates a sample upload. */}
               {!uploadedFile && (
                 <button
                   type="button"
-                  onClick={() =>
-                    setUploadedFile({
-                      name: "barcelona_port_multisensor.tif",
-                      size: "48.2 MB",
-                    })
-                  }
+                  onClick={() => fileInputRef.current?.click()}
                   className="text-[11px] font-mono text-sky-400 hover:text-sky-300 px-2.5 py-1 rounded-lg bg-sky-500/10 hover:bg-sky-500/20 border border-sky-400/20 transition-all cursor-pointer flex items-center gap-1.5"
                 >
                   <Satellite className="w-3 h-3 text-sky-400" />
-                  <span>Use Sample .TIF</span>
+                  <span>Select GeoTIFF</span>
                 </button>
               )}
             </div>
@@ -327,10 +345,10 @@ export default function RuixenMoonChat({ onStartAnalysis }: RuixenMoonChatProps)
             <Button
               type="button"
               onClick={handleSubmit}
-              disabled={!message.trim()}
+              disabled={!message.trim() || !uploadedFile || isSubmitting}
               className={cn(
                 "flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer",
-                message.trim()
+                message.trim() && uploadedFile && !isSubmitting
                   ? "bg-white text-black hover:bg-neutral-200 shadow-lg shadow-white/20 active:scale-95"
                   : "bg-white/10 text-neutral-500 cursor-not-allowed"
               )}
@@ -341,8 +359,30 @@ export default function RuixenMoonChat({ onStartAnalysis }: RuixenMoonChatProps)
           </div>
         </div>
 
+        <div className="mt-3 min-h-5 text-center text-xs" aria-live="polite">
+          {(fileError || submissionError) && (
+            <span className="text-rose-300">{fileError || submissionError}</span>
+          )}
+          {!fileError && !submissionError && submissionStage && (
+            <span className="text-cyan-300">{submissionStage}</span>
+          )}
+          {!fileError && !submissionError && !submissionStage && (
+            <span
+              className={cn(
+                "font-mono",
+                backendStatus === "ready" && "text-emerald-400",
+                backendStatus === "checking" && "text-neutral-400",
+                backendStatus === "degraded" && "text-amber-300",
+                backendStatus === "offline" && "text-rose-300"
+              )}
+            >
+              API {backendStatus}
+            </span>
+          )}
+        </div>
+
         {/* Quick query chips */}
-        <div className="flex items-center justify-center flex-wrap gap-2.5 mt-5">
+        <div className="flex items-center justify-center flex-wrap gap-2.5 mt-3">
           <QuickAction
             icon={<Eye className="w-3.5 h-3.5" />}
             label="What do you see here?"

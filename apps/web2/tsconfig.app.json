@@ -16,11 +16,6 @@
     "noEmit": true,
     "jsx": "react-jsx",
 
-<<<<<<< HEAD
-    /* Linting */
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-=======
     /* Path aliases */
     "ignoreDeprecations": "6.0",
     "baseUrl": ".",
@@ -31,7 +26,6 @@
     /* Linting */
     "noUnusedLocals": false,
     "noUnusedParameters": false,
->>>>>>> a8121246fd2bb72b9a821923dc0a2bf48f07239c
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
