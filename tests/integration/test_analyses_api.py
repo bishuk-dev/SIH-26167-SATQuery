@@ -423,7 +423,7 @@ def test_rerun_does_not_inherit_original_answer_or_verification(tmp_path: Path) 
         # run's composed answer or verification payload.
         application.state.job_runner.enqueue_existing = _queue_full
         response = client.post(f"/api/v1/analyses/{submitted['analysis_id']}/rerun")
-        assert response.status_code == 503, response.text
+        assert response.status_code == 429, response.text
         rerun_id = response.json()["error"]["details"]["analysis_id"]
 
     rerun = repository.get_analysis(rerun_id)

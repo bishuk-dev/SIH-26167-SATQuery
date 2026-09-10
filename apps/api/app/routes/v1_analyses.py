@@ -451,7 +451,7 @@ def rerun_analysis_v1(request: Request, analysis_id: str) -> AnalysisRerunRespon
             code="RESOURCE_BUSY",
             message="The rerun job could not be queued because the local worker queue is full.",
             outcome=FailureOutcomeV1.ABSTAIN,
-            status_code=503,
+            status_code=429,
             request_id=request_id_from(request),
             details={"analysis_id": new_analysis_id, "job_id": new_job_id},
         )
