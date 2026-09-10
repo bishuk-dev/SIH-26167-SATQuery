@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WebGL Earth</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #000; }
+    #webgl { width: 100%; height: 100%; }
+    canvas { display: block; width: 100% !important; height: 100% !important; }
+  </style>
+</head>
+<body>
+  <div id="webgl"></div>
+
+  <script src="/webgl-earth-js/three.min.js"></script>
+  <script src="/webgl-earth-js/Detector.js"></script>
+  <script src="/webgl-earth-js/TrackballControls.js"></script>
+
+  <script>
+    (function () {
+      var webglEl = document.getElementById('webgl');
+
+      if (!Detector.webgl) {
+        Detector.addGetWebGLMessage(webglEl);
+        return;
+      }
+
+      var width  = window.innerWidth;
+      var height = window.innerHeight;
+
+      // Earth params
+      var radius   = 0.5;
+      var segments = 64;
+      var rotation = 6;
+
+      var scene = new THREE.Scene();
+
+      var camera = new THREE.PerspectiveCamera(45, width / height, 0.01, 1000);
+      // Shift camera to the right so the earth appears on the right side of the screen
+      camera.position.set(0.55, 0, 1.5);
+      camera.lookAt(new THREE.Vector3(0, 0, 0));
+
+      var renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setPixelRatio(window.devicePixelRatio || 1);
+      renderer.setSize(width, height);
+
+      scene.add(new THREE.AmbientLight(0x222244, 1.2));
+
+      var sunLight = new THREE.DirectionalLight(0xffffff, 1.4);
+      sunLight.position.set(5, 3, 5);
+      scene.add(sunLight);
+
+      var rimLight = new THREE.DirectionalLight(0x06b6d4, 0.6);
+      rimLight.position.set(-5, -2, -3);
+      scene.add(rimLight);
+
+      var sphere = createSphere(radius, segments);
+      sphere.rotation.y = rotation;
+      scene.add(sphere);
+
+      var clouds = createClouds(radius, segments);
+      clouds.rotation.y = rotation;
+      scene.add(clouds);
+
+      var stars = createStars(90, 64);
+      scene.add(stars);
+
+      var controls = new THREE.TrackballControls(camera);
+      controls.rotateSpeed = 0.5;
+      controls.noZoom = true;
+      controls.noPan = true;
+
+      webglEl.appendChild(renderer.domElement);
+
+      render();
+
+      function render() {
+        controls.update();
+        sphere.rotation.y += 0.0008;
+        clouds.rotation.y += 0.001;
+        requestAnimationFrame(render);
+        renderer.render(scene, camera);
+      }
+
+      function createSphere(radius, segments) {
+        var loader = new THREE.TextureLoader();
+        return new THREE.Mesh(
+          new THREE.SphereGeometry(radius, segments, segments),
+          new THREE.MeshPhongMaterial({
+            map:         loader.load('/webgl-earth-images/2_no_clouds_4k.jpg'),
+            bumpMap:     loader.load('/webgl-earth-images/elev_bump_4k.jpg'),
+            bumpScale:   0.005,
+            specularMap: loader.load('/webgl-earth-images/water_4k.png'),
+            specular:    new THREE.Color(0x1a3a5c),
+            shininess:   20
+          })
+        );
+      }
+
+      function createClouds(radius, segments) {
+        var loader = new THREE.TextureLoader();
+        return new THREE.Mesh(
+          new THREE.SphereGeometry(radius + 0.003, segments, segments),
+          new THREE.MeshPhongMaterial({
+            map:         loader.load('/webgl-earth-images/fair_clouds_4k.png'),
+            transparent: true,
+            opacity:     0.85
+          })
+        );
+      }
+
+      function createStars(radius, segments) {
+        var loader = new THREE.TextureLoader();
+        return new THREE.Mesh(
+          new THREE.SphereGeometry(radius, segments, segments),
+          new THREE.MeshBasicMaterial({
+            map:  loader.load('/webgl-earth-images/galaxy_starfield.png'),
+            side: THREE.BackSide
+          })
+        );
+      }
+
+      window.addEventListener('resize', function () {
+        width  = window.innerWidth;
+        height = window.innerHeight;
+        camera.aspect = width / height;
+        camera.updateProjectionMatrix();
+        renderer.setSize(width, height);
+        controls.handleResize();
+      });
+    }());
+  </script>
+</body>
+</html>

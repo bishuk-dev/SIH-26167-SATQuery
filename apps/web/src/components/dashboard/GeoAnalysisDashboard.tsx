@@ -1,1618 +1,551 @@
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
-  Satellite,
-  Layers,
-  Share2,
-  Download,
-  ZoomIn,
-  ZoomOut,
-  Maximize2,
-  Crosshair,
-  Ruler,
-  Info,
-  History,
-  BarChart3,
-  FileText,
-  Check,
-  ChevronRight,
-  Plus,
-  RefreshCw,
-  Sliders,
   Activity,
-  PanelLeftClose,
-  PanelLeftOpen,
-  PanelRightClose,
-  PanelRightOpen,
+  AlertTriangle,
+  ArrowLeft,
+  Check,
+  Copy,
+  Download,
+  ExternalLink,
+  FileText,
+  History,
+  LoaderCircle,
+  RefreshCw,
+  Satellite,
+  Square,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  apiUrl,
+  cancelJob,
+  getAnalysis,
+  getAnalysisReport,
+  getAnalysisTrace,
+  getJob,
+  getObservation,
+  rerunAnalysis,
+  SatQueryApiError,
+  submitQuery,
+  type AnalysisReport,
+  type AnalysisResponse,
+  type AnalysisStatus,
+  type JobResponse,
+  type ObservationResponse,
+  type QuerySubmissionResponse,
+  type TraceEvent,
+} from "@/lib/satquery-api";
 
 interface GeoAnalysisDashboardProps {
-  analysisId?: string;
+  analysisId: string;
+  jobId?: string;
   uploadedFileName?: string;
   uploadedFileSize?: string;
   initialQuery?: string;
+  initialObservation?: ObservationResponse;
   onBack: () => void;
+  onAnalysisCreated: (submission: QuerySubmissionResponse) => void;
+}
+
+const TERMINAL_ANALYSIS_STATUSES = new Set<AnalysisStatus>([
+  "SUCCEEDED",
+  "FAILED",
+  "ABSTAINED",
+  "REJECTED",
+  "CANCELLED",
+  "INTERRUPTED",
+]);
+
+const glassPanelStyle = {
+  background: "rgba(8, 12, 32, 0.78)",
+  backdropFilter: "blur(20px)",
+  WebkitBackdropFilter: "blur(20px)",
+  boxShadow:
+    "0 0 0 1px rgba(255,255,255,0.05), 0 20px 60px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.06)",
+};
+
+function formatDate(value?: string | null) {
+  if (!value) return "Not reported";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+}
+
+function formatBytes(value: number) {
+  if (value < 1024) return `${value} B`;
+  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
+  return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function statusTone(status: string) {
+  if (status === "SUCCEEDED") return "text-emerald-300 border-emerald-400/30 bg-emerald-400/10";
+  if (["FAILED", "REJECTED", "INTERRUPTED"].includes(status)) {
+    return "text-rose-300 border-rose-400/30 bg-rose-400/10";
+  }
+  if (["ABSTAINED", "CANCELLED", "CANCEL_REQUESTED"].includes(status)) {
+    return "text-amber-300 border-amber-400/30 bg-amber-400/10";
+  }
+  return "text-sky-300 border-sky-400/30 bg-sky-400/10";
+}
+
+function errorMessage(error: unknown) {
+  if (error instanceof SatQueryApiError) {
+    return `${error.outcome ? `${error.outcome}: ` : ""}${error.message}`;
+  }
+  return error instanceof Error ? error.message : "The analysis request failed.";
+}
+
+function previewTileUrl(observation?: ObservationResponse) {
+  if (!observation) return null;
+  const { tile_url_template: template, tile_scheme: scheme, tile_extent: extent } =
+    observation.visualization;
+  let z = 0;
+  let x = 0;
+  let y = 0;
+
+  if (scheme !== "pixel") {
+    const halfWorld = 20_037_508.342789244;
+    const span = Math.max(extent.right - extent.left, extent.top - extent.bottom);
+    if (Number.isFinite(span) && span > 0) {
+      z = Math.max(0, Math.min(14, Math.floor(Math.log2((halfWorld * 2) / span)) - 1));
+      const scale = 2 ** z;
+      const centerX = (extent.left + extent.right) / 2;
+      const centerY = (extent.bottom + extent.top) / 2;
+      x = Math.max(0, Math.min(scale - 1, Math.floor(((centerX + halfWorld) / (halfWorld * 2)) * scale)));
+      y = Math.max(0, Math.min(scale - 1, Math.floor(((halfWorld - centerY) / (halfWorld * 2)) * scale)));
+    }
+  }
+
+  return apiUrl(
+    template.replace("{z}", String(z)).replace("{x}", String(x)).replace("{y}", String(y))
+  );
 }
 
 export default function GeoAnalysisDashboard({
   analysisId,
-  uploadedFileName = "barcelona_port_multisensor.tif",
-  uploadedFileSize = "48.2 MB",
-  initialQuery = "Assess coastal port infrastructure changes between T0 and T1, and identify unpermitted shoreline backfill.",
+  jobId,
+  uploadedFileName = "Uploaded observation",
+  uploadedFileSize,
+  initialQuery = "",
+  initialObservation,
   onBack,
+  onAnalysisCreated,
 }: GeoAnalysisDashboardProps) {
-  // ─── State ──────────────────────────────────────────────────────────────
-  const [isLoading, setIsLoading] = useState(true);
+  const [analysis, setAnalysis] = useState<AnalysisResponse | null>(null);
+  const [job, setJob] = useState<JobResponse | null>(null);
+  const [report, setReport] = useState<AnalysisReport | null>(null);
+  const [observation, setObservation] = useState<ObservationResponse | null>(
+    initialObservation || null
+  );
+  const [trace, setTrace] = useState<TraceEvent[]>([]);
   const [query, setQuery] = useState(initialQuery);
-  const [isRerunning, setIsRerunning] = useState(false);
-  const [sliderPosition, setSliderPosition] = useState(50); // percentage
-  const [opticalOpacity, setOpticalOpacity] = useState(100);
-  const [showHeatmap, setShowHeatmap] = useState(true);
-  const [zoomLevel, setZoomLevel] = useState(1.0);
-  const [activeTab, setActiveTab] = useState<"active" | "bands" | "metadata">("active");
-  const [measureMode, setMeasureMode] = useState(false);
-  const [activeReticle, setActiveReticle] = useState<number | null>(null);
-  const [copiedShare, setCopiedShare] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [isActing, setIsActing] = useState(false);
+  const [showReport, setShowReport] = useState(false);
+  const [showTrace, setShowTrace] = useState(false);
+  const [failedPreviewUrl, setFailedPreviewUrl] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-    }, 1200);
-    return () => clearTimeout(timer);
-  }, []);
+    const controller = new AbortController();
+    let active = true;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let loadedObservationId = initialObservation?.observation_id;
 
-  const showSkeleton = isLoading || isRerunning;
+    async function refresh() {
+      try {
+        const [nextAnalysis, nextReport, nextTrace] = await Promise.all([
+          getAnalysis(analysisId, controller.signal),
+          getAnalysisReport(analysisId, controller.signal),
+          getAnalysisTrace(analysisId, controller.signal),
+        ]);
+        if (!active) return;
 
-  // Panels visibility
-  const [leftPanelOpen, setLeftPanelOpen] = useState(true);
-  const [rightPanelOpen, setRightPanelOpen] = useState(true);
+        const resolvedJobId = jobId || nextTrace.items.at(-1)?.job_id;
+        const nextJob = resolvedJobId ? await getJob(resolvedJobId, controller.signal) : null;
+        const observationId = nextReport.inputs.observation_ids[0] || nextAnalysis.observation_ids[0];
+        let nextObservation: ObservationResponse | null = null;
+        if (observationId && loadedObservationId !== observationId) {
+          nextObservation = await getObservation(observationId, controller.signal);
+          loadedObservationId = observationId;
+        }
+        if (!active) return;
 
-  // Feature overlay toggles
-  const [showBoundaries, setShowBoundaries] = useState(true);
-  const [showCorridors, setShowCorridors] = useState(true);
-  const [showReclamation, setShowReclamation] = useState(true);
+        setAnalysis(nextAnalysis);
+        setReport(nextReport);
+        setTrace(nextTrace.items);
+        if (nextJob) setJob(nextJob);
+        if (nextObservation) setObservation(nextObservation);
+        setQuery((current) => current || nextReport.query);
+        setLoadError(null);
 
-  // Modals
-  const [showReportModal, setShowReportModal] = useState(false);
-  const [showLogModal, setShowLogModal] = useState(false);
-  const [showHistogramsModal, setShowHistogramsModal] = useState(false);
-  const [showAddLayerModal, setShowAddLayerModal] = useState(false);
+        if (!TERMINAL_ANALYSIS_STATUSES.has(nextAnalysis.status)) {
+          timer = setTimeout(refresh, 1_200);
+        }
+      } catch (error) {
+        if (!active || controller.signal.aborted) return;
+        setLoadError(errorMessage(error));
+        timer = setTimeout(refresh, 3_000);
+      }
+    }
 
-  // ─── Swipe Dragging Logic ────────────────────────────────────────────────
-  const viewportRef = useRef<HTMLDivElement>(null);
-  const [isDragging, setIsDragging] = useState(false);
-
-  const handleDrag = useCallback((clientX: number) => {
-    if (!viewportRef.current) return;
-    const rect = viewportRef.current.getBoundingClientRect();
-    const x = clientX - rect.left;
-    const clamped = Math.max(0, Math.min(x, rect.width));
-    setSliderPosition((clamped / rect.width) * 100);
-  }, []);
-
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!isDragging) return;
-      handleDrag(e.clientX);
-    };
-    const handleMouseUp = () => {
-      if (isDragging) setIsDragging(false);
-    };
-
-    window.addEventListener("mousemove", handleMouseMove);
-    window.addEventListener("mouseup", handleMouseUp);
+    void refresh();
     return () => {
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("mouseup", handleMouseUp);
+      active = false;
+      controller.abort();
+      if (timer) clearTimeout(timer);
     };
-  }, [isDragging, handleDrag]);
+  }, [analysisId, initialObservation, jobId]);
 
-  const handleTouchMove = (e: React.TouchEvent) => {
-    if (!isDragging || !e.touches[0]) return;
-    handleDrag(e.touches[0].clientX);
-  };
+  const status = job?.status || analysis?.status || "LOADING";
+  const isProcessing = !analysis || !TERMINAL_ANALYSIS_STATUSES.has(analysis.status);
+  const previewUrl = useMemo(() => previewTileUrl(observation || undefined), [observation]);
+  const previewFailed = previewUrl !== null && failedPreviewUrl === previewUrl;
+  const answer = report?.answer;
+  const allWarnings = [
+    ...(observation?.warnings || []),
+    ...(report?.warnings || []),
+    ...(answer?.limitations || []),
+  ];
 
-  const handleRerun = () => {
-    setIsRerunning(true);
-    setTimeout(() => {
-      setIsRerunning(false);
-    }, 850);
-  };
+  async function handleRun() {
+    if (!report || !query.trim() || isActing) return;
+    setIsActing(true);
+    setActionError(null);
+    try {
+      const submission =
+        query.trim() === report.query.trim()
+          ? await rerunAnalysis(analysisId)
+          : await submitQuery(query.trim(), report.inputs.observation_ids);
+      onAnalysisCreated(submission);
+    } catch (error) {
+      setActionError(errorMessage(error));
+    } finally {
+      setIsActing(false);
+    }
+  }
 
-  const focusReticle = (id: number) => {
-    setActiveReticle((prev) => (prev === id ? null : id));
-  };
+  async function handleCancel() {
+    if (!job || isActing) return;
+    setIsActing(true);
+    setActionError(null);
+    try {
+      const response = await cancelJob(job.job_id);
+      setJob(response.job);
+    } catch (error) {
+      setActionError(errorMessage(error));
+    } finally {
+      setIsActing(false);
+    }
+  }
 
-  const handleShare = () => {
-    navigator.clipboard?.writeText(window.location.href);
-    setCopiedShare(true);
-    setTimeout(() => setCopiedShare(false), 2000);
-  };
+  function downloadReport() {
+    if (!report) return;
+    const url = URL.createObjectURL(
+      new Blob([JSON.stringify(report, null, 2)], { type: "application/json" })
+    );
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `${report.analysis_id}.json`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  }
 
-  // Glass style matching the home page frosted-glass container
-  const glassPanelStyle = {
-    background: "rgba(10, 10, 30, 0.72)",
-    backdropFilter: "blur(20px)",
-    WebkitBackdropFilter: "blur(20px)",
-    boxShadow:
-      "0 0 0 1px rgba(255,255,255,0.06), 0 20px 60px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.08)",
-  };
+  async function copyLink() {
+    await navigator.clipboard.writeText(window.location.href);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1_500);
+  }
 
   return (
-    <div className="relative w-screen h-screen overflow-hidden flex flex-col bg-[#050510] text-[#f0f6fc] font-sans select-none antialiased">
-      {/* Background Radial Gradient matching Home Page */}
+    <div className="relative flex h-screen w-screen flex-col overflow-hidden bg-[#050510] text-[#f0f6fc]">
       <div
-        className="absolute inset-0 pointer-events-none"
+        className="absolute inset-0 pointer-events-none opacity-35"
         style={{
-          background:
-            "radial-gradient(ellipse 120% 80% at 50% 110%, #1a1060 0%, #050510 70%)",
+          backgroundImage: "url('/earth/galaxy_starfield.png')",
+          backgroundPosition: "center",
+          backgroundSize: "cover",
         }}
       />
+      <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_at_center,rgba(24,52,110,0.2),rgba(5,5,16,0.92)_75%)]" />
 
-      {/* ══════════════════════════════════════════════════════════════════════
-          1. TOP NAVIGATION BAR (Enlarged & Spacious)
-      ══════════════════════════════════════════════════════════════════════ */}
-      {/* ══════════════════════════════════════════════════════════════════════
-          1. TOP NAVIGATION BAR (Height matches footer h-12)
-      ══════════════════════════════════════════════════════════════════════ */}
-      <header
-        style={{
-          background: "rgba(10, 10, 30, 0.7)",
-          backdropFilter: "blur(20px)",
-          WebkitBackdropFilter: "blur(20px)",
-        }}
-        className="relative z-50 h-12 border-b border-white/10 px-4 flex items-center justify-between shrink-0 shadow-lg text-xs"
-      >
-        {/* Left branding & context */}
-        <div className="flex items-center gap-3">
-          {/* Logo & Brand with back action */}
-          <div
-            onClick={onBack}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                onBack();
-              }
-            }}
-            className="flex items-center gap-2 cursor-pointer select-none group"
-            title="Return to Query Chat"
-          >
-            <Satellite className="w-4 h-4 text-white group-hover:scale-110 transition-transform" />
-            <span className="text-sm font-semibold tracking-tight text-white group-hover:text-neutral-200 transition-colors">
-              SatQuery
-            </span>
-          </div>
-
-          <div className="h-4 w-px bg-white/15 hidden sm:block" />
-
-          {/* Raster Context */}
-          <div className="hidden md:flex items-center gap-2 text-xs text-neutral-300">
-            {analysisId && (
-              <>
-                <span className="font-mono text-[10px] text-sky-300 bg-sky-500/10 border border-sky-400/20 px-2 py-0.5 rounded-full">
-                  ID: {analysisId}
-                </span>
-                <span className="w-1 h-1 rounded-full bg-white/20" />
-              </>
-            )}
-            <span className="text-neutral-500 font-light">Raster:</span>
-            <span className="font-mono text-[11px] text-neutral-200 bg-white/5 border border-white/10 px-2.5 py-0.5 rounded-full">
-              {uploadedFileName}
-            </span>
-            <span className="w-1 h-1 rounded-full bg-white/20" />
-            <span className="text-neutral-400 font-mono text-[11px]">
-              Sentinel-2 &amp; Sentinel-1 SAR
-            </span>
+      <header className="relative z-40 flex h-14 shrink-0 items-center justify-between border-b border-white/10 bg-[#080c20]/80 px-4 backdrop-blur-xl">
+        <div className="flex min-w-0 items-center gap-3">
+          <button type="button" onClick={onBack} className="rounded-lg p-2 text-neutral-400 hover:bg-white/10 hover:text-white" title="New analysis">
+            <ArrowLeft className="h-4 w-4" />
+          </button>
+          <Satellite className="h-5 w-5 text-cyan-300" />
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-semibold">SatQuery</span>
+              <span className={cn("rounded-full border px-2 py-0.5 font-mono text-[10px]", statusTone(status))}>
+                {status}
+              </span>
+            </div>
+            <p className="truncate font-mono text-[10px] text-neutral-500">{analysisId}</p>
           </div>
         </div>
 
-        {/* Right actions */}
         <div className="flex items-center gap-2">
-          {/* Status Pill */}
-          <div className="hidden sm:flex items-center gap-2 px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-neutral-300 text-xs font-mono">
-            {showSkeleton ? (
-              <>
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping shadow-[0_0_6px_#fbbf24]" />
-                <span className="text-amber-300">Co-registering T0/T1...</span>
-              </>
-            ) : (
-              <>
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_6px_#34d399]" />
-                <span>Ready • Co-registered T0/T1</span>
-              </>
-            )}
-          </div>
-
-          {/* Share Button */}
-          <button
-            type="button"
-            onClick={handleShare}
-            className="px-3 py-1 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 text-neutral-300 hover:text-white text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer"
-          >
-            {copiedShare ? (
-              <>
-                <Check className="w-3.5 h-3.5 text-emerald-400" />
-                <span className="text-emerald-400">Copied!</span>
-              </>
-            ) : (
-              <>
-                <Share2 className="w-3.5 h-3.5" />
-                <span className="hidden md:inline">Share</span>
-              </>
-            )}
+          <button type="button" onClick={copyLink} className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-neutral-300 hover:bg-white/10">
+            {copied ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
+            <span className="hidden sm:inline">{copied ? "Copied" : "Share"}</span>
           </button>
-
-          {/* Export Button (White Pill CTA) */}
-          <button
-            type="button"
-            onClick={() => setShowReportModal(true)}
-            className="px-3.5 py-1 rounded-full bg-white text-black hover:bg-neutral-200 text-xs font-medium flex items-center gap-1.5 transition-all shadow-md shadow-white/10 active:scale-95 cursor-pointer"
-          >
-            <Download className="w-3.5 h-3.5 stroke-[2.2]" />
-            <span>Export Analysis</span>
+          <button type="button" onClick={() => setShowReport(true)} disabled={!report} className="flex items-center gap-1.5 rounded-full bg-white px-3.5 py-1.5 text-xs font-medium text-black hover:bg-neutral-200 disabled:opacity-40">
+            <FileText className="h-3.5 w-3.5" />
+            Report
           </button>
         </div>
       </header>
 
-      {/* ══════════════════════════════════════════════════════════════════════
-          2. MAIN THREE-COLUMN WORKSPACE
-      ══════════════════════════════════════════════════════════════════════ */}
-      <main className="relative flex-1 flex overflow-hidden">
-        {/* ─────────────────────────────────────────────────────────────
-            LEFT PANEL: Geo-Query Assistant & Telemetry
-        ───────────────────────────────────────────────────────────── */}
-        <aside
-          style={glassPanelStyle}
-          className={cn(
-            "relative z-30 flex flex-col border-r border-white/10 transition-all duration-300 shrink-0",
-            leftPanelOpen ? "w-90 sm:w-96" : "w-0 overflow-hidden border-r-0"
-          )}
-        >
-          {/* Query Header */}
-          <div className="p-3.5 border-b border-white/10 bg-white/[0.02]">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-1.5 text-white">
-                
-                <span className="text-xs font-medium tracking-wide uppercase text-neutral-200">
-                  Geo-Query Assistant
-                </span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="text-[10px] font-mono text-sky-300 px-2 py-0.5 rounded-full bg-sky-500/10 border border-sky-400/20">
-                  AI ACTIVE
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setLeftPanelOpen(false)}
-                  className="p-1 text-neutral-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors cursor-pointer"
-                  title="Collapse panel"
-                >
-                  <PanelLeftClose className="w-4 h-4" />
+      {(loadError || actionError) && (
+        <div className="relative z-30 flex items-center gap-2 border-b border-rose-400/20 bg-rose-500/10 px-4 py-2 text-xs text-rose-200" role="alert">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          <span>{actionError || loadError}</span>
+        </div>
+      )}
+
+      <main className="relative z-10 flex min-h-0 flex-1">
+        <aside style={glassPanelStyle} className="hidden w-80 shrink-0 flex-col border-r border-white/10 lg:flex">
+          <div className="border-b border-white/10 p-4">
+            <div className="mb-2 flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase tracking-wider text-neutral-300">Geo-query</span>
+              <span className="text-[10px] text-neutral-500">500 characters max</span>
+            </div>
+            <textarea
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              maxLength={500}
+              rows={4}
+              className="w-full resize-none rounded-xl border border-white/10 bg-black/35 p-3 text-xs leading-relaxed text-white outline-none focus:border-cyan-400/40"
+            />
+            <div className="mt-2 flex gap-2">
+              <button type="button" onClick={handleRun} disabled={!report || !query.trim() || isActing || isProcessing} className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-white/10 px-3 py-2 text-xs font-medium hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-40">
+                <RefreshCw className={cn("h-3.5 w-3.5", isActing && "animate-spin")} />
+                {query.trim() === report?.query.trim() ? "Rerun frozen plan" : "Run updated query"}
+              </button>
+              {isProcessing && job && (
+                <button type="button" onClick={handleCancel} disabled={isActing} className="rounded-lg border border-white/10 p-2 text-neutral-400 hover:text-rose-300" title="Cancel job">
+                  <Square className="h-3.5 w-3.5" />
                 </button>
-              </div>
-            </div>
-
-            {/* Prompt input */}
-            <div className="relative">
-              <textarea
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                rows={3}
-                className="w-full bg-black/40 border border-white/10 rounded-xl p-3 pb-9 text-xs text-neutral-200 placeholder:text-neutral-500 focus:outline-none focus:border-white/25 resize-none font-sans leading-relaxed shadow-inner"
-                placeholder="Ask geospatial questions..."
-              />
-              <button
-                type="button"
-                onClick={handleRerun}
-                disabled={isRerunning}
-                title="Rerun Query"
-                className="absolute bottom-2 right-2 px-3 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-white font-medium text-[11px] border border-white/15 flex items-center gap-1.5 shadow-sm transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
-              >
-                <RefreshCw
-                  className={cn("w-3 h-3", isRerunning && "animate-spin")}
-                />
-                <span>{isRerunning ? "Analyzing..." : "Re-evaluate"}</span>
-              </button>
+              )}
             </div>
           </div>
 
-          {/* Scrollable Telemetry Cards */}
-          <div className="flex-1 overflow-y-auto p-3.5 space-y-3 custom-scrollbar">
-            {showSkeleton ? (
-              <div className="space-y-3 animate-pulse">
-                {/* Detection Summary Skeleton */}
-                <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3.5 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="w-3.5 h-3.5 rounded-full bg-white/20" />
-                      <div className="w-28 h-3.5 rounded bg-white/20" />
-                    </div>
-                    <div className="w-20 h-4 rounded-full bg-white/10" />
-                  </div>
-                  <div className="space-y-1.5 pt-1">
-                    <div className="w-full h-3 rounded bg-white/15" />
-                    <div className="w-4/5 h-3 rounded bg-white/10" />
-                  </div>
-                  <div className="w-full h-1.5 bg-white/10 rounded-full" />
-                </div>
-
-                {/* Evidence Points Skeleton */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between px-1">
-                    <div className="w-32 h-3 rounded bg-white/10" />
-                    <div className="w-14 h-3 rounded bg-white/10" />
-                  </div>
-                  {[1, 2, 3].map((i) => (
-                    <div key={i} className="p-3 rounded-xl border border-white/10 bg-white/[0.02] space-y-2.5">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <div className="w-4 h-4 rounded-full bg-white/15" />
-                          <div className="w-36 h-3.5 rounded bg-white/20" />
-                        </div>
-                        <div className="w-12 h-3 rounded bg-white/10" />
-                      </div>
-                      <div className="flex justify-between pl-6">
-                        <div className="w-24 h-2.5 rounded bg-white/10" />
-                        <div className="w-20 h-2.5 rounded bg-white/10" />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Context Note Skeleton */}
-                <div className="p-3 rounded-xl bg-white/[0.02] border border-white/10 flex items-start gap-2.5">
-                  <div className="w-4 h-4 rounded-full bg-white/15 shrink-0 mt-0.5" />
-                  <div className="w-full space-y-1.5">
-                    <div className="w-full h-2.5 rounded bg-white/10" />
-                    <div className="w-3/4 h-2.5 rounded bg-white/10" />
-                  </div>
-                </div>
+          <div className="custom-scrollbar flex-1 space-y-3 overflow-y-auto p-4">
+            <section className="rounded-2xl border border-white/10 bg-white/[0.035] p-4">
+              <div className="mb-2 flex items-center gap-2 text-xs font-semibold text-white">
+                {isProcessing ? <LoaderCircle className="h-4 w-4 animate-spin text-cyan-300" /> : <Activity className="h-4 w-4 text-emerald-300" />}
+                Verified answer
               </div>
-            ) : (
-              <>
-                {/* Detection Summary Card */}
-                <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3.5 space-y-2.5 shadow-sm">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1.5">
-                      <Activity className="w-3.5 h-3.5 text-sky-400" />
-                      <span className="text-xs font-medium text-white">
-                        Detection Summary
-                      </span>
-                    </div>
-                    <span className="text-[11px] font-mono text-neutral-200 bg-white/10 px-2 py-0.5 rounded-full border border-white/10">
-                      94.2% Confidence
-                    </span>
+              {answer?.answered ? (
+                <p className="text-xs leading-relaxed text-neutral-200">{answer.answer}</p>
+              ) : (
+                <p className="text-xs leading-relaxed text-neutral-400">
+                  {isProcessing
+                    ? "The backend is processing the frozen plan. No scientific answer is shown until verification completes."
+                    : `No verified answer was produced${answer?.outcome ? ` (${answer.outcome})` : ""}.`}
+                </p>
+              )}
+            </section>
+
+            {answer?.measurements.map((measurement) => (
+              <section key={measurement.evidence_id} className="rounded-2xl border border-cyan-400/20 bg-cyan-400/[0.05] p-4">
+                <p className="text-[10px] uppercase tracking-wider text-cyan-300">{measurement.measurement_type}</p>
+                <p className="mt-1 text-xl font-semibold text-white">{measurement.display_value}</p>
+                <p className="mt-2 text-[10px] leading-relaxed text-neutral-400">{measurement.method} • {measurement.calculation_crs}</p>
+              </section>
+            ))}
+
+            <section>
+              <div className="mb-2 flex items-center justify-between text-[11px] uppercase tracking-wider text-neutral-400">
+                <span>Evidence</span>
+                <span>{report?.evidence.length || 0}</span>
+              </div>
+              <div className="space-y-2">
+                {report?.evidence.map((item) => (
+                  <div key={item.evidence_id} className="rounded-xl border border-white/10 bg-white/[0.025] p-3">
+                    <p className="text-xs font-medium text-neutral-200">{item.task}</p>
+                    <p className="mt-1 truncate font-mono text-[9px] text-neutral-500">{item.evidence_id}</p>
                   </div>
-                  <p className="text-xs text-neutral-300 leading-relaxed font-light">
-                    Built-up expansion detected in <strong className="text-white font-medium">Zone B-4</strong>. Radar backscatter increased by{" "}
-                    <span className="text-sky-300 font-mono font-medium">+4.2 dB</span>, matching crane installations and eastern bulkhead reclamation.
-                  </p>
-                  <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-gradient-to-r from-blue-500 to-sky-400 rounded-full w-[94.2%]"
-                    />
-                  </div>
-                </div>
+                ))}
+                {!report?.evidence.length && <p className="text-xs text-neutral-500">No persisted evidence is available yet.</p>}
+              </div>
+            </section>
 
-                {/* Evidence Points */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-[11px] font-medium tracking-wider uppercase text-neutral-400 px-1">
-                    <span>Detected Evidence Points</span>
-                    <span className="text-sky-300 font-mono lowercase">3 verified</span>
-                  </div>
-
-                  {/* Point 1 */}
-                  <button
-                    type="button"
-                    onClick={() => focusReticle(1)}
-                    className={cn(
-                      "w-full text-left p-3 rounded-xl border transition-all group cursor-pointer",
-                      activeReticle === 1
-                        ? "border-white/30 bg-white/[0.08] shadow-lg shadow-black/40"
-                        : "border-white/10 bg-white/[0.02] hover:bg-white/[0.05] hover:border-white/20"
-                    )}
-                  >
-                    <div className="flex items-center justify-between mb-1">
-                      <div className="flex items-center gap-2">
-                        <span className="w-4 h-4 rounded-full bg-white/10 border border-white/20 text-white font-mono text-[10px] font-medium flex items-center justify-center">
-                          1
-                        </span>
-                        <span className="text-xs font-medium text-white">
-                          Shoreline Bulkhead Backfill
-                        </span>
-                      </div>
-                      <span className="font-mono text-[10px] text-neutral-400 group-hover:text-white flex items-center gap-0.5 group-hover:translate-x-0.5 transition-all">
-                        Inspect <ChevronRight className="w-3 h-3" />
-                      </span>
-                    </div>
-                    <div className="flex justify-between font-mono text-[11px] text-neutral-400 pl-6">
-                      <span className="text-neutral-300">+34,800 m² reclaimed</span>
-                      <span className="text-sky-300 font-medium">SAR Δ: +3.8 dB</span>
-                    </div>
-                  </button>
-
-                  {/* Point 2 */}
-                  <button
-                    type="button"
-                    onClick={() => focusReticle(2)}
-                    className={cn(
-                      "w-full text-left p-3 rounded-xl border transition-all group cursor-pointer",
-                      activeReticle === 2
-                        ? "border-white/30 bg-white/[0.08] shadow-lg shadow-black/40"
-                        : "border-white/10 bg-white/[0.02] hover:bg-white/[0.05] hover:border-white/20"
-                    )}
-                  >
-                    <div className="flex items-center justify-between mb-1">
-                      <div className="flex items-center gap-2">
-                        <span className="w-4 h-4 rounded-full bg-white/10 border border-white/20 text-white font-mono text-[10px] font-medium flex items-center justify-center">
-                          2
-                        </span>
-                        <span className="text-xs font-medium text-white">
-                          Crane &amp; Rail Infrastructure
-                        </span>
-                      </div>
-                      <span className="font-mono text-[10px] text-neutral-400 group-hover:text-white flex items-center gap-0.5 group-hover:translate-x-0.5 transition-all">
-                        Inspect <ChevronRight className="w-3 h-3" />
-                      </span>
-                    </div>
-                    <div className="flex justify-between font-mono text-[11px] text-neutral-400 pl-6">
-                      <span className="text-neutral-300">New Gantry Cranes</span>
-                      <span className="text-neutral-400">Berths 14-16</span>
-                    </div>
-                  </button>
-
-                  {/* Point 3 */}
-                  <button
-                    type="button"
-                    onClick={() => focusReticle(3)}
-                    className={cn(
-                      "w-full text-left p-3 rounded-xl border transition-all group cursor-pointer",
-                      activeReticle === 3
-                        ? "border-white/30 bg-white/[0.08] shadow-lg shadow-black/40"
-                        : "border-white/10 bg-white/[0.02] hover:bg-white/[0.05] hover:border-white/20"
-                    )}
-                  >
-                    <div className="flex items-center justify-between mb-1">
-                      <div className="flex items-center gap-2">
-                        <span className="w-4 h-4 rounded-full bg-white/10 border border-white/20 text-white font-mono text-[10px] font-medium flex items-center justify-center">
-                          3
-                        </span>
-                        <span className="text-xs font-medium text-white">
-                          Shipping Fairway Vessel Traffic
-                        </span>
-                      </div>
-                      <span className="font-mono text-[10px] text-neutral-400 group-hover:text-white flex items-center gap-0.5 group-hover:translate-x-0.5 transition-all">
-                        Inspect <ChevronRight className="w-3 h-3" />
-                      </span>
-                    </div>
-                    <div className="flex justify-between font-mono text-[11px] text-neutral-400 pl-6">
-                      <span className="text-neutral-300">8 active cargo transits</span>
-                      <span className="text-neutral-400">-14.2m channel</span>
-                    </div>
-                  </button>
-                </div>
-
-                {/* Tidal / Context Note */}
-                <div className="p-3 rounded-xl bg-white/[0.03] border border-white/10 text-neutral-300 flex items-start gap-2 text-xs font-light">
-                  <Info className="w-4 h-4 text-sky-400 shrink-0 mt-0.5" />
-                  <p className="text-[11px] leading-relaxed text-neutral-400">
-                    Low-tide delta at T0 (-0.42m) compensated via EMODnet bathymetric baseline model. False positive shoreline shifts rejected.
-                  </p>
-                </div>
-              </>
-            )}
-          </div>
-
-          {/* Bottom Action (White pill matching home page) */}
-          <div className="p-3.5 border-t border-white/10 bg-white/[0.02]">
-            {showSkeleton ? (
-              <div className="w-full h-10 rounded-xl bg-white/10 animate-pulse" />
-            ) : (
-              <button
-                type="button"
-                onClick={() => setShowReportModal(true)}
-                className="w-full py-2.5 bg-white text-black hover:bg-neutral-200 font-medium text-xs rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-white/10 active:scale-98 cursor-pointer"
-              >
-                <FileText className="w-3.5 h-3.5" />
-                <span>Generate Change Report</span>
-              </button>
+            {allWarnings.length > 0 && (
+              <section className="rounded-2xl border border-amber-400/20 bg-amber-400/[0.05] p-3 text-[11px] leading-relaxed text-amber-100/80">
+                <p className="mb-2 font-semibold text-amber-300">Warnings and limitations</p>
+                <ul className="space-y-1.5">
+                  {allWarnings.map((warning, index) => <li key={`${warning}-${index}`}>• {warning}</li>)}
+                </ul>
+              </section>
             )}
           </div>
         </aside>
 
-        {/* Collapsed Left Panel Opener */}
-        {!leftPanelOpen && (
-          <button
-            type="button"
-            onClick={() => setLeftPanelOpen(true)}
-            className="absolute top-4 left-4 z-40 p-2.5 rounded-xl bg-[rgba(10,10,30,0.85)] border border-white/15 text-white hover:bg-white/10 backdrop-blur-xl shadow-xl transition-all cursor-pointer"
-            title="Expand Assistant Panel"
-          >
-            <PanelLeftOpen className="w-4 h-4" />
-          </button>
-        )}
-
-        {/* ─────────────────────────────────────────────────────────────
-            CENTER HERO VIEWPORT: Interactive Dual-Sensor Swipe Canvas
-        ───────────────────────────────────────────────────────────── */}
-        <section className="relative flex-1 bg-[#050510] overflow-hidden flex items-center justify-center">
-          <div
-            ref={viewportRef}
-            className="relative w-full h-full select-none overflow-hidden cursor-default"
-            onTouchMove={handleTouchMove}
-          >
-            {/* Map Canvas Zoom & Pan Container */}
-            <div
-              className="w-full h-full relative transition-transform duration-200"
-              style={{
-                transform: `scale(${zoomLevel})`,
-                transformOrigin: "center center",
-              }}
-            >
-              {/* LAYER 1 (BOTTOM): Sentinel-1 SAR Radar Imagery */}
-              <div className="absolute inset-0 w-full h-full">
-                <img
-                  src="/sentinel-1-sar.jpg"
-                  alt="Sentinel-1 SAR C-band Radar Co-registered Imagery"
-                  className="w-full h-full object-cover select-none pointer-events-none filter contrast-125 brightness-105"
-                />
-
-                {/* SAR Watermark Badge */}
-                <div className="absolute top-4 right-4 bg-[rgba(10,10,30,0.85)] backdrop-blur-xl border border-white/15 px-3 py-1.5 rounded-full text-neutral-200 font-mono text-xs z-10 flex items-center gap-2 shadow-xl">
-                  <span className="w-2 h-2 rounded-full bg-sky-400 animate-pulse shadow-[0_0_8px_#38bdf8]" />
-                  <span>Sentinel-1 SAR (2024)</span>
-                </div>
+        <section className="relative flex min-w-0 flex-1 flex-col bg-black/25">
+          <div className="flex items-center justify-between border-b border-white/10 bg-black/20 px-4 py-2 text-[10px] text-neutral-400">
+            <span>{observation ? `Display-only ${observation.visualization.rendering} visualization` : "Observation preview"}</span>
+            <span className="font-mono">{observation?.visualization.tile_scheme || "waiting for metadata"}</span>
+          </div>
+          <div className="relative flex flex-1 items-center justify-center overflow-hidden p-5">
+            <div className="absolute inset-0 opacity-20 [background-image:linear-gradient(rgba(56,189,248,.15)_1px,transparent_1px),linear-gradient(90deg,rgba(56,189,248,.15)_1px,transparent_1px)] [background-size:32px_32px]" />
+            {previewUrl && !previewFailed ? (
+              <img
+                src={previewUrl}
+                alt={`Display visualization for ${observation?.asset.original_name || "uploaded observation"}`}
+                onError={() => setFailedPreviewUrl(previewUrl)}
+                className="relative max-h-full max-w-full rounded-2xl border border-white/10 object-contain shadow-2xl shadow-black/60"
+              />
+            ) : (
+              <div className="relative max-w-md rounded-3xl border border-white/10 bg-[#080c20]/75 p-8 text-center backdrop-blur-xl">
+                {isProcessing ? <LoaderCircle className="mx-auto h-8 w-8 animate-spin text-cyan-300" /> : <Satellite className="mx-auto h-8 w-8 text-neutral-500" />}
+                <p className="mt-4 text-sm font-medium text-neutral-200">
+                  {previewFailed ? "The display tile could not be rendered." : "Preparing observation visualization…"}
+                </p>
+                <p className="mt-2 text-xs leading-relaxed text-neutral-500">
+                  The original raster is never replaced by this display-only derivative.
+                </p>
               </div>
-
-              {/* LAYER 2 (TOP): Sentinel-2 Optical Imagery with Splitter Clip-Path */}
-              <div
-                className="absolute inset-0 w-full h-full overflow-hidden pointer-events-none"
-                style={{
-                  clipPath: `inset(0 ${100 - sliderPosition}% 0 0)`,
-                  opacity: opticalOpacity / 100,
-                  transition: isDragging ? "none" : "clip-path 0.1s ease-out",
-                }}
-              >
-                <img
-                  src="/sentinel-2-optical.jpg"
-                  alt="Sentinel-2 True Color Optical Satellite Ingest"
-                  className="absolute inset-0 w-full h-full object-cover select-none pointer-events-none"
-                />
-
-                {/* Optical Watermark Badge */}
-                <div className="absolute top-4 left-4 bg-[rgba(10,10,30,0.85)] backdrop-blur-xl border border-white/15 px-3 py-1.5 rounded-full text-neutral-200 font-mono text-xs z-10 flex items-center gap-2 shadow-xl pointer-events-auto">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400" />
-                  <span>Sentinel-2 Optical (2023)</span>
-                </div>
-              </div>
-
-              {/* Difference Heatmap / Feature Overlay Layer */}
-              {showHeatmap && (
-                <div
-                  className="absolute inset-0 w-full h-full pointer-events-none z-15 mix-blend-screen transition-opacity duration-300"
-                  style={{ opacity: showHeatmap ? 0.75 : 0 }}
-                >
-                  <svg className="w-full h-full" viewBox="0 0 1000 600" preserveAspectRatio="none">
-                    {showReclamation && (
-                      <path
-                        d="M 380,270 Q 430,260 480,280 L 460,320 Q 400,310 380,270 Z"
-                        fill="rgba(245, 158, 11, 0.4)"
-                        stroke="#f59e0b"
-                        strokeWidth="2"
-                        strokeDasharray="4 2"
-                        className="animate-pulse"
-                      />
-                    )}
-
-                    {showBoundaries && (
-                      <g stroke="#38bdf8" strokeWidth="2" fill="none" opacity="0.8">
-                        <rect x="420" y="245" width="22" height="15" rx="2" fill="rgba(56, 189, 248, 0.25)" />
-                        <rect x="450" y="245" width="22" height="15" rx="2" fill="rgba(56, 189, 248, 0.25)" />
-                        <rect x="580" y="250" width="22" height="15" rx="2" fill="rgba(56, 189, 248, 0.25)" />
-                        <rect x="610" y="250" width="22" height="15" rx="2" fill="rgba(56, 189, 248, 0.25)" />
-                      </g>
-                    )}
-
-                    {showCorridors && (
-                      <path
-                        d="M 120,330 C 300,280 500,220 850,220"
-                        stroke="rgba(6, 182, 212, 0.6)"
-                        strokeWidth="2"
-                        strokeDasharray="6 4"
-                        fill="none"
-                      />
-                    )}
-                  </svg>
-                </div>
-              )}
-
-              {/* Co-registration / Calibration Scanner Overlay when showSkeleton */}
-              {showSkeleton && (
-                <div className="absolute inset-0 z-20 bg-black/40 backdrop-blur-[2px] flex flex-col items-center justify-center pointer-events-none transition-all duration-300">
-                  <div className="relative w-44 h-44 rounded-full border border-sky-400/30 flex items-center justify-center">
-                    <div className="absolute inset-0 rounded-full border border-sky-400/15 animate-ping" />
-                    <div className="w-28 h-28 rounded-full border border-white/20 flex items-center justify-center">
-                      <div className="w-14 h-14 rounded-full border border-sky-400/40 animate-pulse flex items-center justify-center bg-sky-500/10">
-                        <Satellite className="w-6 h-6 text-sky-400 animate-spin" style={{ animationDuration: "3s" }} />
-                      </div>
-                    </div>
-                    {/* Rotating radar sweep */}
-                    <div className="absolute inset-0 origin-center animate-[spin_2.5s_linear_infinite] bg-gradient-to-tr from-sky-500/20 via-transparent to-transparent rounded-full" />
-                  </div>
-
-                  <div className="mt-5 px-4 py-2 rounded-full bg-[rgba(10,10,30,0.85)] border border-white/15 backdrop-blur-xl shadow-2xl flex items-center gap-2.5">
-                    <span className="w-2 h-2 rounded-full bg-sky-400 animate-pulse shadow-[0_0_8px_#38bdf8]" />
-                    <span className="text-xs font-mono text-neutral-200">
-                      Co-registering S2 Optical &amp; S1 SAR rasters...
-                    </span>
-                  </div>
-                  <div className="mt-2 text-[11px] font-mono text-neutral-400">
-                    EPSG:32631 • Resampling 10m grid • Sigma-0 Calibration
-                  </div>
-                </div>
-              )}
-
-              {!showSkeleton && (
-                <>
-                  {/* ─── RETICLE MARKER 1: Bulkhead Reclamation ─── */}
-                  <div
-                    className={cn(
-                      "absolute top-[44%] left-[36%] z-25 cursor-pointer transition-all duration-300 group",
-                      activeReticle === 1 && "scale-115"
-                    )}
-                    onClick={() => focusReticle(1)}
-                  >
-                    <div className="relative">
-                      <span className="w-6 h-6 rounded-full bg-[rgba(10,10,30,0.85)] backdrop-blur-md border border-white/40 text-white flex items-center justify-center text-xs font-medium shadow-xl hover:scale-110 transition-transform">
-                        1
-                      </span>
-                      {/* Frosted Tooltip Card */}
-                      <div
-                        style={glassPanelStyle}
-                        className={cn(
-                          "absolute left-8 -top-3 w-56 p-3 rounded-2xl border border-white/15 transition-all z-30",
-                          activeReticle === 1 ? "opacity-100 scale-100" : "opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto"
-                        )}
-                      >
-                        <div className="flex items-center justify-between text-white text-xs font-medium mb-1">
-                          <span>Bulkhead Reclamation</span>
-                          <span className="text-[10px] font-mono bg-white/10 px-1.5 py-0.2 rounded-full text-neutral-300">
-                            +34,800m²
-                          </span>
-                        </div>
-                        <p className="text-[11px] text-neutral-300 font-light leading-relaxed">
-                          Unpermitted shoreline infill identified between T0 &amp; T1. Radar backscatter shift +3.8 dB.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* ─── RETICLE MARKER 2: Berth Expansion ─── */}
-                  <div
-                    className={cn(
-                      "absolute top-[26%] left-[62%] z-25 cursor-pointer transition-all duration-300 group",
-                      activeReticle === 2 && "scale-115"
-                    )}
-                    onClick={() => focusReticle(2)}
-                  >
-                    <div className="relative">
-                      <span className="w-6 h-6 rounded-full bg-[rgba(10,10,30,0.85)] backdrop-blur-md border border-white/40 text-white flex items-center justify-center text-xs font-medium shadow-xl hover:scale-110 transition-transform">
-                        2
-                      </span>
-                      {/* Frosted Tooltip Card */}
-                      <div
-                        style={glassPanelStyle}
-                        className={cn(
-                          "absolute left-8 -top-3 w-56 p-3 rounded-2xl border border-white/15 transition-all z-30",
-                          activeReticle === 2 ? "opacity-100 scale-100" : "opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto"
-                        )}
-                      >
-                        <div className="flex items-center justify-between text-white text-xs font-medium mb-1">
-                          <span>Berth Expansion</span>
-                          <span className="text-[10px] font-mono bg-white/10 px-1.5 py-0.2 rounded-full text-neutral-300">
-                            +4.2 dB
-                          </span>
-                        </div>
-                        <p className="text-[11px] text-neutral-300 font-light leading-relaxed">
-                          SAR radar double-bounce: newly added rail-mounted gantry cranes.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* ─── RETICLE MARKER 3: Fairway Channel ─── */}
-                  <div
-                    className={cn(
-                      "absolute top-[68%] left-[64%] z-25 cursor-pointer transition-all duration-300 group",
-                      activeReticle === 3 && "scale-115"
-                    )}
-                    onClick={() => focusReticle(3)}
-                  >
-                    <div className="relative">
-                      <span className="w-6 h-6 rounded-full bg-[rgba(10,10,30,0.85)] backdrop-blur-md border border-white/40 text-white flex items-center justify-center text-xs font-medium shadow-xl hover:scale-110 transition-transform">
-                        3
-                      </span>
-                      {/* Frosted Tooltip Card */}
-                      <div
-                        style={glassPanelStyle}
-                        className={cn(
-                          "absolute left-8 -top-3 w-56 p-3 rounded-2xl border border-white/15 transition-all z-30",
-                          activeReticle === 3 ? "opacity-100 scale-100" : "opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto"
-                        )}
-                      >
-                        <div className="flex items-center justify-between text-white text-xs font-medium mb-1">
-                          <span>Fairway Channel</span>
-                          <span className="text-[10px] font-mono bg-white/10 px-1.5 py-0.2 rounded-full text-neutral-300">
-                            8 vessels
-                          </span>
-                        </div>
-                        <p className="text-[11px] text-neutral-300 font-light leading-relaxed">
-                          Verified acoustic and radar transit signatures at -14.2m channel depth.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </>
-              )}
-
-              {/* Measure tool cursor indicator */}
-              {measureMode && (
-                <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                  <div className="px-3.5 py-2 rounded-full bg-black/80 backdrop-blur-md border border-white/20 text-neutral-200 font-mono text-xs flex items-center gap-2 shadow-2xl">
-                    <Crosshair className="w-3.5 h-3.5 animate-spin" />
-                    <span>Crosshair active: Click &amp; drag to measure distance</span>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* ─── INTERACTIVE SWIPE SLIDER BAR ─── */}
-            <div
-              className="absolute top-0 bottom-0 w-px bg-white/50 shadow-[0_0_12px_rgba(255,255,255,0.4)] cursor-ew-resize z-30"
-              style={{
-                left: `${sliderPosition}%`,
-                transition: isDragging ? "none" : "left 0.1s ease-out",
-              }}
-              onMouseDown={(e) => {
-                e.preventDefault();
-                setIsDragging(true);
-              }}
-              onTouchStart={() => setIsDragging(true)}
-            >
-              {/* Drag Handle */}
-              <div
-                className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-8 h-8 rounded-full bg-[rgba(10,10,30,0.9)] backdrop-blur-xl border border-white/40 text-white flex items-center justify-center shadow-2xl pointer-events-auto hover:scale-110 active:scale-95 transition-transform cursor-ew-resize"
-                title="Drag to compare Optical vs SAR"
-              >
-                <div className="flex items-center gap-1 text-[10px] font-bold text-neutral-300">
-                  <span>‹</span>
-                  <span>›</span>
-                </div>
-              </div>
-            </div>
-
-            {/* ─── BOTTOM HUD CONTROLS (Matching Home Page Pill Buttons) ─── */}
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-[rgba(10,10,30,0.75)] backdrop-blur-xl border border-white/10 px-2.5 py-1.5 rounded-full flex items-center gap-1.5 shadow-2xl z-30">
-              <button
-                type="button"
-                onClick={() => setZoomLevel((prev) => Math.min(prev + 0.25, 2.5))}
-                className="p-1.5 rounded-full hover:bg-white/10 text-neutral-300 hover:text-white transition-colors cursor-pointer"
-                title="Zoom In"
-              >
-                <ZoomIn className="w-4 h-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => setZoomLevel((prev) => Math.max(prev - 0.25, 1.0))}
-                className="p-1.5 rounded-full hover:bg-white/10 text-neutral-300 hover:text-white transition-colors cursor-pointer"
-                title="Zoom Out"
-              >
-                <ZoomOut className="w-4 h-4" />
-              </button>
-
-              <div className="h-4 w-px bg-white/15" />
-
-              <button
-                type="button"
-                onClick={() => setMeasureMode((prev) => !prev)}
-                className={cn(
-                  "p-1.5 rounded-full transition-colors cursor-pointer",
-                  measureMode
-                    ? "bg-white text-black"
-                    : "hover:bg-white/10 text-neutral-300 hover:text-white"
-                )}
-                title="Measurement Tool"
-              >
-                <Ruler className="w-4 h-4" />
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setZoomLevel(1.0);
-                  setSliderPosition(50);
-                }}
-                className="p-1.5 rounded-full hover:bg-white/10 text-neutral-300 hover:text-white transition-colors cursor-pointer"
-                title="Reset View Extent"
-              >
-                <Maximize2 className="w-4 h-4" />
-              </button>
-
-              <div className="h-4 w-px bg-white/15" />
-
-              <button
-                type="button"
-                onClick={() => setShowHeatmap((prev) => !prev)}
-                className={cn(
-                  "px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer",
-                  showHeatmap
-                    ? "bg-white text-black font-medium shadow-sm"
-                    : "hover:bg-white/10 text-neutral-400 hover:text-white"
-                )}
-              >
-                <span className={cn("w-2 h-2 rounded-full", showHeatmap ? "bg-amber-500" : "bg-neutral-500")} />
-                <span>Heatmap</span>
-              </button>
-            </div>
+            )}
           </div>
         </section>
 
-        {/* Collapsed Right Panel Opener */}
-        {!rightPanelOpen && (
-          <button
-            type="button"
-            onClick={() => setRightPanelOpen(true)}
-            className="absolute top-4 right-4 z-40 p-2.5 rounded-xl bg-[rgba(10,10,30,0.85)] border border-white/15 text-white hover:bg-white/10 backdrop-blur-xl shadow-xl transition-all cursor-pointer"
-            title="Expand Layer Panel"
-          >
-            <PanelRightOpen className="w-4 h-4" />
-          </button>
-        )}
-
-        {/* ─────────────────────────────────────────────────────────────
-            RIGHT PANEL: Image Layers & Controls
-        ───────────────────────────────────────────────────────────── */}
-        <aside
-          style={glassPanelStyle}
-          className={cn(
-            "relative z-30 flex flex-col border-l border-white/10 transition-all duration-300 shrink-0",
-            rightPanelOpen ? "w-80 sm:w-84" : "w-0 overflow-hidden border-l-0"
-          )}
-        >
-          {/* Header & Tabs */}
-          <div className="p-3.5 border-b border-white/10 bg-white/[0.02]">
-            <div className="flex items-center justify-between mb-2.5">
-              <div className="flex items-center gap-2 text-white">
-                <Layers className="w-4 h-4 text-sky-400" />
-                <span className="text-xs font-medium tracking-wide uppercase text-neutral-200">
-                  Image Layers
-                </span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="text-[11px] font-mono text-neutral-400">2 Co-registered</span>
-                <button
-                  type="button"
-                  onClick={() => setRightPanelOpen(false)}
-                  className="p-1 text-neutral-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors cursor-pointer"
-                  title="Collapse panel"
-                >
-                  <PanelRightClose className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-
-            {/* Sub-Tabs: Active, Bands, Metadata */}
-            <div className="grid grid-cols-3 gap-1 bg-white/[0.04] p-1 rounded-xl border border-white/10 text-xs">
-              <button
-                type="button"
-                onClick={() => setActiveTab("active")}
-                className={cn(
-                  "py-1.5 text-center font-medium rounded-lg transition-all cursor-pointer",
-                  activeTab === "active"
-                    ? "bg-white text-black font-medium shadow-sm"
-                    : "text-neutral-400 hover:text-white"
-                )}
-              >
-                Active
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab("bands")}
-                className={cn(
-                  "py-1.5 text-center font-medium rounded-lg transition-all cursor-pointer",
-                  activeTab === "bands"
-                    ? "bg-white text-black font-medium shadow-sm"
-                    : "text-neutral-400 hover:text-white"
-                )}
-              >
-                Bands
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab("metadata")}
-                className={cn(
-                  "py-1.5 text-center font-medium rounded-lg transition-all cursor-pointer",
-                  activeTab === "metadata"
-                    ? "bg-white text-black font-medium shadow-sm"
-                    : "text-neutral-400 hover:text-white"
-                )}
-              >
-                Metadata
-              </button>
-            </div>
+        <aside style={glassPanelStyle} className="hidden w-80 shrink-0 flex-col border-l border-white/10 xl:flex">
+          <div className="border-b border-white/10 p-4">
+            <p className="text-xs font-semibold uppercase tracking-wider text-neutral-300">Observation metadata</p>
+            <p className="mt-2 truncate text-xs text-white">{observation?.asset.original_name || uploadedFileName}</p>
+            {uploadedFileSize && <p className="mt-1 text-[10px] text-neutral-500">Client upload: {uploadedFileSize}</p>}
           </div>
-
-          {/* Scrollable Layers / Details */}
-          <div className="flex-1 overflow-y-auto p-3.5 space-y-3 custom-scrollbar">
-            {showSkeleton ? (
-              <div className="space-y-3 animate-pulse">
-                {/* Optical Baseline Skeleton */}
-                <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3.5 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-emerald-400/40" />
-                      <div className="w-32 h-3.5 rounded bg-white/20" />
-                    </div>
-                    <div className="w-16 h-4 rounded-full bg-white/10" />
-                  </div>
-                  <div className="space-y-2 pt-1">
-                    <div className="flex justify-between">
-                      <div className="w-12 h-2.5 rounded bg-white/10" />
-                      <div className="w-24 h-2.5 rounded bg-white/15" />
-                    </div>
-                    <div className="flex justify-between">
-                      <div className="w-16 h-2.5 rounded bg-white/10" />
-                      <div className="w-20 h-2.5 rounded bg-white/15" />
-                    </div>
-                    <div className="flex justify-between">
-                      <div className="w-20 h-2.5 rounded bg-white/10" />
-                      <div className="w-16 h-2.5 rounded bg-white/15" />
-                    </div>
-                  </div>
-                </div>
-
-                {/* SAR Observation Skeleton */}
-                <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3.5 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-sky-400/40" />
-                      <div className="w-36 h-3.5 rounded bg-white/20" />
-                    </div>
-                    <div className="w-16 h-4 rounded-full bg-white/10" />
-                  </div>
-                  <div className="space-y-2 pt-1">
-                    <div className="flex justify-between">
-                      <div className="w-12 h-2.5 rounded bg-white/10" />
-                      <div className="w-24 h-2.5 rounded bg-white/15" />
-                    </div>
-                    <div className="flex justify-between">
-                      <div className="w-16 h-2.5 rounded bg-white/10" />
-                      <div className="w-20 h-2.5 rounded bg-white/15" />
-                    </div>
-                    <div className="flex justify-between">
-                      <div className="w-24 h-2.5 rounded bg-white/10" />
-                      <div className="w-18 h-2.5 rounded bg-white/15" />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Opacity Slider Skeleton */}
-                <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3.5 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="w-28 h-3 rounded bg-white/20" />
-                    <div className="w-8 h-3 rounded bg-white/15" />
-                  </div>
-                  <div className="w-full h-1.5 rounded-lg bg-white/10" />
-                  <div className="flex items-center justify-between pt-1">
-                    <div className="w-28 h-3 rounded bg-white/10" />
-                    <div className="w-9 h-5 rounded-full bg-white/10" />
-                  </div>
-                </div>
-
-                {/* Feature Overlays Skeleton */}
-                <div className="pt-1 space-y-2">
-                  <div className="w-24 h-3 rounded bg-white/10 px-1" />
-                  <div className="space-y-1.5">
-                    {[1, 2, 3].map((i) => (
-                      <div key={i} className="py-2.5 px-3 rounded-xl bg-white/[0.02] border border-white/5 flex items-center justify-between">
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-3.5 h-3.5 rounded bg-white/15" />
-                          <div className="w-32 h-3 rounded bg-white/15" />
-                        </div>
-                        <div className="w-14 h-2.5 rounded bg-white/10" />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <>
-                {activeTab === "active" && (
-                  <>
-                    {/* Optical Baseline Card */}
-                    <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3.5 space-y-2 shadow-sm">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <span className="w-2 h-2 rounded-full bg-emerald-400" />
-                          <span className="text-xs font-medium text-white">
-                            Optical Baseline (T0)
-                          </span>
-                        </div>
-                        <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-white/10 text-neutral-300">
-                          Apr 2023
-                        </span>
-                      </div>
-                      <div className="text-xs text-neutral-400 font-light space-y-1">
-                        <div className="flex justify-between">
-                          <span>Source</span>
-                          <span className="text-neutral-200 font-mono text-[11px]">Sentinel-2B MSI</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>Resolution</span>
-                          <span className="text-neutral-200 font-mono text-[11px]">10m / px (RGB)</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>Cloud Cover</span>
-                          <span className="text-neutral-200 font-mono text-[11px]">0.4% (Clear)</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* SAR Observation Card */}
-                    <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3.5 space-y-2 shadow-sm">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <span className="w-2 h-2 rounded-full bg-sky-400" />
-                          <span className="text-xs font-medium text-white">
-                            Synthetic Aperture Radar (T1)
-                          </span>
-                        </div>
-                        <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-white/10 text-neutral-300">
-                          Mar 2024
-                        </span>
-                      </div>
-                      <div className="text-xs text-neutral-400 font-light space-y-1">
-                        <div className="flex justify-between">
-                          <span>Sensor</span>
-                          <span className="text-neutral-200 font-mono text-[11px]">Sentinel-1 C-Band</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>Polarization</span>
-                          <span className="text-neutral-200 font-mono text-[11px]">VV + VH Dual</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>Backscatter Shift</span>
-                          <span className="text-sky-300 font-mono text-[11px] font-medium">
-                            +4.2 dB Sigma-0
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Layer Opacity Slider */}
-                    <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3.5 space-y-2.5 shadow-sm">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="font-medium text-white">Optical Layer Opacity</span>
-                        <span className="text-neutral-300 font-mono text-[11px]">
-                          {opticalOpacity}%
-                        </span>
-                      </div>
-                      <input
-                        type="range"
-                        min="0"
-                        max="100"
-                        value={opticalOpacity}
-                        onChange={(e) => setOpticalOpacity(Number(e.target.value))}
-                        className="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-white"
-                      />
-
-                      {/* Difference Heatmap Toggle */}
-                      <div className="flex items-center justify-between pt-1 text-xs">
-                        <div className="flex items-center gap-1.5 text-neutral-300 font-light">
-                          <Sliders className="w-3.5 h-3.5 text-amber-400" />
-                          <span>Highlight Change Areas</span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => setShowHeatmap((prev) => !prev)}
-                          className={cn(
-                            "w-9 h-5 rounded-full relative transition-colors duration-200 cursor-pointer shadow-inner",
-                            showHeatmap ? "bg-white" : "bg-white/10"
-                          )}
-                        >
-                          <span
-                            className={cn(
-                              "absolute top-0.5 w-4 h-4 rounded-full transition-all duration-200 shadow-sm",
-                              showHeatmap ? "left-4.5 bg-black" : "left-0.5 bg-white"
-                            )}
-                          />
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Feature Overlays */}
-                    <div className="pt-1 space-y-2">
-                      <span className="text-[11px] font-medium tracking-wider uppercase text-neutral-400 px-1">
-                        Feature Overlays
-                      </span>
-                      <div className="space-y-1.5 text-xs">
-                        <label className="flex items-center justify-between py-2 px-3 rounded-xl bg-white/[0.02] hover:bg-white/[0.05] border border-white/5 cursor-pointer transition-all">
-                          <div className="flex items-center gap-2.5">
-                            <input
-                              type="checkbox"
-                              checked={showBoundaries}
-                              onChange={(e) => setShowBoundaries(e.target.checked)}
-                              className="rounded border-white/20 bg-black text-white focus:ring-0 w-3.5 h-3.5"
-                            />
-                            <span className="text-neutral-200 font-light">Terminals &amp; Port Boundary</span>
-                          </div>
-                          <span className="text-neutral-500 font-mono text-[11px]">14 zones</span>
-                        </label>
-
-                        <label className="flex items-center justify-between py-2 px-3 rounded-xl bg-white/[0.02] hover:bg-white/[0.05] border border-white/5 cursor-pointer transition-all">
-                          <div className="flex items-center gap-2.5">
-                            <input
-                              type="checkbox"
-                              checked={showCorridors}
-                              onChange={(e) => setShowCorridors(e.target.checked)}
-                              className="rounded border-white/20 bg-black text-white focus:ring-0 w-3.5 h-3.5"
-                            />
-                            <span className="text-neutral-200 font-light">Navigational Corridors</span>
-                          </div>
-                          <span className="text-neutral-500 font-mono text-[11px]">3 lanes</span>
-                        </label>
-
-                        <label className="flex items-center justify-between py-2 px-3 rounded-xl bg-white/[0.02] hover:bg-white/[0.05] border border-white/5 cursor-pointer transition-all">
-                          <div className="flex items-center gap-2.5">
-                            <input
-                              type="checkbox"
-                              checked={showReclamation}
-                              onChange={(e) => setShowReclamation(e.target.checked)}
-                              className="rounded border-white/20 bg-black text-white focus:ring-0 w-3.5 h-3.5"
-                            />
-                            <span className="text-neutral-200 font-light">Identified Reclamation</span>
-                          </div>
-                          <span className="text-amber-300 font-mono text-[11px] font-medium">+34.8k m²</span>
-                        </label>
-                      </div>
-                    </div>
-                  </>
-                )}
-
-                {activeTab === "bands" && (
-                  <div className="space-y-3 text-xs">
-                    <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3.5 space-y-2">
-                      <span className="font-medium text-white">Sentinel-2 Spectral Bands</span>
-                      <div className="space-y-1 text-neutral-300 font-mono text-[11px]">
-                        <div className="flex justify-between py-1 border-b border-white/5">
-                          <span>B02 (Blue 490 nm)</span>
-                          <span className="text-neutral-300">10m</span>
-                        </div>
-                        <div className="flex justify-between py-1 border-b border-white/5">
-                          <span>B03 (Green 560 nm)</span>
-                          <span className="text-neutral-300">10m</span>
-                        </div>
-                        <div className="flex justify-between py-1 border-b border-white/5">
-                          <span>B04 (Red 665 nm)</span>
-                          <span className="text-neutral-300">10m</span>
-                        </div>
-                        <div className="flex justify-between py-1">
-                          <span>B08 (NIR 842 nm)</span>
-                          <span className="text-neutral-300">10m</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3.5 space-y-2">
-                      <span className="font-medium text-white">Sentinel-1 Radar Polarization</span>
-                      <div className="space-y-1 text-neutral-300 font-mono text-[11px]">
-                        <div className="flex justify-between py-1 border-b border-white/5">
-                          <span>VV (Vertical-Vertical)</span>
-                          <span className="text-neutral-300">Calibrated</span>
-                        </div>
-                        <div className="flex justify-between py-1">
-                          <span>VH (Vertical-Horizontal)</span>
-                          <span className="text-neutral-300">Calibrated</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {activeTab === "metadata" && (
-                  <div className="space-y-3 text-xs">
-                    <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3.5 space-y-2">
-                      <span className="font-medium text-white">Geospatial CRS &amp; Coordinates</span>
-                      <div className="space-y-1.5 text-neutral-400 font-mono text-[11px]">
-                        <div className="flex justify-between">
-                          <span>CRS</span>
-                          <span className="text-neutral-200">EPSG:32631</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>UTM Zone</span>
-                          <span className="text-neutral-200">31N (WGS84)</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>Bounding Box</span>
-                          <span className="text-neutral-200 text-[10px]">2.14°E, 41.34°N</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>Radiometric Unit</span>
-                          <span className="text-sky-300">Sigma-0 (dB)</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-
-          {/* Right panel bottom button */}
-          <div className="p-3.5 border-t border-white/10 bg-white/[0.02]">
-            {showSkeleton ? (
-              <div className="w-full h-10 rounded-xl bg-white/10 animate-pulse" />
-            ) : (
-              <button
-                type="button"
-                onClick={() => setShowAddLayerModal(true)}
-                className="w-full py-2.5 bg-white/5 hover:bg-white/10 text-neutral-200 hover:text-white border border-white/10 hover:border-white/20 font-medium text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Add Imagery Layer</span>
-              </button>
-            )}
+          <div className="custom-scrollbar flex-1 space-y-4 overflow-y-auto p-4 text-xs">
+            <MetadataGroup title="Raster">
+              <MetadataRow label="Driver" value={observation?.metadata.raster.driver} />
+              <MetadataRow label="Dimensions" value={observation ? `${observation.metadata.raster.width} × ${observation.metadata.raster.height}` : undefined} />
+              <MetadataRow label="Bands" value={observation?.metadata.raster.band_count} />
+              <MetadataRow label="Data types" value={observation?.metadata.raster.dtypes.join(", ")} />
+            </MetadataGroup>
+            <MetadataGroup title="Sensor">
+              <MetadataRow label="Modality" value={observation?.metadata.sensor.modality} />
+              <MetadataRow label="Sensor" value={observation?.metadata.sensor.sensor_name} />
+              <MetadataRow label="Platform" value={observation?.metadata.sensor.platform} />
+              <MetadataRow label="Product" value={observation?.metadata.sensor.product_level} />
+              <MetadataRow label="Polarizations" value={observation?.metadata.sensor.polarizations.join(", ")} />
+            </MetadataGroup>
+            <MetadataGroup title="Geospatial">
+              <MetadataRow label="CRS" value={observation?.metadata.geo.crs} />
+              <MetadataRow label="GSD X" value={observation?.metadata.geo.native_gsd_x} />
+              <MetadataRow label="GSD Y" value={observation?.metadata.geo.native_gsd_y} />
+              <MetadataRow label="Units" value={observation?.metadata.geo.units} />
+              <MetadataRow label="Quality" value={observation?.validity.metadata_quality} />
+            </MetadataGroup>
+            <MetadataGroup title="Provenance">
+              <MetadataRow label="Acquired" value={formatDate(observation?.metadata.temporal.acquisition_time)} />
+              <MetadataRow label="Ingested" value={formatDate(observation?.metadata.provenance.created_at)} />
+              <MetadataRow label="Ingestion version" value={observation?.metadata.provenance.ingestion_version} />
+              <MetadataRow label="Source SHA-256" value={observation?.asset.sha256 ? `${observation.asset.sha256.slice(0, 16)}…` : undefined} />
+            </MetadataGroup>
+            <MetadataGroup title="Frozen workflow">
+              <MetadataRow label="Intent" value={String(report?.intent.task_family || analysis?.intent || "Not reported")} />
+              <MetadataRow label="Feasibility" value={report?.feasibility_outcome} />
+              <MetadataRow label="Steps" value={report?.workflow.steps.length} />
+              <MetadataRow label="Registry" value={report?.workflow.registry_hash ? `${report.workflow.registry_hash.slice(0, 16)}…` : undefined} />
+            </MetadataGroup>
           </div>
         </aside>
       </main>
 
-      {/* ══════════════════════════════════════════════════════════════════════
-          3. BOTTOM TELEMETRY TRAY
-      ══════════════════════════════════════════════════════════════════════ */}
-      <footer
-        style={{
-          background: "rgba(10, 10, 30, 0.7)",
-          backdropFilter: "blur(20px)",
-          WebkitBackdropFilter: "blur(20px)",
-        }}
-        className="h-12 border-t border-white/10 flex items-center justify-between px-4 z-40 shrink-0 text-xs"
-      >
-        <div className="flex items-center gap-3 text-neutral-400 font-light">
-          {showSkeleton ? (
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping shadow-[0_0_6px_#fbbf24]" />
-              <span className="text-amber-300 font-medium">Processing Pipeline...</span>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-400" />
-              <span className="text-neutral-200 font-medium">Pipeline Complete</span>
-            </div>
-          )}
-
-          <span className="text-white/20 hidden sm:inline">•</span>
-
-          <div className="hidden sm:flex items-center gap-1 font-mono text-[11px]">
-            <span>Center:</span>
-            {showSkeleton ? (
-              <span className="inline-block w-24 h-3.5 rounded bg-white/10 animate-pulse" />
-            ) : (
-              <span className="text-neutral-200">41°21'N 02°09'E</span>
-            )}
-          </div>
-
-          <span className="text-white/20 hidden md:inline">•</span>
-
-          <div className="hidden md:flex items-center gap-1 font-mono text-[11px]">
-            <span>Projection:</span>
-            {showSkeleton ? (
-              <span className="inline-block w-28 h-3.5 rounded bg-white/10 animate-pulse" />
-            ) : (
-              <span className="text-neutral-200">UTM 31N (WGS84)</span>
-            )}
-          </div>
-
-          <span className="text-white/20 hidden lg:inline">•</span>
-
-          <div className="hidden lg:flex items-center gap-1 font-mono text-[11px]">
-            <span>Latency:</span>
-            {showSkeleton ? (
-              <span className="inline-block w-14 h-3.5 rounded bg-white/10 animate-pulse" />
-            ) : (
-              <span className="text-emerald-400 font-semibold">842ms</span>
-            )}
-          </div>
+      <footer className="relative z-30 flex h-12 shrink-0 items-center justify-between border-t border-white/10 bg-[#080c20]/80 px-4 text-xs backdrop-blur-xl">
+        <div className="flex min-w-0 items-center gap-3 text-neutral-400">
+          <span className={cn("h-2 w-2 shrink-0 rounded-full", isProcessing ? "animate-pulse bg-cyan-400" : status === "SUCCEEDED" ? "bg-emerald-400" : "bg-amber-400")} />
+          <span className="truncate">Updated {formatDate(job?.updated_at || analysis?.updated_at)}</span>
+          {report?.verification && <span className="hidden sm:inline">Verification: {report.verification.passed ? "passed" : "not passed"}</span>}
         </div>
-
-        {/* Modal Triggers */}
-        <div className="flex items-center gap-2">
-          {showSkeleton ? (
-            <>
-              <div className="w-20 h-7 rounded-full bg-white/10 animate-pulse" />
-              <div className="w-24 h-7 rounded-full bg-white/10 animate-pulse" />
-            </>
-          ) : (
-            <>
-              <button
-                type="button"
-                onClick={() => setShowLogModal(true)}
-                className="px-3 py-1 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 text-neutral-300 hover:text-white text-xs transition-colors flex items-center gap-1.5 cursor-pointer"
-              >
-                <History className="w-3.5 h-3.5" />
-                <span>Run Log</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setShowHistogramsModal(true)}
-                className="px-3 py-1 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 text-neutral-300 hover:text-white text-xs transition-colors flex items-center gap-1.5 cursor-pointer"
-              >
-                <BarChart3 className="w-3.5 h-3.5" />
-                <span>Histograms</span>
-              </button>
-            </>
-          )}
-        </div>
+        <button type="button" onClick={() => setShowTrace(true)} className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-neutral-300 hover:bg-white/10">
+          <History className="h-3.5 w-3.5" />
+          Run log ({trace.length})
+        </button>
       </footer>
 
-      {/* ══════════════════════════════════════════════════════════════════════
-          4. MODALS (Styled with matching frosted glass)
-      ══════════════════════════════════════════════════════════════════════ */}
-
-      {/* Change Report Modal */}
-      {showReportModal && (
-        <div className="fixed inset-0 z-100 bg-black/75 backdrop-blur-md flex items-center justify-center p-4">
-          <div
-            style={glassPanelStyle}
-            className="relative w-full max-w-2xl border border-white/15 rounded-3xl p-6 overflow-hidden flex flex-col max-h-[85vh] shadow-2xl"
-          >
-            <div className="flex items-center justify-between pb-4 border-b border-white/10">
-              <div className="flex items-center gap-2">
-                <FileText className="w-5 h-5 text-sky-400" />
-                <h3 className="text-base font-semibold text-white">
-                  SatQuery Change Detection Verification Report {analysisId ? `• ${analysisId}` : ""}
-                </h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowReportModal(false)}
-                className="p-1 rounded-full text-neutral-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
+      {showReport && report && (
+        <Modal title="Analysis report" onClose={() => setShowReport(false)}>
+          <div className="space-y-4 text-xs text-neutral-300">
+            <div className="rounded-xl border border-white/10 bg-white/[0.035] p-4">
+              <p className="font-mono text-[10px] text-neutral-500">{report.analysis_id}</p>
+              <p className="mt-2 text-sm leading-relaxed text-white">{report.answer?.answer || "No verified answer was produced."}</p>
             </div>
-
-            <div className="flex-1 overflow-y-auto py-4 space-y-4 text-xs leading-relaxed text-neutral-300 font-light custom-scrollbar">
-              <div className="p-3.5 rounded-2xl bg-white/[0.03] border border-white/10 text-neutral-200">
-                <strong className="text-white font-medium">Executive Assessment:</strong> Significant port expansion confirmed across Zone B-4. High confidence multi-sensor consensus between Optical NIR loss and SAR Sigma-0 backscatter surge.
-              </div>
-
-              <div className="space-y-2">
-                <h4 className="font-medium text-white text-sm">Quantitative Derived Metrics</h4>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 font-mono text-[11px]">
-                  <div className="p-3 rounded-xl bg-white/5 border border-white/10">
-                    <div className="text-neutral-400 text-[10px] font-sans">Net Reclaimed Land</div>
-                    <div className="text-white text-sm font-semibold mt-1">+34,800 m²</div>
-                  </div>
-                  <div className="p-3 rounded-xl bg-white/5 border border-white/10">
-                    <div className="text-neutral-400 text-[10px] font-sans">Radar Backscatter Shift</div>
-                    <div className="text-sky-300 text-sm font-semibold mt-1">+4.2 dB Sigma-0</div>
-                  </div>
-                  <div className="p-3 rounded-xl bg-white/5 border border-white/10">
-                    <div className="text-neutral-400 text-[10px] font-sans">Statistical Certainty</div>
-                    <div className="text-emerald-400 text-sm font-semibold mt-1">p &lt; 0.001</div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <h4 className="font-medium text-white text-sm">Sensor Provenance &amp; Calibration</h4>
-                <p className="text-neutral-400">
-                  - T0 Optical: Sentinel-2B MSI (Level-2A BOA), EPSG:32631, 10m GSD, clear cloud condition.<br />
-                  - T1 Radar: Sentinel-1 IW C-band GRD (Terrain Corrected Range Doppler), VV/VH dual polarization.
-                </p>
-              </div>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <ReportStat label="Outcome" value={report.answer?.outcome || report.status} />
+              <ReportStat label="Verification" value={report.verification?.passed ? "PASSED" : "NOT PASSED"} />
+              <ReportStat label="Evidence records" value={report.evidence.length} />
+              <ReportStat label="Artifacts" value={report.artifacts.length} />
             </div>
-
-            <div className="pt-4 border-t border-white/10 flex justify-end gap-2.5">
-              <button
-                type="button"
-                onClick={() => setShowReportModal(false)}
-                className="px-4 py-2 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 text-neutral-300 text-xs font-medium cursor-pointer"
-              >
-                Close
+            {report.artifacts.map((artifact) => (
+              <div key={artifact.artifact_id} className="rounded-xl border border-white/10 p-3">
+                <div className="flex justify-between gap-3"><span>{artifact.media_type}</span><span>{formatBytes(artifact.size_bytes)}</span></div>
+                <p className="mt-1 truncate font-mono text-[9px] text-neutral-500">{artifact.artifact_id} • {artifact.sha256}</p>
+              </div>
+            ))}
+            <div className="flex flex-wrap justify-end gap-2 border-t border-white/10 pt-4">
+              <button type="button" onClick={() => window.open(apiUrl(`/api/v1/reports/${analysisId}/html`), "_blank", "noopener,noreferrer")} className="flex items-center gap-1.5 rounded-full border border-white/10 px-4 py-2 hover:bg-white/10">
+                <ExternalLink className="h-3.5 w-3.5" /> HTML report
               </button>
-              <button
-                type="button"
-                onClick={() => {
-                  alert("Report JSON and GeoTIFF mask exported to download folder.");
-                  setShowReportModal(false);
-                }}
-                className="px-4 py-2 rounded-full bg-white text-black hover:bg-neutral-200 font-medium text-xs flex items-center gap-1.5 shadow-lg shadow-white/10 cursor-pointer"
-              >
-                <Download className="w-3.5 h-3.5 stroke-[2.2]" />
-                <span>Download PDF &amp; GeoJSON</span>
+              <button type="button" onClick={downloadReport} className="flex items-center gap-1.5 rounded-full bg-white px-4 py-2 font-medium text-black hover:bg-neutral-200">
+                <Download className="h-3.5 w-3.5" /> Download JSON
               </button>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
 
-      {/* Run Log Modal */}
-      {showLogModal && (
-        <div className="fixed inset-0 z-100 bg-black/75 backdrop-blur-md flex items-center justify-center p-4">
-          <div
-            style={glassPanelStyle}
-            className="relative w-full max-w-xl border border-white/15 rounded-3xl p-6 flex flex-col max-h-[80vh] shadow-2xl"
-          >
-            <div className="flex items-center justify-between pb-3 border-b border-white/10">
-              <div className="flex items-center gap-2">
-                <History className="w-4 h-4 text-sky-400" />
-                <h3 className="text-sm font-semibold text-white">Pipeline Execution Telemetry</h3>
+      {showTrace && (
+        <Modal title="Persisted execution trace" onClose={() => setShowTrace(false)}>
+          <div className="space-y-2 font-mono text-[11px]">
+            {trace.map((event) => (
+              <div key={`${event.job_id}-${event.sequence}`} className="grid grid-cols-[3rem_1fr_auto] gap-3 rounded-xl border border-white/10 bg-white/[0.025] p-3">
+                <span className="text-neutral-500">#{event.sequence}</span>
+                <span className="text-cyan-200">{event.event_type}</span>
+                <span className="text-neutral-500">{formatDate(event.created_at)}</span>
               </div>
-              <button
-                type="button"
-                onClick={() => setShowLogModal(false)}
-                className="p-1 rounded-full text-neutral-400 hover:text-white cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="flex-1 overflow-y-auto py-3 space-y-2 font-mono text-[11px] text-neutral-300 custom-scrollbar">
-              <div className="text-neutral-500">[00:00:01] Ingesting GeoTIFF payload: {uploadedFileName}</div>
-              <div className="text-neutral-500">[00:00:12] GDAL inspect: 4 spectral bands detected, CRS EPSG:32631</div>
-              <div className="text-neutral-500">[00:00:24] Sentinel-2 Level-2A TOA reflectance normalizer initialized</div>
-              <div className="text-neutral-500">[00:00:45] Sentinel-1 SAR C-band Sigma-0 radiometry aligned</div>
-              <div className="text-neutral-300">[00:01:10] Co-registration affine warp: Residual RMSE = 0.18 pixels</div>
-              <div className="text-sky-300">[00:01:52] Change detector: +4.2 dB backscatter delta identified</div>
-              <div className="text-emerald-400">[00:02:18] Execution clean: Deterministic land area derived: 34,800 m²</div>
-            </div>
-
-            <div className="pt-3 border-t border-white/10 flex justify-end">
-              <button
-                type="button"
-                onClick={() => setShowLogModal(false)}
-                className="px-4 py-1.5 rounded-full bg-white/10 hover:bg-white/15 text-white text-xs cursor-pointer"
-              >
-                Close
-              </button>
-            </div>
+            ))}
+            {!trace.length && <p className="text-neutral-500">No execution events have been persisted yet.</p>}
           </div>
-        </div>
+        </Modal>
       )}
+    </div>
+  );
+}
 
-      {/* Histograms Modal */}
-      {showHistogramsModal && (
-        <div className="fixed inset-0 z-100 bg-black/75 backdrop-blur-md flex items-center justify-center p-4">
-          <div
-            style={glassPanelStyle}
-            className="relative w-full max-w-xl border border-white/15 rounded-3xl p-6 flex flex-col shadow-2xl"
-          >
-            <div className="flex items-center justify-between pb-3 border-b border-white/10">
-              <div className="flex items-center gap-2">
-                <BarChart3 className="w-4 h-4 text-sky-400" />
-                <h3 className="text-sm font-semibold text-white">Radiometric Histogram Distributions</h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowHistogramsModal(false)}
-                className="p-1 rounded-full text-neutral-400 hover:text-white cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
+function MetadataGroup({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="rounded-2xl border border-white/10 bg-white/[0.025] p-3">
+      <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-neutral-400">{title}</p>
+      <div className="space-y-2">{children}</div>
+    </section>
+  );
+}
 
-            <div className="py-4 space-y-4">
-              <div>
-                <div className="flex justify-between text-xs mb-1 font-mono text-neutral-400">
-                  <span>SAR Backscatter Sigma-0 (dB)</span>
-                  <span className="text-sky-300">Shift +4.2 dB</span>
-                </div>
-                <div className="h-24 bg-white/[0.03] border border-white/10 rounded-2xl p-2 flex items-end">
-                  <svg className="w-full h-full" viewBox="0 0 300 80">
-                    <path
-                      d="M 10,75 Q 80,70 120,40 T 180,10 T 230,45 T 290,75"
-                      fill="rgba(56, 189, 248, 0.15)"
-                      stroke="#38bdf8"
-                      strokeWidth="2"
-                    />
-                  </svg>
-                </div>
-              </div>
+function MetadataRow({ label, value }: { label: string; value: unknown }) {
+  const shown = value === null || value === undefined || value === "" ? "Not reported" : String(value);
+  return <div className="flex justify-between gap-3"><span className="text-neutral-500">{label}</span><span className="min-w-0 truncate text-right font-mono text-[10px] text-neutral-200" title={shown}>{shown}</span></div>;
+}
 
-              <div>
-                <div className="flex justify-between text-xs mb-1 font-mono text-neutral-400">
-                  <span>Optical NDVI Water vs Land Distribution</span>
-                  <span className="text-emerald-400">Bimodal Split: 0.12</span>
-                </div>
-                <div className="h-24 bg-white/[0.03] border border-white/10 rounded-2xl p-2 flex items-end">
-                  <svg className="w-full h-full" viewBox="0 0 300 80">
-                    <path
-                      d="M 10,75 Q 60,15 100,70 T 190,20 T 290,75"
-                      fill="rgba(52, 211, 153, 0.15)"
-                      stroke="#34d399"
-                      strokeWidth="2"
-                    />
-                  </svg>
-                </div>
-              </div>
-            </div>
+function ReportStat({ label, value }: { label: string; value: unknown }) {
+  return <div className="rounded-xl border border-white/10 bg-white/[0.025] p-3"><p className="text-[10px] uppercase tracking-wider text-neutral-500">{label}</p><p className="mt-1 font-mono text-sm text-white">{String(value)}</p></div>;
+}
 
-            <div className="pt-3 border-t border-white/10 flex justify-end">
-              <button
-                type="button"
-                onClick={() => setShowHistogramsModal(false)}
-                className="px-4 py-1.5 rounded-full bg-white/10 hover:bg-white/15 text-white text-xs cursor-pointer"
-              >
-                Close
-              </button>
-            </div>
-          </div>
+function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-md" role="dialog" aria-modal="true" aria-label={title}>
+      <div style={glassPanelStyle} className="flex max-h-[85vh] w-full max-w-3xl flex-col overflow-hidden rounded-3xl border border-white/15">
+        <div className="flex items-center justify-between border-b border-white/10 p-5">
+          <h2 className="font-semibold text-white">{title}</h2>
+          <button type="button" onClick={onClose} className="rounded-full p-1 text-neutral-400 hover:bg-white/10 hover:text-white" aria-label="Close">
+            <X className="h-5 w-5" />
+          </button>
         </div>
-      )}
-
-      {/* Add Layer Modal */}
-      {showAddLayerModal && (
-        <div className="fixed inset-0 z-100 bg-black/75 backdrop-blur-md flex items-center justify-center p-4">
-          <div
-            style={glassPanelStyle}
-            className="relative w-full max-w-md border border-white/15 rounded-3xl p-6 flex flex-col shadow-2xl"
-          >
-            <div className="flex items-center justify-between pb-3 border-b border-white/10">
-              <div className="flex items-center gap-2">
-                <Plus className="w-4 h-4 text-sky-400" />
-                <h3 className="text-sm font-semibold text-white">Add Co-registered Layer</h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowAddLayerModal(false)}
-                className="p-1 rounded-full text-neutral-400 hover:text-white cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="py-4 space-y-3 text-xs">
-              <label className="block p-3 rounded-2xl border border-white/10 bg-white/5 hover:bg-white/10 cursor-pointer transition-all">
-                <input type="radio" name="layerChoice" defaultChecked className="mr-2.5 text-white" />
-                <span className="text-white font-medium">Landsat-9 OLI-2 (30m Optical Multispectral)</span>
-              </label>
-              <label className="block p-3 rounded-2xl border border-white/10 bg-white/5 hover:bg-white/10 cursor-pointer transition-all">
-                <input type="radio" name="layerChoice" className="mr-2.5 text-white" />
-                <span className="text-white font-medium">PlanetScope High-Res (3m Orthotile)</span>
-              </label>
-              <label className="block p-3 rounded-2xl border border-white/10 bg-white/5 hover:bg-white/10 cursor-pointer transition-all">
-                <input type="radio" name="layerChoice" className="mr-2.5 text-white" />
-                <span className="text-white font-medium">EMODnet Bathymetry Depth Contours</span>
-              </label>
-            </div>
-
-            <div className="pt-3 border-t border-white/10 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setShowAddLayerModal(false)}
-                className="px-4 py-1.5 rounded-full border border-white/10 bg-white/5 text-neutral-300 text-xs cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  alert("Raster layer loaded into workspace.");
-                  setShowAddLayerModal(false);
-                }}
-                className="px-4 py-1.5 rounded-full bg-white text-black hover:bg-neutral-200 font-medium text-xs cursor-pointer"
-              >
-                Load Layer
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+        <div className="custom-scrollbar overflow-y-auto p-5">{children}</div>
+      </div>
     </div>
   );
 }

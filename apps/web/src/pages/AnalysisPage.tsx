@@ -1,36 +1,42 @@
 import React from "react";
-import { useParams, useLocation, useNavigate } from "react-router-dom";
+import { Navigate, useParams, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import GeoAnalysisDashboard from "@/components/dashboard/GeoAnalysisDashboard";
+import type { ObservationResponse, QuerySubmissionResponse } from "@/lib/satquery-api";
 
 export default function AnalysisPage() {
   const { id } = useParams<{ id: string }>();
   const location = useLocation();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   const state = location.state as {
     query?: string;
     file?: {
       name: string;
-      size: string;
+      size: number;
     };
+    observation?: ObservationResponse;
   } | null;
 
-  const defaultFileName =
-    id === "sq-barcelona-01"
-      ? "barcelona_port_multisensor.tif"
-      : `${id?.replace(/^sq-/, "") || "raster"}_multisensor.tif`;
+  if (!id?.startsWith("ana_")) return <Navigate to="/" replace />;
+
+  const handleAnalysisCreated = (submission: QuerySubmissionResponse) => {
+    navigate(`/analysis/${submission.analysis_id}?job=${submission.job_id}`);
+  };
 
   return (
     <main className="h-screen w-full bg-[#050510] text-white overflow-hidden select-none">
       <GeoAnalysisDashboard
         analysisId={id}
-        uploadedFileName={state?.file?.name || defaultFileName}
-        uploadedFileSize={state?.file?.size || "48.2 MB"}
-        initialQuery={
-          state?.query ||
-          "Assess coastal port infrastructure changes between T0 and T1, and identify unpermitted shoreline backfill."
+        jobId={searchParams.get("job") || undefined}
+        uploadedFileName={state?.file?.name}
+        uploadedFileSize={
+          state?.file ? `${(state.file.size / (1024 * 1024)).toFixed(1)} MB` : undefined
         }
+        initialQuery={state?.query}
+        initialObservation={state?.observation}
         onBack={() => navigate("/")}
+        onAnalysisCreated={handleAnalysisCreated}
       />
     </main>
   );
