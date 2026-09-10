@@ -12,7 +12,7 @@ phase5_start:
   mode: RESTRICTED_CAPABILITY
   phase4_closeout_status: BLOCKED
   phase4_closeout_path: experiments/phase4_temporal_analytics/PHASE_4_CLOSEOUT.json
-  phase4_closeout_sha256: 84b890f56c990ad83497668e1393a3086248ae8af9babb1eab081e9770e582e3
+  phase4_closeout_sha256: 26f31fa2a6007b1a93cdfbe5498d40de3f545f7bac904b934682a0747830f200
   starting_git_sha: 5d2adc7a95fb3853788a905782a8e5f32b058031
   start_policy: >-
     Phase 5 may start once (1) a canonical Phase 4 closeout artifact exists,

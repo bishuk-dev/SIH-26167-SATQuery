@@ -7,7 +7,7 @@ Phase 5 backend artifacts (contracts, closeout) live in this directory.
 
 - **Mode:** `RESTRICTED_CAPABILITY`
 - **Phase 4 closeout:** `experiments/phase4_temporal_analytics/PHASE_4_CLOSEOUT.json`
-  (SHA-256 `84b890f56c990ad83497668e1393a3086248ae8af9babb1eab081e9770e582e3`,
+  (SHA-256 `26f31fa2a6007b1a93cdfbe5498d40de3f545f7bac904b934682a0747830f200`,
   status `BLOCKED`, closeout git SHA `660466161cb187208a63111698fd11a14f3412bc`)
 - **Starting git SHA:** `5d2adc7a95fb3853788a905782a8e5f32b058031`
 - **Human review:** the Phase 4 closeout (BLOCKED status, measured P4-E01 lanes
