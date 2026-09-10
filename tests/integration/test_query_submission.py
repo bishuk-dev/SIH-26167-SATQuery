@@ -261,7 +261,7 @@ def test_queue_submission_failure_marks_analysis_and_job_failed(
         application.state.job_runner.enqueue_existing = original_enqueue
         client.close()
 
-    assert response.status_code == 503
+    assert response.status_code == 429
     body = response.json()
     assert body["error"]["code"] == "RESOURCE_BUSY"
     assert body["error"]["details"]["job_id"] == captured["job_id"]
