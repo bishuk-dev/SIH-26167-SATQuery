@@ -50,7 +50,12 @@ def _runner(tmp_path: Path, adapter: object, *, queue_size: int = 4) -> tuple[Jo
         status=AnalysisStatus.PENDING,
         created_at=now,
         updated_at=now,
-        payload={},
+        # JobRunner completion follows the same persisted analysis contract as
+        # the API path: answer verification requires a serialized intent.
+        payload={
+            "query": "test fixture",
+            "intent": {"task_family": "CAPABILITY_QUERY", "matched_rule": "test-fixture"},
+        },
     ))
     engine = ExecutionEngine({"fake": adapter})
     return JobRunner(repo, engine, max_queued_jobs=queue_size), repo

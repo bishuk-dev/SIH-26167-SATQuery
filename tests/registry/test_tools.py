@@ -218,6 +218,34 @@ def test_runtime_capability_is_available_after_registered_ready_probe() -> None:
     assert capability.executor is ToolExecutor.SAR_TEMPORAL_CHANGE
 
 
+def test_phase4_runtime_capabilities_expose_only_registered_backend_tools() -> None:
+    capabilities = {
+        capability.capability_id: capability
+        for capability in build_runtime_capabilities(load_tool_registry())
+        if capability.source_phase == 4
+    }
+
+    for capability_id in (
+        "spectral_index_ndvi",
+        "spectral_index_ndwi",
+        "spectral_index_mndwi",
+        "temporal_difference",
+        "threshold_temporal_difference",
+        "common_grid_preparation",
+    ):
+        assert capabilities[capability_id].status is CapabilityState.NOT_IMPLEMENTED
+        assert capabilities[capability_id].tool_ids == ()
+
+    for capability_id in (
+        "mask_area_measurement",
+        "deterministic_sar_temporal_change",
+        "diagnostic_mask_agreement",
+    ):
+        assert capabilities[capability_id].status is CapabilityState.AVAILABLE
+        assert capabilities[capability_id].tool_ids
+        assert capabilities[capability_id].executor is not None
+
+
 def test_blocked_capability_cannot_become_available() -> None:
     registry = load_tool_registry()
     capability = build_runtime_capabilities(

@@ -86,7 +86,12 @@ def _load_inputs(request: Request, payload: QueryPlanRequest) -> tuple[tuple[Any
         record = repository.get_pair(payload.pair_id)
         if record is None:
             raise HTTPException(status_code=404)
-        pair = PairCompatibility.model_validate(record.payload["validation"])
+        # SQLite stores the API snapshot as JSON-compatible values. Validate
+        # through Pydantic's JSON mode so strict enums/tuples are reconstructed
+        # exactly as they are when loading any other persisted contract.
+        pair = PairCompatibility.model_validate_json(
+            json.dumps(record.payload["validation"])
+        )
         pair_ids = (record.observation_a_id, record.observation_b_id)
         if observation_ids and tuple(observation_ids) != pair_ids:
             raise HTTPException(status_code=422)

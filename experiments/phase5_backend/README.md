@@ -7,7 +7,7 @@ Phase 5 backend artifacts (contracts, closeout) live in this directory.
 
 - **Mode:** `RESTRICTED_CAPABILITY`
 - **Phase 4 closeout:** `experiments/phase4_temporal_analytics/PHASE_4_CLOSEOUT.json`
-  (SHA-256 `84b890f56c990ad83497668e1393a3086248ae8af9babb1eab081e9770e582e3`,
+  (SHA-256 `26f31fa2a6007b1a93cdfbe5498d40de3f545f7bac904b934682a0747830f200`,
   status `BLOCKED`, closeout git SHA `660466161cb187208a63111698fd11a14f3412bc`)
 - **Starting git SHA:** `5d2adc7a95fb3853788a905782a8e5f32b058031`
 - **Human review:** the Phase 4 closeout (BLOCKED status, measured P4-E01 lanes
@@ -20,9 +20,9 @@ Phase 5 backend artifacts (contracts, closeout) live in this directory.
 Phase 4 is truthfully `BLOCKED`, not `COMPLETE`. Independently verified
 capabilities are exposed; blocked capabilities stay unavailable:
 
-**Locally verified (exposed):**
-- deterministic multispectral formulas (NDVI/NDWI/MNDWI)
-- temporal pair/grid preparation and signed temporal differences
+**Locally verified:**
+- deterministic multispectral formulas (NDVI/NDWI/MNDWI), currently library-only
+- temporal pair/grid preparation and signed temporal differences, currently library-only
 - CRS-safe deterministic area measurement
 - deterministic SAR temporal change (explicit radiometric contracts)
 - diagnostic mask compatibility/agreement
@@ -42,11 +42,12 @@ the API surface is frozen in `api_contract.md`.
 
 ## Task 0 tool-registry audit finding
 
-`satquery/registry/tools.yaml` contains two declarative entries
-(`sar_temporal_change_v1`, `mask_agreement_v1`) that map to real, tested
-implementations, but there is **no strict ToolRegistry parser/schema yet**.
-Implementing the strict loader is a **Phase 5 Task 5 prerequisite**. The
-entries are retained.
+`satquery/registry/tools.yaml` contains three executable deterministic entries:
+`sar_temporal_change_v1`, `mask_agreement_v1`, and
+`compute_mask_area_v1`. They are validated by the strict `ToolRegistry`
+loader and bound to code-owned adapters. Phase 4 primitives without an
+executor/evidence adapter are reported as `NOT_IMPLEMENTED` by the backend,
+even when their underlying library functions are locally verified.
 
 ## Task 0 boundaries
 

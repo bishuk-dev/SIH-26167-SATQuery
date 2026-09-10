@@ -24,19 +24,35 @@ def test_liveness_does_not_require_application_dependencies(tmp_path: Path) -> N
     assert response.json() == {"status": "alive"}
 
 
-def test_readiness_reports_components_without_loading_checkpoints(tmp_path: Path) -> None:
+def test_readiness_allows_restricted_deterministic_runtime_without_model_checkpoints(
+    tmp_path: Path,
+) -> None:
     with TestClient(create_app(data_root=tmp_path / "data")) as client:
         response = client.get("/health/ready")
 
-    assert response.status_code == 503
+    assert response.status_code == 200
     body = response.json()
-    assert body["status"] == "not_ready"
+    assert body["status"] == "ready"
     assert {"sqlite", "filesystem", "registries", "queue", "models"} <= set(
         body["components"]
     )
     assert body["components"]["sqlite"]["status"] == "ready"
+    assert body["components"]["models"]["status"] == "unavailable"
     assert body["components"]["models"]["checkpoint_loading"] is False
     assert str(tmp_path) not in response.text
+
+
+def test_readiness_fails_when_a_required_core_component_is_unavailable(
+    tmp_path: Path,
+) -> None:
+    application = create_app(data_root=tmp_path / "data")
+    with TestClient(application) as client:
+        application.state.observation_repository = None
+        response = client.get("/health/ready")
+
+    assert response.status_code == 503
+    assert response.json()["status"] == "not_ready"
+    assert response.json()["components"]["sqlite"]["status"] == "unavailable"
 
 
 def test_status_and_limits_are_safe_and_typed(tmp_path: Path) -> None:
