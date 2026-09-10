@@ -29,7 +29,9 @@ coverage/
 .DS_Store
 Thumbs.db
 
-# Runtime data, databases, and logs
+# Runtime data, databases, worktrees, and logs
+.worktrees
+.worktrees/
 data/*
 !data/.gitkeep
 *.db

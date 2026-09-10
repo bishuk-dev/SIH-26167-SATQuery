@@ -3,10 +3,14 @@ tools:
   sar_temporal_change_v1:
     title: Deterministic SAR temporal change
     kind: deterministic_analytics
+    executor: sar_temporal_change
+    implementation: satquery.analytics.sar.sar_temporal_change
     description: >-
       Absolute-change score between two co-observed SAR arrays under an
       explicitly contracted radiometric domain and semantic polarizations.
-      Unknown radiometric semantics (amplitude, complex, raw DN) reject.
+      The execution adapter publishes the derived binary mask as an immutable
+      artifact with source observation hashes. Unknown radiometric semantics
+      (amplitude, complex, raw DN) reject.
     inputs:
       - name: t1
         kind: observation_array
@@ -22,9 +26,11 @@ tools:
         type: enum_list
         values: [VV, VH, HH, HV]
         min_items: 1
+        max_items: 4
       threshold:
         type: number
         minimum: 0
+        maximum: 1000000
     evidence:
       type: change_mask
       deterministic: true
@@ -33,9 +39,12 @@ tools:
   mask_agreement_v1:
     title: Diagnostic mask agreement (IoU)
     kind: deterministic_analytics
+    executor: mask_agreement
+    implementation: satquery.analytics.reconciliation.diagnostic_mask_agreement
     description: >-
-      Intersection/union/IoU between two binary masks over valid pixels.
-      Agreement is diagnostic only and maps to no decision policy.
+      Intersection/union/IoU between two immutable binary-mask evidence
+      artifacts over valid pixels. Agreement is diagnostic only and maps to no
+      decision policy.
     inputs:
       - name: first
         kind: mask
@@ -48,3 +57,22 @@ tools:
       type: agreement
       deterministic: true
       interpretation: agreement_not_accuracy
+
+  compute_mask_area_v1:
+    title: Deterministic mask area measurement
+    kind: deterministic_measurement
+    executor: mask_area
+    implementation: satquery.analytics.measurement.measure_mask_area
+    description: >-
+      Measures positive pixels from immutable binary-mask evidence using
+      CRS-safe projected or geographic area calculation.
+    inputs:
+      - name: mask
+        kind: mask
+    parameters:
+      unit:
+        type: enum
+        values: [m2, ha, km2]
+    evidence:
+      type: measurement
+      deterministic: true

@@ -1,0 +1,58 @@
+"""Bounded execution primitives and durable local job runner."""
+
+from satquery.execution.models import (
+    ArtifactMetadata,
+    ArtifactOutput,
+    ArtifactRecord,
+    ExecutionContext,
+    ExecutionEventType,
+    ExecutionPlan,
+    PlanStep,
+    StagedArtifact,
+    ToolAdapter,
+    ToolCall,
+    ToolResult,
+)
+
+__all__ = [
+    "AnalysisCache",
+    "ArtifactMetadata",
+    "ArtifactOutput",
+    "ArtifactRecord",
+    "ExecutionContext",
+    "ExecutionEngine",
+    "ExecutionError",
+    "ExecutionEventType",
+    "ExecutionPlan",
+    "JobCancelledError",
+    "JobQueueFullError",
+    "JobRunner",
+    "ModelBusyError",
+    "PlanStep",
+    "StagedArtifact",
+    "ToolAdapter",
+    "ToolCall",
+    "ToolExecutionError",
+    "ToolResult",
+    "UnknownToolError",
+    "build_cache_key",
+]
+
+
+def __getattr__(name: str):
+    if name in {"ExecutionEngine", "ExecutionError", "JobCancelledError", "ToolExecutionError", "UnknownToolError"}:
+        from satquery.execution.engine import (
+            ExecutionEngine,
+            ExecutionError,
+            JobCancelledError,
+            ToolExecutionError,
+            UnknownToolError,
+        )
+        return locals()[name]
+    if name in {"AnalysisCache", "CacheKeyError", "build_cache_key"}:
+        from satquery.execution.cache import AnalysisCache, CacheKeyError, build_cache_key
+        return locals()[name]
+    if name in {"JobQueueFullError", "JobRunner", "ModelBusyError"}:
+        from satquery.execution.jobs import JobQueueFullError, JobRunner, ModelBusyError
+        return locals()[name]
+    raise AttributeError(name)

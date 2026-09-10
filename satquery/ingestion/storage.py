@@ -207,6 +207,34 @@ class FilesystemObservationStore:
                 "Visualization asset was not found"
             ) from None
 
+    def list_registrations(self) -> tuple[ObservationRegistration, ...]:
+        """List every valid stored registration in deterministic ID order.
+
+        Directory names outside the server-generated observation ID pattern are
+        ignored because they are not registrations. A matching directory is
+        expected to be a complete registration; malformed metadata or missing
+        derived assets raises instead of silently disappearing from the index.
+        """
+
+        try:
+            self._ensure_roots()
+            directories = sorted(
+                (
+                    path
+                    for path in self.observations_root.iterdir()
+                    if path.is_dir() and OBSERVATION_ID_PATTERN.fullmatch(path.name)
+                ),
+                key=lambda path: path.name,
+            )
+        except OSError as exc:
+            raise AssetStorageError("Could not enumerate observation storage") from exc
+
+        registrations: list[ObservationRegistration] = []
+        for directory in directories:
+            registration, _visualization_path = self.load_registration(directory.name)
+            registrations.append(registration)
+        return tuple(registrations)
+
     def load_registration(
         self, observation_id: str
     ) -> tuple[ObservationRegistration, Path]:

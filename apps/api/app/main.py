@@ -2,10 +2,15 @@
 
 from __future__ import annotations
 
+import logging
 import os
+import time
+from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, PlainTextResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -25,10 +30,25 @@ from apps.api.app.routes.grounding import (
     router as grounding_router,
 )
 from apps.api.app.routes.tiles import router as tiles_router
-from apps.api.app.routes.v1_system import router as v1_system_router
+from apps.api.app.routes.v1_observations import (
+    index_existing_observations,
+    router as v1_observations_router,
+)
+from apps.api.app.routes.v1_pairs import router as v1_pairs_router
+from apps.api.app.routes.v1_registry import router as v1_registry_router
+from apps.api.app.routes.v1_jobs import router as v1_jobs_router
+from apps.api.app.routes.v1_artifacts import router as v1_artifacts_router
+from apps.api.app.routes.v1_query import router as v1_query_router
+from apps.api.app.routes.v1_analyses import router as v1_analyses_router
+from apps.api.app.routes.v1_reports import router as v1_reports_router
+from apps.api.app.routes.v1_system import (
+    public_router as public_system_router,
+    router as v1_system_router,
+)
 from apps.api.app.routes.vqa import invalid_vqa_request_response
 from apps.api.app.routes.vqa import router as vqa_router
 from apps.api.app.schemas_v1 import FailureOutcomeV1
+from apps.api.app.security import SecuritySettings, auth_dependencies, security_middleware
 from apps.api.app.services.observations import ObservationIngestionService
 from satquery.inference.config import GroundingRuntimeSettings, VqaRuntimeSettings
 from satquery.inference.grounding import GroundingBackend, TextGuidedGroundingService
@@ -38,9 +58,20 @@ from satquery.ingestion import (
     RasterInspector,
     RasterSafetyLimits,
 )
+from satquery.artifacts import ArtifactStore
+from satquery.execution import ExecutionEngine, JobRunner
+from satquery.execution.adapters import build_registered_adapters
+from satquery.persistence import Database, MetadataRepository
+from satquery.reporting import ReportBuilder
+from satquery.registry import (
+    load_model_registry,
+    load_runtime_capabilities,
+    load_tool_registry,
+)
 from satquery.visualization.config import VisualizationSettings
 from satquery.visualization.derivatives import VisualizationDerivativeGenerator
 from satquery.visualization.tiles import RasterTileService
+from satquery.observability import configure_json_logging
 
 
 def create_app(
@@ -52,12 +83,36 @@ def create_app(
     vqa_backend: VqaBackend | None = None,
     grounding_settings: GroundingRuntimeSettings | None = None,
     grounding_backend: GroundingBackend | None = None,
+    security_settings: SecuritySettings | None = None,
 ) -> FastAPI:
+    configure_json_logging()
     safety_limits = limits or RasterSafetyLimits.from_env()
     display_settings = visualization_settings or VisualizationSettings.from_env()
+    api_security = security_settings or SecuritySettings.from_env()
     storage_root = Path(data_root or os.environ.get("DATA_ROOT", "./data"))
     store = FilesystemObservationStore(storage_root)
+    database = Database(store.data_root / "satquery.db")
+    database.migrate()
+    repository = MetadataRepository(database)
+    index_existing_observations(store, repository)
+    tool_registry = load_tool_registry()
+    model_registry = load_model_registry()
+    runtime_capabilities = load_runtime_capabilities(
+        tool_registry, model_registry=model_registry
+    )
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        app.state.observation_repository.mark_running_jobs_interrupted(
+            updated_at=datetime.now(timezone.utc)
+        )
+        app.state.job_runner.start()
+        try:
+            yield
+        finally:
+            app.state.job_runner.stop(timeout_seconds=5.0)
+
     application = FastAPI(
+        lifespan=lifespan,
         title=openapi_metadata.API_TITLE,
         summary=openapi_metadata.API_SUMMARY,
         description=openapi_metadata.API_DESCRIPTION,
@@ -66,6 +121,31 @@ def create_app(
         docs_url=openapi_metadata.DOCS_URL,
         redoc_url=openapi_metadata.REDOC_URL,
         openapi_url=openapi_metadata.OPENAPI_URL,
+        swagger_ui_parameters=openapi_metadata.SWAGGER_UI_PARAMETERS,
+    )
+    application.state.security_settings = api_security
+    application.state.observation_repository = repository
+    application.state.observation_store = store
+    application.state.tool_registry = tool_registry
+    application.state.model_registry = model_registry
+    application.state.runtime_capabilities = runtime_capabilities
+    application.state.safety_limits = safety_limits
+    application.state.visualization_settings = display_settings
+    artifact_store = ArtifactStore(store.data_root)
+    execution_engine = ExecutionEngine(
+        build_registered_adapters(tool_registry, artifact_store=artifact_store),
+        artifact_store=artifact_store,
+        tool_registry=tool_registry,
+        timeout_seconds=float(os.environ.get("SATQUERY_TOOL_TIMEOUT_SECONDS", "300")),
+    )
+    application.state.artifact_store = artifact_store
+    application.state.report_builder = ReportBuilder(repository, artifact_store=artifact_store)
+    application.state.execution_engine = execution_engine
+    application.state.job_runner = JobRunner(
+        repository,
+        execution_engine,
+        max_queued_jobs=api_security.max_queue_size,
+        worker_count=int(os.environ.get("SATQUERY_JOB_WORKERS", "1")),
     )
     application.state.observation_ingestion_service = ObservationIngestionService(
         inspector=RasterInspector(safety_limits),
@@ -83,12 +163,42 @@ def create_app(
         settings=grounding_settings,
         backend=grounding_backend,
     )
+    application.state.model_roots = tuple(
+        {
+            application.state.single_image_vqa_service.settings.model_root,
+            application.state.text_guided_grounding_service.settings.model_root,
+        }
+    )
     application.include_router(router)
     application.include_router(tiles_router)
     application.include_router(vqa_router)
     application.include_router(grounding_router)
-    application.include_router(v1_system_router)
+    v1_dependencies = auth_dependencies(api_security)
+    # API-key authentication is scoped to the versioned API. Health probes
+    # and the deprecated legacy limits alias remain usable by infrastructure
+    # without credentials.
+    application.include_router(public_system_router)
+    application.include_router(v1_system_router, dependencies=v1_dependencies)
+    application.include_router(v1_observations_router, dependencies=v1_dependencies)
+    application.include_router(v1_pairs_router, dependencies=v1_dependencies)
+    application.include_router(v1_registry_router, dependencies=v1_dependencies)
+    application.include_router(v1_jobs_router, dependencies=v1_dependencies)
+    application.include_router(v1_artifacts_router, dependencies=v1_dependencies)
+    application.include_router(v1_query_router, dependencies=v1_dependencies)
+    application.include_router(v1_analyses_router, dependencies=v1_dependencies)
+    application.include_router(v1_reports_router, dependencies=v1_dependencies)
 
+    if api_security.cors_origins:
+        application.add_middleware(
+            CORSMiddleware,
+            allow_origins=list(api_security.cors_origins),
+            allow_credentials=api_security.cors_allow_credentials,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
+    application.middleware("http")(
+        lambda request, call_next: security_middleware(request, call_next, api_security)
+    )
     add_request_id_middleware(application)
     install_v1_error_handlers(application)
 
@@ -107,9 +217,29 @@ def add_request_id_middleware(application: FastAPI) -> None:
     async def request_id_middleware(request: Request, call_next):  # type: ignore[no-untyped-def]
         request_id = new_request_id()
         request.state.request_id = request_id
-        response = await call_next(request)
-        response.headers["X-Request-ID"] = request_id
-        return response
+        started = time.monotonic()
+        response = None
+        try:
+            response = await call_next(request)
+            response.headers["X-Request-ID"] = request_id
+            return response
+        finally:
+            # Path parameters are restricted to the two durable correlation IDs;
+            # request paths and payloads never enter the log record.
+            extra: dict[str, object] = {
+                "request_id": request_id,
+                "event": "request_completed",
+                "duration_ms": round((time.monotonic() - started) * 1000, 2),
+            }
+            if response is not None:
+                extra["status_code"] = response.status_code
+            for field, prefix in (("job_id", "job_"), ("analysis_id", "ana_")):
+                value = request.path_params.get(field)
+                if isinstance(value, str) and value.startswith(prefix):
+                    extra[field] = value
+            logging.getLogger("satquery.api").info(
+                "request completed", extra=extra
+            )
 
 
 def install_v1_error_handlers(application: FastAPI) -> None:
@@ -149,10 +279,12 @@ def install_v1_error_handlers(application: FastAPI) -> None:
         if _is_v1(request):
             request_id = request_id_from(request)
             code = {
+                401: "UNAUTHORIZED",
                 404: "NOT_FOUND",
                 405: "METHOD_NOT_ALLOWED",
             }.get(error.status_code, f"HTTP_{error.status_code}")
             message = {
+                401: "Authentication is required for this API.",
                 404: "The requested API resource was not found.",
                 405: "The HTTP method is not allowed on this resource.",
             }.get(error.status_code, "The request could not be processed.")

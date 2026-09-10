@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import math
 import warnings
+from collections.abc import Mapping
+from pathlib import Path
 
 import numpy as np
 import rasterio
@@ -43,6 +45,79 @@ class RasterTileService:
                     rgba = self._render_web_mercator(dataset, asset, z, x, y)
                 else:
                     rgba = self._render_pixel_grid(dataset, asset, z, x, y)
+            return _encode_png(rgba)
+        except InvalidTileRequestError:
+            raise
+        except (OSError, RasterioError, ValueError) as exc:
+            raise TileRenderingError("Could not render the requested tile") from exc
+
+    def render_binary_mask_tile(
+        self,
+        path: Path,
+        z: int,
+        x: int,
+        y: int,
+        *,
+        colormap: Mapping[int, tuple[int, int, int, int]],
+    ) -> bytes:
+        """Render a single-band uint8 mask artifact as an XYZ tile.
+
+        Georeferenced masks are reprojected into the Web Mercator tile;
+        masks without a CRS keep the existing pixel-grid scheme. Colors come
+        only from a code-resolved registered colormap: the HTTP layer never
+        accepts colormap expressions, and values outside the mapping stay
+        transparent instead of being silently recolored.
+        """
+
+        self._validate_coordinates(z, x, y)
+        try:
+            with rasterio.open(path, "r", sharing=False) as dataset:
+                if dataset.count != 1 or dataset.dtypes[0] != "uint8":
+                    raise TileRenderingError(
+                        "Mask tile source must be a single-band uint8 raster"
+                    )
+                size = self.settings.tile_size
+                if dataset.crs is not None:
+                    bounds = _xyz_bounds(z, x, y)
+                    transform = Affine(
+                        (bounds[2] - bounds[0]) / size,
+                        0,
+                        bounds[0],
+                        0,
+                        -(bounds[3] - bounds[1]) / size,
+                        bounds[3],
+                    )
+                    band = np.zeros((size, size), dtype="uint8")
+                    reproject(
+                        source=rasterio.band(dataset, 1),
+                        destination=band,
+                        src_transform=dataset.transform,
+                        src_crs=dataset.crs,
+                        dst_transform=transform,
+                        dst_crs="EPSG:3857",
+                        dst_nodata=0,
+                        resampling=Resampling.nearest,
+                        num_threads=1,
+                    )
+                else:
+                    side = 1 << z
+                    window = Window(
+                        col_off=x * dataset.width / side,
+                        row_off=y * dataset.height / side,
+                        width=dataset.width / side,
+                        height=dataset.height / side,
+                    )
+                    band = dataset.read(
+                        1,
+                        window=window,
+                        out_shape=(size, size),
+                        resampling=Resampling.nearest,
+                    )
+            rgba = np.zeros((4, size, size), dtype="uint8")
+            for value, color in colormap.items():
+                matched = band == int(value)
+                for channel in range(4):
+                    rgba[channel][matched] = int(color[channel])
             return _encode_png(rgba)
         except InvalidTileRequestError:
             raise

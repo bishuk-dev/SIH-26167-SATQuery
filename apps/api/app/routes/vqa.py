@@ -16,7 +16,7 @@ from satquery.inference.exceptions import (
 from satquery.inference.vqa import SingleImageVqaService
 from satquery.ingestion.exceptions import ObservationNotFoundError
 
-router = APIRouter(prefix="/api/vqa", tags=["vqa"])
+router = APIRouter(prefix="/api/vqa", tags=["Legacy"])
 
 
 class VqaRequest(ApiModel):
@@ -28,6 +28,11 @@ class VqaRequest(ApiModel):
     "",
     response_model=VqaEvidence,
     response_model_exclude_none=True,
+    operation_id="single_image_vqa_legacy",
+    summary="Answer a visual question (legacy).",
+    description="Deprecated compatibility route; use the canonical versioned query API.",
+    tags=["Legacy"],
+    deprecated=True,
     responses={
         404: {"model": ErrorResponse},
         422: {"model": ErrorResponse},
