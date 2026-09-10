@@ -78,5 +78,11 @@ def test_capability_api_keeps_blocked_specialists_unavailable(tmp_path) -> None:
         assert by_id["learned_flood_segmentation"]["status"] == (
             "UNAVAILABLE_CONTRACT_BLOCKED"
         )
+        assert by_id["spectral_index_ndvi"]["status"] == "NOT_IMPLEMENTED"
+        assert by_id["temporal_difference"]["status"] == "NOT_IMPLEMENTED"
+        assert by_id["common_grid_preparation"]["status"] == "NOT_IMPLEMENTED"
+        assert by_id["deterministic_sar_temporal_change"]["status"] == "AVAILABLE"
+        assert by_id["mask_area_measurement"]["status"] == "AVAILABLE"
+        assert by_id["diagnostic_mask_agreement"]["status"] == "AVAILABLE"
         assert "implementation" not in by_id["learned_structural_change"]
         assert "path" not in by_id["learned_structural_change"]

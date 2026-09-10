@@ -181,18 +181,25 @@ def _check_models(application: Any) -> dict[str, Any]:
 def readiness_components(application: Any) -> dict[str, dict[str, Any]]:
     """Return safe component states; this function never invokes inference."""
 
-    return {
+    components = {
         "sqlite": _check_sqlite(application),
         "filesystem": _check_filesystem(application),
         "registries": _check_registries(application),
         "queue": _check_queue(application),
         "models": _check_models(application),
     }
+    # Phase 5 runs in RESTRICTED_CAPABILITY mode while optional learned-model
+    # checkpoints are absent. Deterministic registered tools remain runnable,
+    # so missing optional checkpoints are reported but do not make the API
+    # unrouteable by an orchestrator.
+    components["models"]["required"] = False
+    return components
 
 
 def readiness_payload(application: Any) -> dict[str, Any]:
     components = readiness_components(application)
-    ready = all(item["status"] == "ready" for item in components.values())
+    required = ("sqlite", "filesystem", "registries", "queue")
+    ready = all(components[name]["status"] == "ready" for name in required)
     return {"status": "ready" if ready else "not_ready", "components": components}
 
 

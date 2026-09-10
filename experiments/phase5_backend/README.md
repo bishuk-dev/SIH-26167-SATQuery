@@ -20,9 +20,9 @@ Phase 5 backend artifacts (contracts, closeout) live in this directory.
 Phase 4 is truthfully `BLOCKED`, not `COMPLETE`. Independently verified
 capabilities are exposed; blocked capabilities stay unavailable:
 
-**Locally verified (exposed):**
-- deterministic multispectral formulas (NDVI/NDWI/MNDWI)
-- temporal pair/grid preparation and signed temporal differences
+**Locally verified:**
+- deterministic multispectral formulas (NDVI/NDWI/MNDWI), currently library-only
+- temporal pair/grid preparation and signed temporal differences, currently library-only
 - CRS-safe deterministic area measurement
 - deterministic SAR temporal change (explicit radiometric contracts)
 - diagnostic mask compatibility/agreement
@@ -42,11 +42,12 @@ the API surface is frozen in `api_contract.md`.
 
 ## Task 0 tool-registry audit finding
 
-`satquery/registry/tools.yaml` contains two declarative entries
-(`sar_temporal_change_v1`, `mask_agreement_v1`) that map to real, tested
-implementations, but there is **no strict ToolRegistry parser/schema yet**.
-Implementing the strict loader is a **Phase 5 Task 5 prerequisite**. The
-entries are retained.
+`satquery/registry/tools.yaml` contains three executable deterministic entries:
+`sar_temporal_change_v1`, `mask_agreement_v1`, and
+`compute_mask_area_v1`. They are validated by the strict `ToolRegistry`
+loader and bound to code-owned adapters. Phase 4 primitives without an
+executor/evidence adapter are reported as `NOT_IMPLEMENTED` by the backend,
+even when their underlying library functions are locally verified.
 
 ## Task 0 boundaries
 

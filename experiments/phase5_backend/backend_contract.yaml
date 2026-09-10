@@ -175,55 +175,66 @@ capabilities:
 
   # ----- Phase 4 deterministic analytics (locally verified) -----
   spectral_index_ndvi:
-    status: AVAILABLE
+    status: NOT_IMPLEMENTED
     source_phase: 4
     tool_ids: []
     implementation: satquery.analytics.spectral.compute_index (NDVI)
     modality: multispectral with semantic RED/NIR band roles
     evidence_type: index_raster
     measurement_support: none
+    blocker: verified library primitive; no registered backend executor or evidence adapter
 
   spectral_index_ndwi:
-    status: AVAILABLE
+    status: NOT_IMPLEMENTED
     source_phase: 4
+    tool_ids: []
     implementation: satquery.analytics.spectral.compute_index (NDWI)
     modality: multispectral with semantic GREEN/NIR band roles
     evidence_type: index_raster
     measurement_support: none
+    blocker: verified library primitive; no registered backend executor or evidence adapter
 
   spectral_index_mndwi:
-    status: AVAILABLE
+    status: NOT_IMPLEMENTED
     source_phase: 4
+    tool_ids: []
     implementation: satquery.analytics.spectral.compute_index (MNDWI)
     modality: multispectral with semantic GREEN/SWIR1 band roles
     evidence_type: index_raster
     measurement_support: none
+    blocker: verified library primitive; no registered backend executor or evidence adapter
 
   temporal_difference:
-    status: AVAILABLE
+    status: NOT_IMPLEMENTED
     source_phase: 4
+    tool_ids: []
     implementation: satquery.analytics.temporal.temporal_difference
     evidence_type: difference_raster
     measurement_support: none
     limitations: [signed T2-T1 on a verified common grid only]
+    blocker: verified library primitive; no registered backend executor or difference-raster evidence adapter
 
   threshold_temporal_difference:
-    status: AVAILABLE
+    status: NOT_IMPLEMENTED
     source_phase: 4
+    tool_ids: []
     implementation: satquery.analytics.temporal.threshold_temporal_difference
     evidence_type: change_mask
     measurement_support: via mask-area measurement only
     limitations: >
       explicitly parameterized diagnostic operator; NOT a generic semantic
       change detector and never benchmarked against OSCD labels
+    blocker: verified library primitive; no registered bounded backend workflow
 
   common_grid_preparation:
-    status: AVAILABLE
+    status: NOT_IMPLEMENTED
     source_phase: 4
+    tool_ids: []
     implementation: satquery.analytics.temporal.prepare_common_grid
     evidence_type: aligned_pair_provenance
     measurement_support: none
     limitations: [destination grid is exactly one declared observation grid; source assets stay byte-identical]
+    blocker: automatic backend reprojection is explicitly deferred; aligned pairs remain required
 
   mask_area_measurement:
     status: AVAILABLE

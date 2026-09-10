@@ -1,10 +1,41 @@
 # API application
 
+The deployable Phase 5 runtime is the versioned `/api/v1` API. Interactive
+Swagger is available at `http://127.0.0.1:8000/docs`; it can upload imagery,
+create temporal pairs, submit analyses, inspect jobs/evidence/artifacts, and
+render JSON or HTML reports.
+
 This directory contains the FastAPI transport boundary. Run the current API from the repository root with:
 
 ```bash
 uvicorn apps.api.app.main:app --reload
 ```
+
+For a production-like local container:
+
+```bash
+docker build -t satquery-backend:phase5 .
+docker run --rm --name satquery-api -p 8000:8000 \
+  -v satquery-data:/data satquery-backend:phase5
+```
+
+The container runs as the non-root `satquery` user with one Uvicorn process.
+One process is deliberate because the durable in-process job queue owns its
+worker threads. Mount `/data` persistently. Optionally mount verified model
+checkpoints at `/models`; missing checkpoints remain visible as unavailable
+while deterministic registered tools stay ready.
+
+The default image intentionally installs only the deterministic API/GIS
+runtime. When verified model checkpoints are mounted and learned inference is
+required, build with
+`--build-arg SATQUERY_INSTALL_TARGET=.[inference]`.
+
+Set `SATQUERY_API_KEY` through the deployment secret manager to require the
+`X-API-Key` header. Configure exact comma-separated origins with
+`SATQUERY_CORS_ORIGINS`. `/health/live` checks the process; `/health/ready`
+checks required storage, SQLite, registries, and queue capacity without
+loading model checkpoints. Shutdown drains the local runner for up to five
+seconds and marks interrupted work safely on the next startup.
 
 `POST /api/observations` accepts a multipart GeoTIFF/TIFF file field named `file`. A successful response distinguishes the immutable original from its display-only COG and provides the tile scheme, extent, and URL template.
 

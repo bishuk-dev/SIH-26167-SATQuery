@@ -1840,7 +1840,8 @@ satquery/
 │
 ├── docs/
 │
-├── docker-compose.yml
+├── Dockerfile
+├── .dockerignore
 ├── .env.example
 ├── .gitignore
 └── README.md
@@ -1911,6 +1912,9 @@ source .venv/bin/activate
 pip install -e ".[dev]"
 ```
 
+Install `.[inference]` when running the registered VQA or grounding models;
+the deterministic backend does not require PyTorch or Transformers.
+
 Start the Phase 1B API:
 
 ```bash
@@ -1931,11 +1935,18 @@ The frontend package has not been scaffolded yet. It will be added with the imag
 
 ## Docker
 
-When Docker Compose configuration is available:
+Build and run the single Phase 5 backend runtime:
 
 ```bash
-docker compose up --build
+docker build -t satquery-backend:phase5 .
+docker run --rm --name satquery-api -p 8000:8000 \
+  -v satquery-data:/data satquery-backend:phase5
 ```
+
+Then open `http://127.0.0.1:8000/docs`. The Swagger interface is the current
+interactive product surface; the custom React/OpenLayers client is Phase 6.
+See [`apps/api/README.md`](apps/api/README.md) for storage, authentication,
+model-mount, readiness, and shutdown details.
 
 ---
 
@@ -1944,12 +1955,19 @@ docker compose up --build
 Example `.env.example`:
 
 ```env
-SATQUERY_ENV=development
-
 DATA_ROOT=./data
 MODEL_ROOT=./models
+PORT=8000
 
-DATABASE_URL=sqlite:///./data/satquery.db
+SATQUERY_API_KEY=
+SATQUERY_CORS_ORIGINS=
+SATQUERY_CORS_ALLOW_CREDENTIALS=false
+SATQUERY_MAX_QUERY_BYTES=1048576
+SATQUERY_MAX_ROI_VERTICES=10000
+SATQUERY_MAX_QUEUED_JOBS=32
+SATQUERY_MAX_RESULT_BYTES=10485760
+SATQUERY_JOB_WORKERS=1
+SATQUERY_TOOL_TIMEOUT_SECONDS=300
 
 MAX_UPLOAD_SIZE_MB=512
 MAX_RASTER_WIDTH=50000
