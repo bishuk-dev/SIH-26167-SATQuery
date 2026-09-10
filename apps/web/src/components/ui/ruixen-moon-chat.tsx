@@ -140,16 +140,16 @@ export default function RuixenMoonChat({ onStartAnalysis }: RuixenMoonChatProps)
       </a>
 
       {/* ══════════════════════════════════════════════
-          EARTH — full-width, rising from the bottom
+          EARTH — centered, with room for orbital paths
       ══════════════════════════════════════════════ */}
       <div
         className="absolute pointer-events-none"
         style={{
-          bottom: "-66vw",
+          top: "50%",
           left: "50%",
-          transform: "translateX(-50%)",
-          width: "140vw",
-          height: "100vw",
+          transform: "translate(-50%, -50%)",
+          width: "min(92vw, 92vh)",
+          height: "min(92vw, 92vh)",
           zIndex: 1,
         }}
       >
